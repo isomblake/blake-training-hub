@@ -492,35 +492,33 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone }) {
   const pct = Math.min(elapsed / seconds, 1);
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(6,6,11,0.97)", zIndex: 1000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
-      <div style={{ fontSize: 12, color: C.mut, marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>Rest Timer</div>
-      <div style={{ fontSize: 14, color: C.txt, fontWeight: 600, marginBottom: 16 }}>{exName}</div>
-      
-      <div style={{ fontSize: 88, fontWeight: 800, fontFamily: "monospace", color: isOver ? C.grn : C.txt, lineHeight: 1 }}>
-        {isOver ? "+" + fmtTimer(overBy) : fmtTimer(remaining)}
+    <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000, background: isOver ? C.grn + "18" : C.card, borderBottom: `2px solid ${isOver ? C.grn : C.pur}`, padding: "8px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 28, fontWeight: 800, fontFamily: "monospace", color: isOver ? C.grn : C.txt, lineHeight: 1, flexShrink: 0 }}>
+          {isOver ? "+" + fmtTimer(overBy) : fmtTimer(remaining)}
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 11, color: isOver ? C.grn : C.txt, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {isOver ? "GO — you're rested" : exName}
+          </div>
+          <div style={{ fontSize: 9, color: C.mut }}>
+            Set {setNum}/{totalSets} · {isOver ? "rest complete" : `${fmtTimer(elapsed)} / ${fmtRest(seconds)}`}
+          </div>
+        </div>
       </div>
-      <div style={{ fontSize: 12, color: isOver ? C.grn : C.mut, fontWeight: 600, marginBottom: 24 }}>
-        {isOver ? "GO — you're rested" : `${fmtTimer(elapsed)} / ${fmtRest(seconds)}`}
-      </div>
-
-      <div style={{ width: 180, height: 6, background: C.c2, borderRadius: 3, marginBottom: 32 }}>
-        <div style={{ width: `${pct * 100}%`, height: "100%", background: isOver ? C.grn : C.pur, borderRadius: 3, transition: "width 1s linear" }} />
-      </div>
-
-      <div style={{ fontSize: 11, color: C.mut, marginBottom: 20 }}>
-        Set {setNum} of {totalSets} complete
-        {setNum < totalSets && <span style={{ color: C.blu }}> — Set {setNum + 1} next</span>}
-        {setNum >= totalSets && <span style={{ color: C.grn }}> — Exercise done!</span>}
-      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+        {/* Progress ring */}
+        <svg width="32" height="32" style={{ transform: "rotate(-90deg)" }}>
+          <circle cx="16" cy="16" r="13" fill="none" stroke={C.bdr} strokeWidth="3" />
+          <circle cx="16" cy="16" r="13" fill="none" stroke={isOver ? C.grn : C.pur} strokeWidth="3"
+            strokeDasharray={`${pct * 81.7} 81.7`} strokeLinecap="round" />
+        </svg>
 
       <button onClick={() => { clearInterval(ref.current); onDone(); }}
-        style={{ padding: "16px 60px", borderRadius: 14, border: "none", background: isOver ? C.grn : C.pur, color: C.bg, fontSize: 16, fontWeight: 800, cursor: "pointer" }}>
-        {setNum < totalSets ? "Next Set →" : "Done ✓"}
+        style={{ padding: "5px 14px", borderRadius: 6, border: "none", background: isOver ? C.grn : C.pur, color: C.bg, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+        {isOver ? "Done ✓" : "Skip"}
       </button>
-      <button onClick={() => { clearInterval(ref.current); onDone(); }}
-        style={{ marginTop: 12, padding: "8px 20px", borderRadius: 8, border: `1px solid ${C.bdr}`, background: "transparent", color: C.mut, fontSize: 11, cursor: "pointer" }}>
-        Skip rest
-      </button>
+      </div>
     </div>
   );
 }
@@ -588,7 +586,9 @@ function ExerciseCard({ ex, week, sessionKey, allSets, setAllSets, onStartRest, 
     setAllSets(updated);
     onSave(updated, sessionKey);
     onSync(ex.name, setNum, data.reps, data.wt);
-    if (setNum < totalSets) {
+    // Always start rest timer (even on edits) — only skip if it's the very last set and all sets are done
+    const allSetsDone = Object.keys(updated[exKey] || {}).length >= totalSets && setNum >= totalSets;
+    if (!allSetsDone) {
       onStartRest(ex.rest, ex.name, setNum, totalSets);
     }
   };
@@ -769,7 +769,7 @@ export default function App() {
     setTimer({ seconds, exName, setNum, totalSets });
   }, []);
 
-  const W = { background: C.bg, minHeight: "100vh", color: C.txt, fontFamily: "'SF Pro Display',system-ui,sans-serif", padding: "12px 10px", maxWidth: 480, margin: "0 auto" };
+  const W = { background: C.bg, minHeight: "100vh", color: C.txt, fontFamily: "'SF Pro Display',system-ui,sans-serif", padding: "12px 10px", paddingTop: timer ? 64 : 12, maxWidth: 480, margin: "0 auto" };
 
   return (
     <div style={W}>
