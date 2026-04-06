@@ -1,86 +1,46 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
 // === SOUND SYSTEM ===
-// Uses a single pre-loaded Audio element that gets "unlocked" on first tap.
-// This is the most reliable approach for mobile browsers (iOS + Android).
-// The trick: create the Audio on user gesture, then reuse it.
+// Vibration-only by default. AudioContext on iOS/Safari takes over the
+// audio session and pauses Spotify — even just resuming it on a tap.
+// So we ONLY use AudioContext when we actually need to play a sound,
+// and we NEVER resume it on first tap. This keeps Spotify playing.
 
-let _audioEl = null;   // warning ding
-let _audioEl2 = null;  // done chime
-let _unlocked = false;
-
-// Base64-encoded tiny MP3 silence (needed to prime Audio on iOS)
-const SILENCE = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAABhgC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAAYYoRwMHAAAAAAD/+1DEAAAGAAGn9AAAIgAANP8AAABM//tQxBUAAADSAAAAAAAAANIAAAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tQxCgAAADSAAAAAAAAANIAAAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV";
-
-function unlockAudio() {
-  if (_unlocked) return;
-  _unlocked = true;
-  // Create and prime two audio elements on user gesture
-  _audioEl = new Audio(SILENCE);
-  _audioEl.volume = 1;
-  _audioEl.play().catch(() => {});
-
-  _audioEl2 = new Audio(SILENCE);
-  _audioEl2.volume = 1;
-  _audioEl2.play().catch(() => {});
-}
-
-// Attach to first user interaction
-if (typeof document !== 'undefined') {
-  const h = () => { unlockAudio(); document.removeEventListener('touchstart', h); document.removeEventListener('click', h); };
-  document.addEventListener('touchstart', h, { once: true });
-  document.addEventListener('click', h, { once: true });
-}
-
-// Generate a ding sound as a WAV data URL
-function makeDing(freq, dur, vol) {
-  const sr = 22050, n = Math.floor(sr * dur);
-  const buf = new ArrayBuffer(44 + n * 2);
-  const d = new DataView(buf);
-  const w = (o, s) => { for (let i = 0; i < s.length; i++) d.setUint8(o + i, s.charCodeAt(i)); };
-  w(0,'RIFF'); d.setUint32(4,36+n*2,true); w(8,'WAVE'); w(12,'fmt ');
-  d.setUint32(16,16,true); d.setUint16(20,1,true); d.setUint16(22,1,true);
-  d.setUint32(24,sr,true); d.setUint32(28,sr*2,true); d.setUint16(32,2,true);
-  d.setUint16(34,16,true); w(36,'data'); d.setUint32(40,n*2,true);
-  for (let i = 0; i < n; i++) {
-    const t = i/sr;
-    const env = Math.exp(-t * 6) * vol; // exponential decay
-    const s = Math.sin(2 * Math.PI * freq * t) * env;
-    d.setInt16(44+i*2, Math.max(-32768, Math.min(32767, s * 32767)), true);
+let _ctx = null;
+function getCtx() {
+  if (!_ctx) {
+    _ctx = new (window.AudioContext || window.webkitAudioContext)();
   }
-  return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+  return _ctx;
 }
 
-// Pre-generate sounds lazily
-let _warnUrl = null, _doneUrls = null;
-function ensureSounds() {
-  if (!_warnUrl) {
-    _warnUrl = makeDing(880, 0.4, 0.7);
-    _doneUrls = [makeDing(523, 0.5, 0.8), makeDing(659, 0.5, 0.8), makeDing(784, 0.6, 0.9)];
-  }
+function playTone(freq, dur, vol, startOffset = 0) {
+  try {
+    const ctx = getCtx();
+    // Only resume right when we need sound — not on first tap
+    if (ctx.state === 'suspended') ctx.resume();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(freq, ctx.currentTime + startOffset);
+    gain.gain.setValueAtTime(vol, ctx.currentTime + startOffset);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startOffset + dur);
+    osc.start(ctx.currentTime + startOffset);
+    osc.stop(ctx.currentTime + startOffset + dur);
+  } catch(e) {}
 }
 
 function playWarningSound() {
-  ensureSounds();
-  try {
-    if (_audioEl) { _audioEl.src = _warnUrl; _audioEl.volume = 0.8; _audioEl.play().catch(() => {}); }
-    else { const a = new Audio(_warnUrl); a.volume = 0.8; a.play().catch(() => {}); }
-  } catch(e) {}
-  if (navigator.vibrate) navigator.vibrate(200);
+  playTone(880, 0.3, 0.5);
+  if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
 }
 
 function playRestBeep() {
-  ensureSounds();
-  _doneUrls.forEach((url, i) => {
-    setTimeout(() => {
-      try {
-        // Alternate between the two pre-unlocked audio elements, fall back to new Audio
-        const el = i % 2 === 0 ? _audioEl : _audioEl2;
-        if (el) { el.src = url; el.volume = 0.9; el.play().catch(() => {}); }
-        else { const a = new Audio(url); a.volume = 0.9; a.play().catch(() => {}); }
-      } catch(e) {}
-    }, i * 220);
-  });
+  playTone(523, 0.4, 0.6, 0);
+  playTone(659, 0.4, 0.6, 0.2);
+  playTone(784, 0.5, 0.7, 0.4);
   if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 300]);
 }
 import { supabase } from "./supabaseClient";
@@ -558,10 +518,10 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone }) {
     return () => clearInterval(ref.current);
   }, []);
 
-  // 5-second warning ding
+  // 10-second warning ding
   useEffect(() => {
     const remaining = seconds - elapsed;
-    if (remaining === 5 && !warnedRef.current) {
+    if (remaining === 10 && !warnedRef.current) {
       warnedRef.current = true;
       playWarningSound();
     }

@@ -124,11 +124,30 @@ When Blake adjusts weight mid-workout, the app should:
 
 ---
 
-## CURRENT MESOCYCLE: RP Meso 1
+## DELOAD WEEK (April 6–12, 2026)
+
+RP deload following 8 weeks of Sculpted Strength before starting Meso 1.
+- Same exercises and split as Meso 1
+- **2 sets per exercise** (instead of 3)
+- **50% of Meso 1 Week 1 base weights**
+- RIR 4+ — should feel very easy, just moving blood
+- No cardio requirement (keep walks optional/easy)
+
+| Day | Routine | Deload Weights |
+|-----|---------|---------------|
+| Mon Apr 6 | Upper A | Bench 60, Incline 40, Chin-Ups BW, Row 70, Laterals 10, Face Pull 35, Curl 35, OH Tri 30 |
+| Tue Apr 7 | Lower A | Front Squat 55, SLDL 60, Goblet Squat 15, Calf Raise 60, Cable Crunch 25, Upright Row 20 |
+| Thu Apr 9 | Upper B | CG Bench 40, Cable Fly 10, Pulldown 90, LM Row 10, CB Lateral 5, RD Fly 5, Bayesian 10, Pushdown 35 |
+| Sat Apr 12 | Lower B | Hack Squat 50, Good Morning 40, Lunge 20, Calf Raise 60, Knee Raise BW, Upright Row 20 |
+
+---
+
+## CURRENT MESOCYCLE: RP Meso 1 (Starts April 13, 2026)
 
 ### Parameters
 - Split: Upper A (Mon) / Lower A (Tue) / Upper B (Thu) / Lower B (Sat)
 - Duration: 5 weeks accumulation + 1 week deload
+- Start: April 13, 2026 | End: May 24, 2026
 - RIR: W1:4 -> W2:3 -> W3:2 -> W4:2 -> W5:0-1 -> W6:4 (deload)
 - Deload: 50% weight, 50% sets
 
@@ -218,6 +237,8 @@ When Blake adjusts weight mid-workout, the app should:
 - **Natural Strength**: 1 session (Jan 17, 2026) - intro/orientation
 - **Starting Strength**: 9 sessions (Jan 19 - Feb 7) - 3x/week full body
 - **Sculpted Strength**: 32 sessions (Feb 9 - Apr 4) - 4x/week split, 8 weeks
+- **RP Deload**: Apr 6-12 - 2 sets, 50% weight, same Meso 1 exercises
+- **RP Meso 1**: Starts Apr 13 - 5 weeks accumulation + 1 deload
 
 ### Database Stats
 - 42 sessions total
