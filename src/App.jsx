@@ -1,52 +1,62 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
 // === SOUND SYSTEM ===
-// Uses an HTML Audio element loaded from a CDN sound file.
-// On "Enable Sound" tap, we load + play the audio element at volume 0
-// to unlock it for iOS. Then we reuse that same element for all sounds.
-// This is the most battle-tested approach for mobile web audio.
+// iPhone: AudioContext is the ONLY way to play sounds without killing Spotify.
+// HTML Audio elements take over the iOS audio session and stop other apps.
+// AudioContext oscillators mix with Spotify because they use the "ambient" category.
+//
+// Flow: user taps "Enable Sound" -> we resume AudioContext (requires gesture) ->
+// then oscillator-based sounds play alongside Spotify for the rest of the session.
 
-let _audio = null;
+let _ctx = null;
 let _soundEnabled = false;
 
-// Free notification sounds from CDN
-const SOUND_WARNING = "https://cdn.freesound.org/previews/536/536108_11943040-lq.mp3";
-const SOUND_DONE = "https://cdn.freesound.org/previews/341/341695_5858296-lq.mp3";
-
 function enableSound() {
-  // Create and unlock audio element on user gesture
-  _audio = new Audio();
-  _audio.volume = 0.01;
-  _audio.src = SOUND_WARNING;
-  const p = _audio.play();
-  if (p) p.then(() => { _audio.pause(); _audio.currentTime = 0; _audio.volume = 0.8; }).catch(() => {});
+  try {
+    _ctx = new (window.AudioContext || window.webkitAudioContext)();
+    // Resume must happen in a direct user gesture handler
+    _ctx.resume().then(() => {
+      _soundEnabled = true;
+      // Play a confirmation tone so user knows it worked
+      _playOsc(660, 0.15, 0.3);
+      setTimeout(() => _playOsc(880, 0.15, 0.3), 160);
+    });
+  } catch(e) {}
   _soundEnabled = true;
-  // Pre-fetch both sounds
-  fetch(SOUND_WARNING).catch(() => {});
-  fetch(SOUND_DONE).catch(() => {});
   return true;
 }
 
+function _playOsc(freq, dur, vol) {
+  if (!_ctx) return;
+  try {
+    const t = _ctx.currentTime;
+    const osc = _ctx.createOscillator();
+    const gain = _ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(vol, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    osc.connect(gain);
+    gain.connect(_ctx.destination);
+    osc.start(t);
+    osc.stop(t + dur + 0.05);
+  } catch(e) {}
+}
+
 function playWarningSound() {
-  if (_soundEnabled && _audio) {
-    try {
-      _audio.src = SOUND_WARNING;
-      _audio.volume = 0.7;
-      _audio.currentTime = 0;
-      _audio.play().catch(() => {});
-    } catch(e) {}
+  if (_soundEnabled && _ctx) {
+    // Single high ding
+    _playOsc(880, 0.25, 0.5);
   }
   if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
 }
 
 function playRestBeep() {
-  if (_soundEnabled && _audio) {
-    try {
-      _audio.src = SOUND_DONE;
-      _audio.volume = 0.9;
-      _audio.currentTime = 0;
-      _audio.play().catch(() => {});
-    } catch(e) {}
+  if (_soundEnabled && _ctx) {
+    // Ascending three-note chime: C5, E5, G5
+    _playOsc(523, 0.3, 0.6);
+    setTimeout(() => _playOsc(659, 0.3, 0.6), 200);
+    setTimeout(() => _playOsc(784, 0.35, 0.7), 400);
   }
   if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 300]);
 }
