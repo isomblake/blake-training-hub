@@ -1067,6 +1067,7 @@ export default function App() {
   const [dbConnected, setDbConnected] = useState(false);
   const [view, setView] = useState("workout"); // "workout" or "history"
   const [sessionStartTime] = useState(Date.now());
+  const [showFinishReview, setShowFinishReview] = useState(false);
   const [mesoIdx, setMesoIdx] = useState(() => getActiveMeso(new Date().toISOString().slice(0, 10)));
   const activeMeso = MESOCYCLES[mesoIdx];
   const activeWeeks = activeMeso.weeks;
@@ -1304,23 +1305,89 @@ export default function App() {
         ))}
 
         {/* Finish Session + Export */}
-        <div style={{ marginTop: 16, display: "flex", gap: 6 }}>
-          <button onClick={async () => {
-              if (!currentSession) return;
-              const mins = Math.round((Date.now() - sessionStartTime) / 60000);
-              await db.finishSession(currentSession.id, mins);
-              setSyncStatus("session saved ✓");
-              setTimeout(() => setSyncStatus(""), 3000);
-            }}
-            style={{ flex: 1, padding: "14px", borderRadius: 10, border: `1px solid ${C.grn}44`, background: C.grn + "11", color: C.grn, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-            ✓ Finish Session
-          </button>
-          <button onClick={() => setShowExport(!showExport)}
-            style={{ flex: 1, padding: "14px", borderRadius: 10, border: `1px solid ${C.blu}44`, background: C.blu + "11", color: C.blu, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-            {showExport ? "Hide" : "📋 Export"}
-          </button>
-        </div>
-        {showExport && (
+        {!showFinishReview ? (
+          <div style={{ marginTop: 16, display: "flex", gap: 6 }}>
+            <button onClick={() => setShowFinishReview(true)}
+              style={{ flex: 1, padding: "14px", borderRadius: 10, border: `1px solid ${C.grn}44`, background: C.grn + "11", color: C.grn, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+              ✓ Finish Session
+            </button>
+            <button onClick={() => setShowExport(!showExport)}
+              style={{ flex: 1, padding: "14px", borderRadius: 10, border: `1px solid ${C.blu}44`, background: C.blu + "11", color: C.blu, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+              {showExport ? "Hide" : "📋 Export"}
+            </button>
+          </div>
+        ) : (
+          <div style={{ marginTop: 16, background: C.card, borderRadius: 12, border: `1px solid ${C.grn}33`, padding: 14 }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: C.grn, marginBottom: 10 }}>Session Review</div>
+            <div style={{ fontSize: 11, color: C.mut, marginBottom: 8 }}>
+              {rKey} · {activeWeeks[week].rir} · {Math.round((Date.now() - sessionStartTime) / 60000)} min
+            </div>
+
+            {/* Review each exercise */}
+            {r.sections.map((sec, si) => (
+              <div key={si}>
+                {sec.exercises.map((ex, ei) => {
+                  const exKey = `${sessionKey}|${ex.name}`;
+                  const logged = allSets[exKey] || {};
+                  const setCount = Object.keys(logged).length;
+                  if (setCount === 0) return null;
+                  return (
+                    <div key={ei} style={{ marginBottom: 8 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: C.txt }}>{ex.name}</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 3 }}>
+                        {Object.entries(logged).sort(([a],[b]) => a - b).map(([setNum, data]) => (
+                          <div key={setNum} style={{ background: C.c2, borderRadius: 6, padding: "4px 8px", fontSize: 12, fontFamily: "monospace" }}>
+                            <span style={{ color: C.mut, fontSize: 9 }}>S{setNum} </span>
+                            <span style={{ color: C.blu }}>{data.reps}</span>
+                            <span style={{ color: C.mut }}>×</span>
+                            <span style={{ color: C.gld }}>{data.wt === 0 ? "BW" : data.wt}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+
+            {/* Summary */}
+            {(() => {
+              let totalSetsR = 0, totalVol = 0;
+              Object.values(allSets).forEach(ex => {
+                Object.values(ex).forEach(s => { totalSetsR++; totalVol += (s.reps || 0) * (s.wt || 0); });
+              });
+              return (
+                <div style={{ marginTop: 8, padding: "6px 8px", background: C.c2, borderRadius: 6, fontSize: 10, color: C.mut, display: "flex", justifyContent: "space-between" }}>
+                  <span>Total: <span style={{ color: C.grn, fontWeight: 600 }}>{totalSetsR} sets</span></span>
+                  {totalVol > 0 && <span>Volume: <span style={{ color: C.gld, fontWeight: 600 }}>{totalVol.toLocaleString()} lb</span></span>}
+                </div>
+              );
+            })()}
+
+            <div style={{ fontSize: 10, color: C.org, marginTop: 10, marginBottom: 10 }}>
+              Tap any exercise above to go back and edit. When ready, confirm below.
+            </div>
+
+            <div style={{ display: "flex", gap: 6 }}>
+              <button onClick={() => setShowFinishReview(false)}
+                style={{ flex: 1, padding: "12px", borderRadius: 8, border: `1px solid ${C.bdr}`, background: "transparent", color: C.mut, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                ← Back to Edit
+              </button>
+              <button onClick={async () => {
+                  if (!currentSession) return;
+                  const mins = Math.round((Date.now() - sessionStartTime) / 60000);
+                  await db.finishSession(currentSession.id, mins);
+                  setSyncStatus("session saved ✓");
+                  setShowFinishReview(false);
+                  setTimeout(() => setSyncStatus(""), 3000);
+                }}
+                style={{ flex: 1, padding: "12px", borderRadius: 8, border: "none", background: C.grn, color: C.bg, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
+                ✓ Confirm & Save
+              </button>
+            </div>
+          </div>
+        )}
+        {showExport && !showFinishReview && (
           <div style={{ marginTop: 8 }}>
             <pre style={{ background: C.c2, padding: 10, borderRadius: 8, fontSize: 10, color: C.txt, overflow: "auto", whiteSpace: "pre-wrap" }}>
               {exportData()}
