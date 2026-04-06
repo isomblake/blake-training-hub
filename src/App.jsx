@@ -470,8 +470,10 @@ function SetRow({ setNum, targetReps, targetWt, onLog, onDelete, logged }) {
 
 function RestTimer({ seconds, exName, setNum, totalSets, onDone }) {
   const [elapsed, setElapsed] = useState(0);
+  const [expanded, setExpanded] = useState(false);
   const ref = useRef(null);
   const alertedRef = useRef(false);
+  const touchStartY = useRef(null);
 
   useEffect(() => {
     ref.current = setInterval(() => setElapsed(e => e + 1), 1000);
@@ -492,10 +494,73 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone }) {
   const isOver = elapsed >= seconds;
   const overBy = elapsed - seconds;
   const pct = Math.min(elapsed / seconds, 1);
+  const accent = isOver ? C.grn : C.pur;
 
+  // Swipe/drag handling
+  const onTouchStart = (e) => { touchStartY.current = e.touches[0].clientY; };
+  const onTouchEnd = (e) => {
+    if (touchStartY.current === null) return;
+    const diff = e.changedTouches[0].clientY - touchStartY.current;
+    if (diff > 50) setExpanded(true);   // swipe down = expand
+    if (diff < -50) setExpanded(false);  // swipe up = collapse
+    touchStartY.current = null;
+  };
+
+  if (expanded) {
+    // FULL SCREEN MODE
+    return (
+      <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
+        style={{ position: "fixed", inset: 0, background: C.bg, zIndex: 1000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
+        {/* Swipe hint */}
+        <div onClick={() => setExpanded(false)}
+          style={{ position: "absolute", top: 12, width: 40, height: 4, borderRadius: 2, background: C.mut + "44", cursor: "pointer" }} />
+
+        <div style={{ fontSize: 12, color: C.mut, marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>Rest Timer</div>
+        <div style={{ fontSize: 16, color: C.txt, fontWeight: 600, marginBottom: 20 }}>{exName}</div>
+
+        {/* Big progress ring */}
+        <div style={{ position: "relative", marginBottom: 20 }}>
+          <svg width="200" height="200" style={{ transform: "rotate(-90deg)" }}>
+            <circle cx="100" cy="100" r="88" fill="none" stroke={C.bdr} strokeWidth="6" />
+            <circle cx="100" cy="100" r="88" fill="none" stroke={accent} strokeWidth="6"
+              strokeDasharray={`${pct * 553} 553`} strokeLinecap="round" />
+          </svg>
+          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ fontSize: 64, fontWeight: 800, fontFamily: "monospace", color: isOver ? C.grn : C.txt, lineHeight: 1 }}>
+              {isOver ? "+" + fmtTimer(overBy) : fmtTimer(remaining)}
+            </div>
+            <div style={{ fontSize: 12, color: isOver ? C.grn : C.mut, fontWeight: 600, marginTop: 4 }}>
+              {isOver ? "GO — you're rested" : `${fmtTimer(elapsed)} / ${fmtRest(seconds)}`}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ fontSize: 12, color: C.mut, marginBottom: 24 }}>
+          Set {setNum} of {totalSets} complete
+          {setNum < totalSets && <span style={{ color: C.blu }}> — Set {setNum + 1} next</span>}
+          {setNum >= totalSets && <span style={{ color: C.grn }}> — Exercise done!</span>}
+        </div>
+
+        <button onClick={() => { clearInterval(ref.current); onDone(); }}
+          style={{ padding: "16px 60px", borderRadius: 14, border: "none", background: accent, color: C.bg, fontSize: 16, fontWeight: 800, cursor: "pointer" }}>
+          {setNum < totalSets ? "Next Set →" : "Done ✓"}
+        </button>
+        <button onClick={() => setExpanded(false)}
+          style={{ marginTop: 12, padding: "8px 20px", borderRadius: 8, border: `1px solid ${C.bdr}`, background: "transparent", color: C.mut, fontSize: 11, cursor: "pointer" }}>
+          Minimize
+        </button>
+      </div>
+    );
+  }
+
+  // COMPACT BAR MODE
   return (
-    <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000, background: isOver ? C.grn + "18" : C.card, borderBottom: `2px solid ${isOver ? C.grn : C.pur}`, padding: "8px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0 }}>
+    <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
+      style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000, background: isOver ? C.grn + "18" : C.card, borderBottom: `2px solid ${accent}`, padding: "8px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)" }}>
+      {/* Swipe hint */}
+      <div style={{ position: "absolute", bottom: -8, left: "50%", transform: "translateX(-50%)", width: 30, height: 3, borderRadius: 2, background: C.mut + "44" }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, minWidth: 0, cursor: "pointer" }}
+        onClick={() => setExpanded(true)}>
         <div style={{ fontSize: 28, fontWeight: 800, fontFamily: "monospace", color: isOver ? C.grn : C.txt, lineHeight: 1, flexShrink: 0 }}>
           {isOver ? "+" + fmtTimer(overBy) : fmtTimer(remaining)}
         </div>
@@ -509,17 +574,15 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone }) {
         </div>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-        {/* Progress ring */}
         <svg width="32" height="32" style={{ transform: "rotate(-90deg)" }}>
           <circle cx="16" cy="16" r="13" fill="none" stroke={C.bdr} strokeWidth="3" />
-          <circle cx="16" cy="16" r="13" fill="none" stroke={isOver ? C.grn : C.pur} strokeWidth="3"
+          <circle cx="16" cy="16" r="13" fill="none" stroke={accent} strokeWidth="3"
             strokeDasharray={`${pct * 81.7} 81.7`} strokeLinecap="round" />
         </svg>
-
-      <button onClick={() => { clearInterval(ref.current); onDone(); }}
-        style={{ padding: "5px 14px", borderRadius: 6, border: "none", background: isOver ? C.grn : C.pur, color: C.bg, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
-        {isOver ? "Done ✓" : "Skip"}
-      </button>
+        <button onClick={() => { clearInterval(ref.current); onDone(); }}
+          style={{ padding: "5px 14px", borderRadius: 6, border: "none", background: accent, color: C.bg, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+          {isOver ? "Done ✓" : "Skip"}
+        </button>
       </div>
     </div>
   );
