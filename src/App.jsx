@@ -290,14 +290,27 @@ const C = {
   gld: "#ffd166", blu: "#4ea8ff", pur: "#a78bfa", org: "#ff8c42", teal: "#00f2ea"
 };
 
+// Weight progression per week by equipment type:
+// Smith (bar-loaded, 2.5 per side = 5 lb min jump): +0, +5, +5, +10, +10
+// Cable compound (stack, 2.5 lb pin): +0, +2.5, +5, +7.5, +10
+// Cable isolation (stack, slower): +0, +0, +2.5, +2.5, +5
 const WEEKS = [
-  { rir: "4 RIR", note: "Technique focus · moderate effort", wtAdd: 0, deload: false },
-  { rir: "3 RIR", note: "+2.5 lb compounds · add sets if easy", wtAdd: 2.5, deload: false },
-  { rir: "2 RIR", note: "Getting harder · hold reps stable", wtAdd: 5, deload: false },
-  { rir: "2 RIR", note: "Sustained effort · stay consistent", wtAdd: 7.5, deload: false },
-  { rir: "0-1 RIR", note: "PEAK · push near failure · max volume", wtAdd: 10, deload: false },
-  { rir: "4 RIR", note: "DELOAD · 50% weight · 50% sets · recover", wtAdd: 0, deload: true },
+  { rir: "4 RIR", note: "Technique focus · moderate effort", smith: 0, cable: 0, iso: 0, deload: false },
+  { rir: "3 RIR", note: "Effort up · weight up where possible", smith: 5, cable: 2.5, iso: 0, deload: false },
+  { rir: "2 RIR", note: "Getting harder · hold reps stable", smith: 5, cable: 5, iso: 2.5, deload: false },
+  { rir: "2 RIR", note: "Sustained effort · stay consistent", smith: 10, cable: 7.5, iso: 2.5, deload: false },
+  { rir: "0-1 RIR", note: "PEAK · push near failure · max volume", smith: 10, cable: 10, iso: 5, deload: false },
+  { rir: "4 RIR", note: "DELOAD · 50% weight · 50% sets · recover", smith: 0, cable: 0, iso: 0, deload: true },
 ];
+
+// Determine exercise category from name for weight progression
+function getExCategory(name, rest) {
+  const isSmith = name.toLowerCase().startsWith("smith");
+  const isCompound = rest >= 120;
+  if (isSmith) return "smith";
+  if (isCompound) return "cable"; // cable or landmine compound
+  return "iso"; // cable/landmine isolation
+}
 
 const ROUTINES = {
   "Upper A": {
@@ -644,12 +657,13 @@ function ExerciseCard({ ex, week, sessionKey, allSets, setAllSets, onStartRest, 
   const allDone = numDone >= totalSets;
 
   const wkData = WEEKS[week];
-  const isCompound = ex.rest >= 120;
-  const weeklyAdd = isCompound ? wkData.wtAdd : Math.floor(wkData.wtAdd / 2.5) * 2.5 * 0.5;
+  const exCat = getExCategory(ex.name, ex.rest);
+  const weeklyAdd = wkData[exCat]; // smith, cable, or iso
+  const minStep = exCat === "smith" ? 5 : 2.5; // rounding step
   const baseTarget = ex.wt
     ? wkData.deload
-      ? Math.round(ex.wt * 0.5 / 5) * 5
-      : Math.round((ex.wt + weeklyAdd) / 2.5) * 2.5
+      ? Math.round(ex.wt * 0.5 / minStep) * minStep
+      : Math.round((ex.wt + weeklyAdd) / minStep) * minStep
     : null;
 
   // Set Progression Algorithm: check last session's data and auto-adjust target
@@ -666,7 +680,7 @@ function ExerciseCard({ ex, week, sessionKey, allSets, setAllSets, onStartRest, 
       const maxReps = repRange[1] || repRange[0];
       const avgWt = last.sets.reduce((a, s) => a + s.weight, 0) / last.sets.length;
       const avgReps = last.sets.reduce((a, s) => a + s.reps, 0) / last.sets.length;
-      const increment = isCompound ? 2.5 : 2.5;
+      const increment = minStep; // 5 for Smith, 2.5 for cable/iso
       const lastWk = last.weekNumber || 0;
 
       let adjusted = baseTarget;
@@ -677,15 +691,15 @@ function ExerciseCard({ ex, week, sessionKey, allSets, setAllSets, onStartRest, 
 
       if (avgReps >= maxReps && avgWt >= (baseTarget || 0)) {
         // Exceeded rep range at or above target — extra bump
-        adjusted = Math.round((avgWt + increment + increment) / 2.5) * 2.5;
+        adjusted = Math.round((avgWt + increment) / minStep) * minStep;
         note = `↑ Bumped — hit ${Math.round(avgReps)} reps @ ${avgWt} lb last session (exceeded range)`;
       } else if (avgReps < minReps) {
         // Couldn't hit min reps — hold weight, don't progress
-        adjusted = Math.round(avgWt / 2.5) * 2.5;
+        adjusted = Math.round(avgWt / minStep) * minStep;
         note = `⏸ Holding @ ${avgWt} lb — only ${Math.round(avgReps)} reps last session (below ${minReps} min)`;
       } else if (avgWt > (baseTarget || 0)) {
         // Went heavier than programmed — adjust up from actual
-        adjusted = Math.round((avgWt + increment) / 2.5) * 2.5;
+        adjusted = Math.round((avgWt + increment) / minStep) * minStep;
         note = `↑ Adjusted — you lifted ${avgWt} lb last session (above programmed ${baseTarget})`;
       } else {
         // Normal progression — reps in range, weight on target
