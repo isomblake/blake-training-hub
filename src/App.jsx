@@ -1,28 +1,47 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
 // === SOUND SYSTEM ===
-// Vibration-only by default. AudioContext on iOS/Safari takes over the
-// audio session and pauses Spotify — even just resuming it on a tap.
-// So we ONLY use AudioContext when we actually need to play a sound,
-// and we NEVER resume it on first tap. This keeps Spotify playing.
+// iOS requires AudioContext.resume() from a direct user gesture before
+// it will play any sound. But resuming it also pauses Spotify.
+// Solution: provide an explicit "Enable Sound" button that the user
+// taps ONCE per session. This is a deliberate gesture so iOS allows
+// sound AND the user knowingly accepts the Spotify interaction.
+// After that first tap, all timer sounds work without further gestures.
+// If they skip the button, they still get vibration alerts.
 
 let _ctx = null;
+let _soundEnabled = false;
+
 function getCtx() {
-  if (!_ctx) {
-    _ctx = new (window.AudioContext || window.webkitAudioContext)();
-  }
+  if (!_ctx) _ctx = new (window.AudioContext || window.webkitAudioContext)();
   return _ctx;
 }
 
-function playTone(freq, dur, vol, startOffset = 0) {
+// Called from the "Enable Sound" button — this is the user gesture iOS needs
+function enableSound() {
+  const ctx = getCtx();
+  if (ctx.state === 'suspended') ctx.resume();
+  // Play a quick test tone so user knows it worked
   try {
-    const ctx = getCtx();
-    // Only resume right when we need sound — not on first tap
-    if (ctx.state === 'suspended') ctx.resume();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'sine'; osc.frequency.value = 660;
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+    osc.start(); osc.stop(ctx.currentTime + 0.25);
+  } catch(e) {}
+  _soundEnabled = true;
+  return true;
+}
+
+function playTone(freq, dur, vol, startOffset = 0) {
+  if (!_soundEnabled) return; // skip if user hasn't enabled sound
+  try {
+    const ctx = getCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
     osc.type = 'sine';
     osc.frequency.setValueAtTime(freq, ctx.currentTime + startOffset);
     gain.gain.setValueAtTime(vol, ctx.currentTime + startOffset);
@@ -806,6 +825,7 @@ export default function App() {
   const [currentSession, setCurrentSession] = useState(null);
   const [syncStatus, setSyncStatus] = useState("");
   const [dbConnected, setDbConnected] = useState(false);
+  const [soundOn, setSoundOn] = useState(false);
 
   const r = ROUTINES[ROUTINE_KEYS[routine]];
   const rKey = ROUTINE_KEYS[routine];
@@ -927,6 +947,12 @@ export default function App() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ fontSize: 20, fontWeight: 800, color: C.blu, letterSpacing: -0.5 }}>TRAINING HUB</div>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <button onClick={() => { const ok = enableSound(); setSoundOn(ok); }}
+              style={{ padding: "3px 8px", borderRadius: 6, border: `1px solid ${soundOn ? C.grn + "44" : C.org + "44"}`,
+                background: soundOn ? C.grn + "15" : C.org + "15",
+                color: soundOn ? C.grn : C.org, fontSize: 9, fontWeight: 600, cursor: "pointer" }}>
+              {soundOn ? "🔊 Sound On" : "🔇 Tap for Sound"}
+            </button>
             {syncStatus && (
               <div style={{ fontSize: 8, color: syncStatus.includes("✓") || syncStatus === "ready" ? C.grn : syncStatus.includes("err") || syncStatus.includes("offline") ? C.red : C.mut }}>
                 {syncStatus}
