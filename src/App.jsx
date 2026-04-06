@@ -481,7 +481,7 @@ function SetRow({ setNum, targetReps, targetWt, isBW, onLog, onDelete, logged })
 
 function RestTimer({ seconds, exName, setNum, totalSets, onDone }) {
   const [elapsed, setElapsed] = useState(0);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const ref = useRef(null);
   const alertedRef = useRef(false);
   const touchStartY = useRef(null);
