@@ -213,25 +213,29 @@ const db = {
       .single();
     if (!ex) return null;
 
-    const { data } = await supabase
-      .from('sets')
-      .select('reps, weight, set_number, sessions(date, week_number, notes)')
-      .eq('exercise_id', ex.id)
-      .lt('sessions.date', beforeDate || '9999-12-31')
-      .order('created_at', { ascending: false })
-      .limit(20);
+    // Get recent sessions that have this exercise, before today
+    const { data: sessions } = await supabase
+      .from('sessions')
+      .select('id, date, week_number, notes')
+      .lt('date', beforeDate || '9999-12-31')
+      .order('date', { ascending: false })
+      .limit(10);
 
-    // Group by session, return most recent session's sets
-    const bySession = {};
-    (data || []).forEach(s => {
-      const d = s.sessions?.date;
-      if (!d || (beforeDate && d >= beforeDate)) return;
-      if (!bySession[d]) bySession[d] = [];
-      bySession[d].push(s);
-    });
-    const dates = Object.keys(bySession).sort().reverse();
-    if (dates.length === 0) return null;
-    return { date: dates[0], sets: bySession[dates[0]] };
+    if (!sessions || sessions.length === 0) return null;
+
+    // For each recent session, check if it has sets for this exercise
+    for (const session of sessions) {
+      const { data: sets } = await supabase
+        .from('sets')
+        .select('reps, weight, set_number')
+        .eq('session_id', session.id)
+        .eq('exercise_id', ex.id);
+
+      if (sets && sets.length > 0) {
+        return { date: session.date, weekNumber: session.week_number, sets };
+      }
+    }
+    return null;
   },
 
   // Get exercise progression (weight over time for a specific exercise)
@@ -381,9 +385,9 @@ const ROUTINE_KEYS = Object.keys(ROUTINES);
 const fmtRest = s => s >= 60 ? `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}` : `${s}s`;
 const fmtTimer = s => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`;
 
-function SetRow({ setNum, targetReps, targetWt, onLog, onDelete, logged }) {
+function SetRow({ setNum, targetReps, targetWt, isBW, onLog, onDelete, logged }) {
   const [reps, setReps] = useState(logged?.reps?.toString() || targetReps || "");
-  const [wt, setWt] = useState(logged?.wt?.toString() || (targetWt?.toString() || ""));
+  const [wt, setWt] = useState(logged?.wt?.toString() || (targetWt?.toString() || (isBW ? "0" : "")));
   const [editing, setEditing] = useState(false);
   const isDone = logged != null && !editing;
 
@@ -395,8 +399,9 @@ function SetRow({ setNum, targetReps, targetWt, onLog, onDelete, logged }) {
   }, [logged, editing]);
 
   const handleLog = () => {
-    if (reps && wt) {
-      onLog(setNum, { reps: parseInt(reps), wt: parseFloat(wt) });
+    const weight = isBW ? 0 : parseFloat(wt);
+    if (reps && (isBW || wt)) {
+      onLog(setNum, { reps: parseInt(reps), wt: weight });
       setEditing(false);
     }
   };
@@ -410,7 +415,7 @@ function SetRow({ setNum, targetReps, targetWt, onLog, onDelete, logged }) {
     e.stopPropagation();
     onDelete(setNum);
     setReps("");
-    setWt(targetWt?.toString() || "");
+    setWt(targetWt?.toString() || (isBW ? "0" : ""));
     setEditing(false);
   };
 
@@ -418,9 +423,9 @@ function SetRow({ setNum, targetReps, targetWt, onLog, onDelete, logged }) {
     e.stopPropagation();
     if (isDone) return;
     const r = reps || targetReps;
-    const w = wt || targetWt || "";
-    if (r && w) {
-      onLog(setNum, { reps: parseInt(r), wt: parseFloat(w) });
+    const w = isBW ? 0 : parseFloat(wt || targetWt || 0);
+    if (r && (isBW || w)) {
+      onLog(setNum, { reps: parseInt(r), wt: w });
       setEditing(false);
     }
   };
@@ -435,8 +440,8 @@ function SetRow({ setNum, targetReps, targetWt, onLog, onDelete, logged }) {
           <div style={{ fontSize: 14, fontFamily: "monospace", fontWeight: 700, color: C.txt, flex: 1 }}>
             <span style={{ color: C.blu }}>{logged.reps}</span>
             <span style={{ color: C.mut }}> × </span>
-            <span style={{ color: C.gld }}>{logged.wt}</span>
-            <span style={{ color: C.mut, fontSize: 9 }}> lb</span>
+            <span style={{ color: C.gld }}>{isBW ? "BW" : logged.wt}</span>
+            {!isBW && <span style={{ color: C.mut, fontSize: 9 }}> lb</span>}
           </div>
           <button onClick={handleEdit} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${C.bdr}`, background: C.c2, color: C.mut, fontSize: 10, cursor: "pointer" }}>Edit</button>
           <button onClick={handleDelete} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${C.red}22`, background: C.red + "11", color: C.red, fontSize: 10, cursor: "pointer" }}>✕</button>
@@ -448,13 +453,19 @@ function SetRow({ setNum, targetReps, targetWt, onLog, onDelete, logged }) {
             style={{ width: 48, padding: "5px 4px", borderRadius: 6, border: `1px solid ${C.bdr}`, background: C.c2, color: C.txt, fontSize: 13, textAlign: "center" }}
           />
           <span style={{ fontSize: 9, color: C.mut }}>reps</span>
-          <span style={{ fontSize: 12, color: C.mut }}>×</span>
-          <input type="number" inputMode="decimal" placeholder={targetWt || "BW"} value={wt} onChange={e => setWt(e.target.value)}
-            onFocus={e => e.target.select()}
-            style={{ width: 56, padding: "5px 4px", borderRadius: 6, border: `1px solid ${C.bdr}`, background: C.c2, color: C.txt, fontSize: 13, textAlign: "center" }}
-          />
-          <span style={{ fontSize: 9, color: C.mut }}>lb</span>
-          {reps && wt && (
+          {isBW ? (
+            <span style={{ fontSize: 12, color: C.teal, fontWeight: 600, marginLeft: 4 }}>BW</span>
+          ) : (
+            <>
+              <span style={{ fontSize: 12, color: C.mut }}>×</span>
+              <input type="number" inputMode="decimal" placeholder={targetWt || "wt"} value={wt} onChange={e => setWt(e.target.value)}
+                onFocus={e => e.target.select()}
+                style={{ width: 56, padding: "5px 4px", borderRadius: 6, border: `1px solid ${C.bdr}`, background: C.c2, color: C.txt, fontSize: 13, textAlign: "center" }}
+              />
+              <span style={{ fontSize: 9, color: C.mut }}>lb</span>
+            </>
+          )}
+          {reps && (isBW || wt) && (
             <button onClick={handleLog} style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: C.grn, color: C.bg, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
               {editing ? "Save" : "Log"}
             </button>
@@ -607,11 +618,14 @@ function ExerciseCard({ ex, week, sessionKey, allSets, setAllSets, onStartRest, 
       : Math.round((ex.wt + weeklyAdd) / 2.5) * 2.5
     : null;
 
-  // Set Progression Algorithm: check last session and auto-adjust
+  // Set Progression Algorithm: check last session's data and auto-adjust target
   useEffect(() => {
     if (!ex.wt || wkData.deload) return;
-    const today = new Date().toISOString().slice(0, 10);
-    db.getLastSessionForExercise(ex.name, today).then(last => {
+    setSmartTarget(null);
+    setProgressNote(null);
+    // Use tomorrow's date so we include today's earlier sessions too
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    db.getLastSessionForExercise(ex.name, tomorrow).then(last => {
       if (!last || !last.sets || last.sets.length === 0) return;
       const repRange = ex.reps.split("-").map(Number);
       const minReps = repRange[0];
@@ -619,22 +633,29 @@ function ExerciseCard({ ex, week, sessionKey, allSets, setAllSets, onStartRest, 
       const avgWt = last.sets.reduce((a, s) => a + s.weight, 0) / last.sets.length;
       const avgReps = last.sets.reduce((a, s) => a + s.reps, 0) / last.sets.length;
       const increment = isCompound ? 2.5 : 2.5;
+      const lastWk = last.weekNumber || 0;
 
       let adjusted = baseTarget;
       let note = null;
 
-      if (avgReps >= maxReps && avgWt >= baseTarget) {
+      // Only adjust if last data was from a PREVIOUS week (not current week being viewed)
+      if (lastWk >= (week + 1)) return;
+
+      if (avgReps >= maxReps && avgWt >= (baseTarget || 0)) {
         // Exceeded rep range at or above target — extra bump
-        adjusted = Math.round((avgWt + increment) / 2.5) * 2.5;
-        note = "↑ Bumped — you exceeded rep range last time";
+        adjusted = Math.round((avgWt + increment + increment) / 2.5) * 2.5;
+        note = `↑ Bumped — hit ${Math.round(avgReps)} reps @ ${avgWt} lb last session (exceeded range)`;
       } else if (avgReps < minReps) {
         // Couldn't hit min reps — hold weight, don't progress
         adjusted = Math.round(avgWt / 2.5) * 2.5;
-        note = "⏸ Holding weight — reps below range last session";
-      } else if (avgWt > baseTarget) {
+        note = `⏸ Holding @ ${avgWt} lb — only ${Math.round(avgReps)} reps last session (below ${minReps} min)`;
+      } else if (avgWt > (baseTarget || 0)) {
         // Went heavier than programmed — adjust up from actual
         adjusted = Math.round((avgWt + increment) / 2.5) * 2.5;
-        note = "↑ Adjusted from your actual weight last session";
+        note = `↑ Adjusted — you lifted ${avgWt} lb last session (above programmed ${baseTarget})`;
+      } else {
+        // Normal progression — reps in range, weight on target
+        return;
       }
 
       if (adjusted !== baseTarget) {
@@ -647,23 +668,25 @@ function ExerciseCard({ ex, week, sessionKey, allSets, setAllSets, onStartRest, 
   const targetWt = smartTarget || baseTarget;
 
   const logSet = (setNum, data) => {
-    const updated = { ...allSets, [exKey]: { ...logged, [setNum]: data } };
-    setAllSets(updated);
-    onSave(updated, sessionKey);
+    setAllSets(prev => {
+      const prevEx = prev[exKey] || {};
+      const updated = { ...prev, [exKey]: { ...prevEx, [setNum]: data } };
+      return updated;
+    });
     onSync(ex.name, setNum, data.reps, data.wt);
     // Always start rest timer (even on edits) — only skip if it's the very last set and all sets are done
-    const allSetsDone = Object.keys(updated[exKey] || {}).length >= totalSets && setNum >= totalSets;
-    if (!allSetsDone) {
+    const currentDone = Object.keys(logged).length + 1;
+    if (!(currentDone >= totalSets && setNum >= totalSets)) {
       onStartRest(ex.rest, ex.name, setNum, totalSets);
     }
   };
 
   const deleteSet = (setNum) => {
-    const updatedEx = { ...logged };
-    delete updatedEx[setNum];
-    const updated = { ...allSets, [exKey]: updatedEx };
-    setAllSets(updated);
-    onSave(updated, sessionKey);
+    setAllSets(prev => {
+      const prevEx = { ...(prev[exKey] || {}) };
+      delete prevEx[setNum];
+      return { ...prev, [exKey]: prevEx };
+    });
     if (onDeleteFromDb) onDeleteFromDb(ex.name, setNum);
   };
 
@@ -716,7 +739,7 @@ function ExerciseCard({ ex, week, sessionKey, allSets, setAllSets, onStartRest, 
           )}
 
           {Array.from({ length: totalSets }, (_, i) => (
-            <SetRow key={i} setNum={i + 1} targetReps={ex.reps.split("-")[0]} targetWt={targetWt} logged={logged[i + 1]} onLog={logSet} onDelete={deleteSet} />
+            <SetRow key={i} setNum={i + 1} targetReps={ex.reps.split("-")[0]} targetWt={targetWt} isBW={!ex.wt && ex.wt !== 0} logged={logged[i + 1]} onLog={logSet} onDelete={deleteSet} />
           ))}
         </div>
       )}
@@ -739,7 +762,7 @@ export default function App() {
   const r = ROUTINES[ROUTINE_KEYS[routine]];
   const rKey = ROUTINE_KEYS[routine];
   const today = new Date().toISOString().slice(0, 10);
-  const sessionKey = today + "-" + rKey.replace(/\s+/g, "");
+  const sessionKey = today + "-" + rKey.replace(/\s+/g, "") + "-W" + (week + 1);
 
   // Load session from Supabase on mount or when routine/week changes
   useEffect(() => {
@@ -747,15 +770,17 @@ export default function App() {
     const loadSession = async () => {
       try {
         setSyncStatus("loading...");
-        const session = await db.getOrCreateSession(today, rKey, week + 1, WEEKS[week].rir);
+        // Include week number in session lookup so W1 and W2 are separate
+        const weekTag = `W${week + 1}-${rKey}`;
+        const session = await db.getOrCreateSession(today, weekTag, week + 1, WEEKS[week].rir);
         if (cancelled) return;
-        
+
         if (session) {
           setCurrentSession(session);
           setDbConnected(true);
           const sessionSets = await db.loadSession(session.id);
           if (cancelled) return;
-          
+
           // Convert to allSets format
           const rebuilt = {};
           Object.entries(sessionSets).forEach(([exName, sets]) => {
