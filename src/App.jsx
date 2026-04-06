@@ -11,52 +11,67 @@ import { useState, useEffect, useCallback, useRef } from "react";
 let _ctx = null;
 let _soundEnabled = false;
 
+function _ensureCtx() {
+  // Reuse existing context, or create new one
+  if (_ctx && _ctx.state !== 'closed') {
+    // If suspended (iOS background), resume it
+    if (_ctx.state === 'suspended') _ctx.resume().catch(() => {});
+    return _ctx;
+  }
+  _ctx = new (window.AudioContext || window.webkitAudioContext)();
+  return _ctx;
+}
+
 function enableSound() {
   try {
-    _ctx = new (window.AudioContext || window.webkitAudioContext)();
-    // Resume must happen in a direct user gesture handler
-    _ctx.resume().then(() => {
-      _soundEnabled = true;
-      // Play a confirmation tone so user knows it worked
-      _playOsc(660, 0.15, 0.3);
-      setTimeout(() => _playOsc(880, 0.15, 0.3), 160);
-    });
+    const ctx = _ensureCtx();
+    ctx.resume().then(() => {
+      // Play confirmation tone
+      _playOsc(660, 0.15, 0.4);
+      setTimeout(() => _playOsc(880, 0.15, 0.4), 160);
+    }).catch(() => {});
   } catch(e) {}
   _soundEnabled = true;
   return true;
 }
 
+function disableSound() {
+  _soundEnabled = false;
+  return false;
+}
+
 function _playOsc(freq, dur, vol) {
-  if (!_ctx) return;
   try {
-    const t = _ctx.currentTime;
-    const osc = _ctx.createOscillator();
-    const gain = _ctx.createGain();
+    const ctx = _ensureCtx();
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
     osc.type = 'sine';
     osc.frequency.value = freq;
     gain.gain.setValueAtTime(vol, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
     osc.connect(gain);
-    gain.connect(_ctx.destination);
+    gain.connect(ctx.destination);
     osc.start(t);
     osc.stop(t + dur + 0.05);
   } catch(e) {}
 }
 
 function playWarningSound() {
-  if (_soundEnabled && _ctx) {
-    // Single high ding
-    _playOsc(880, 0.25, 0.5);
+  if (_soundEnabled) {
+    // Double high ding — louder and repeated so it cuts through
+    _playOsc(880, 0.35, 0.9);
+    setTimeout(() => _playOsc(880, 0.35, 0.9), 350);
   }
-  if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
 }
 
 function playRestBeep() {
-  if (_soundEnabled && _ctx) {
+  if (_soundEnabled) {
     // Ascending three-note chime: C5, E5, G5
-    _playOsc(523, 0.3, 0.6);
-    setTimeout(() => _playOsc(659, 0.3, 0.6), 200);
-    setTimeout(() => _playOsc(784, 0.35, 0.7), 400);
+    _playOsc(523, 0.3, 0.7);
+    setTimeout(() => _playOsc(659, 0.3, 0.7), 200);
+    setTimeout(() => _playOsc(784, 0.35, 0.8), 400);
   }
   if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 300]);
 }
@@ -186,13 +201,25 @@ const db = {
   },
 
   // Get recent sessions for history
-  async getRecentSessions(limit = 20) {
+  async getRecentSessions(limit = 50) {
     const { data } = await supabase
       .from('sessions')
-      .select('*, sets(*, exercises(name))')
+      .select('*, sets(*, exercises(name, muscles, muscle_group))')
       .order('date', { ascending: false })
       .limit(limit);
     return data || [];
+  },
+
+  // Finish a session — mark as completed with duration
+  async finishSession(sessionId, durationMinutes) {
+    const { data, error } = await supabase
+      .from('sessions')
+      .update({ status: 'completed', duration_minutes: durationMinutes })
+      .eq('id', sessionId)
+      .select()
+      .single();
+    if (error) console.error('Finish session error:', error);
+    return data;
   },
 
   // Get volume data for a week
@@ -329,7 +356,33 @@ function getExCategory(name, rest) {
   return "iso"; // cable/landmine isolation
 }
 
-const ROUTINES = {
+// ============================================================
+// MESOCYCLE DEFINITIONS
+// Each mesocycle has its own routines, weeks config, and date range.
+// The app auto-selects the active meso based on today's date,
+// or the user can switch manually.
+// ============================================================
+
+// Helper: clone routines with overridden sets and weights for deload
+function makeDeloadRoutines(baseRoutines, deloadWeights) {
+  const result = {};
+  Object.entries(baseRoutines).forEach(([key, routine]) => {
+    result[key] = {
+      ...routine,
+      sections: routine.sections.map(sec => ({
+        ...sec,
+        exercises: sec.exercises.map(ex => {
+          const dlWt = deloadWeights[ex.name];
+          return { ...ex, sets: 2, wt: dlWt !== undefined ? dlWt : (ex.wt ? Math.round(ex.wt * 0.5 / 5) * 5 : null) };
+        })
+      }))
+    };
+  });
+  return result;
+}
+
+// Base Meso 1 routines (used for both Meso 1 and pre-Meso deload)
+const MESO1_ROUTINES = {
   "Upper A": {
     day: "Mon", cardio: "20-min incline walk", sections: [
       { name: "Chest", exercises: [
@@ -436,7 +489,63 @@ const ROUTINES = {
   },
 };
 
-const ROUTINE_KEYS = Object.keys(ROUTINES);
+// Deload weights from master brief (50% of Meso 1 W1, rounded)
+const DELOAD_WEIGHTS = {
+  "Smith Flat Bench Press": 60, "Smith Incline Press (30°)": 40,
+  "Chin-Ups (Wide Overhand)": null, "Seated Cable Row (Neutral)": 70,
+  "Cable Lateral Raise": 10, "Cable Face Pull (Rope)": 35,
+  "Cable EZ Bar Curl": 35, "Cable OH Tricep Extension": 30,
+  "Smith Front Squat": 55, "Smith Stiff-Leg Deadlift": 60,
+  "Landmine Goblet Squat": 15, "Smith Deficit Calf Raise": 60,
+  "Cable Crunch (Kneeling)": 25, "Cable Upright Row": 20,
+  "Smith Close-Grip Bench": 40, "Cable Fly (Low-to-High)": 10,
+  "Cable Lat Pulldown (Close)": 90, "Landmine Row (Per Arm)": 10,
+  "Cable Cross-Body Lateral": 5, "Cable Rear Delt Fly": 5,
+  "Cable Bayesian Curl": 10, "Cable Pushdown (Bar)": 35,
+  "Smith Hack Squat (Feet Fwd)": 50, "Smith Good Morning": 40,
+  "Smith Lunge (Front Elevated)": 20, "Hanging Knee Raise": null,
+};
+
+const DELOAD_ROUTINES = makeDeloadRoutines(MESO1_ROUTINES, DELOAD_WEIGHTS);
+
+// Deload only has 1 "week" — no progression
+const DELOAD_WEEKS = [
+  { rir: "4+ RIR", note: "DELOAD · 2 sets · 50% weight · learn Meso 1 moves · prep for Apr 13", smith: 0, cable: 0, iso: 0, deload: true },
+];
+
+// All mesocycles
+const MESOCYCLES = [
+  {
+    id: "deload-pre-meso1",
+    name: "RP Deload",
+    shortName: "Deload",
+    startDate: "2026-04-06",
+    endDate: "2026-04-12",
+    weeks: DELOAD_WEEKS,
+    routines: DELOAD_ROUTINES,
+  },
+  {
+    id: "rp-meso-1",
+    name: "RP Meso 1",
+    shortName: "Meso 1",
+    startDate: "2026-04-13",
+    endDate: "2026-05-24",
+    weeks: WEEKS,
+    routines: MESO1_ROUTINES,
+  },
+];
+
+// Auto-select active mesocycle based on today's date
+function getActiveMeso(dateStr) {
+  for (let i = MESOCYCLES.length - 1; i >= 0; i--) {
+    if (dateStr >= MESOCYCLES[i].startDate) return i;
+  }
+  return 0;
+}
+
+// Legacy compat — these get overridden in App based on active meso
+let ROUTINES = MESO1_ROUTINES;
+const ROUTINE_KEYS = Object.keys(MESO1_ROUTINES);
 
 const fmtRest = s => s >= 60 ? `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}` : `${s}s`;
 const fmtTimer = s => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`;
@@ -663,7 +772,7 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone }) {
   );
 }
 
-function ExerciseCard({ ex, week, sessionKey, allSets, setAllSets, onStartRest, onSave, onSync, onDeleteFromDb }) {
+function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, onStartRest, onSave, onSync, onDeleteFromDb }) {
   const [expanded, setExpanded] = useState(false);
   const [smartTarget, setSmartTarget] = useState(null);
   const [progressNote, setProgressNote] = useState(null);
@@ -673,7 +782,7 @@ function ExerciseCard({ ex, week, sessionKey, allSets, setAllSets, onStartRest, 
   const totalSets = ex.sets;
   const allDone = numDone >= totalSets;
 
-  const wkData = WEEKS[week];
+  const wkData = (weeksConfig || WEEKS)[week];
   const exCat = getExCategory(ex.name, ex.rest);
   const weeklyAdd = wkData[exCat]; // smith, cable, or iso
   const minStep = exCat === "smith" ? 5 : 2.5; // rounding step
@@ -812,6 +921,133 @@ function ExerciseCard({ ex, week, sessionKey, allSets, setAllSets, onStartRest, 
   );
 }
 
+// ============================================================
+// HISTORY VIEW
+// ============================================================
+function HistoryView() {
+  const [sessions, setSessions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState(null);
+
+  useEffect(() => {
+    db.getRecentSessions(50).then(data => {
+      // Filter to only sessions that have sets logged
+      setSessions(data.filter(s => s.sets && s.sets.length > 0));
+      setLoading(false);
+    });
+  }, []);
+
+  if (loading) return <div style={{ padding: 40, textAlign: "center", color: C.mut, fontSize: 12 }}>Loading history...</div>;
+  if (sessions.length === 0) return <div style={{ padding: 40, textAlign: "center", color: C.mut, fontSize: 12 }}>No past workouts yet.</div>;
+
+  // Group sets by exercise for a session
+  const groupSets = (sets) => {
+    const byExercise = {};
+    (sets || []).forEach(s => {
+      const name = s.exercises?.name || 'Unknown';
+      if (!byExercise[name]) byExercise[name] = { name, muscles: s.exercises?.muscles || '', sets: [] };
+      byExercise[name].sets.push(s);
+    });
+    // Sort sets within each exercise by set_number
+    Object.values(byExercise).forEach(ex => ex.sets.sort((a, b) => a.set_number - b.set_number));
+    return Object.values(byExercise);
+  };
+
+  // Parse routine name from notes
+  const getRoutineName = (notes) => {
+    if (!notes) return 'Workout';
+    // Notes like "W1-Upper A" or "SC-W3D2 | Sculpted Strength | W3D2"
+    if (notes.includes('Upper A')) return 'Upper A';
+    if (notes.includes('Upper B')) return 'Upper B';
+    if (notes.includes('Lower A')) return 'Lower A';
+    if (notes.includes('Lower B')) return 'Lower B';
+    if (notes.includes('Sculpted')) return 'Sculpted Strength';
+    if (notes.includes('Starting')) return 'Starting Strength';
+    if (notes.includes('Natural')) return 'Natural Strength';
+    return notes.split('|')[0]?.trim() || 'Workout';
+  };
+
+  const fmtDate = (d) => {
+    const dt = new Date(d + 'T12:00:00');
+    const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${days[dt.getDay()]} ${months[dt.getMonth()]} ${dt.getDate()}`;
+  };
+
+  return (
+    <div>
+      {sessions.map(session => {
+        const isExpanded = expandedId === session.id;
+        const exercises = groupSets(session.sets);
+        const totalSets = session.sets?.length || 0;
+        const routineName = getRoutineName(session.notes);
+        const totalVolume = (session.sets || []).reduce((a, s) => a + (s.reps * s.weight), 0);
+
+        return (
+          <div key={session.id} style={{ background: C.card, borderRadius: 10, marginBottom: 6, border: `1px solid ${C.bdr}`, overflow: "hidden" }}>
+            {/* Session header — tap to expand */}
+            <div onClick={() => setExpandedId(isExpanded ? null : session.id)}
+              style={{ padding: "10px 12px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: C.txt }}>
+                  {isExpanded ? "▾" : "▸"} {routineName}
+                </div>
+                <div style={{ fontSize: 10, color: C.mut, marginTop: 2, marginLeft: 16 }}>
+                  {fmtDate(session.date)}
+                  {session.week_number && <span> · W{session.week_number}</span>}
+                  {session.duration_minutes && <span> · {session.duration_minutes} min</span>}
+                  {session.rir && <span> · {session.rir}</span>}
+                </div>
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: C.blu }}>{totalSets} sets</div>
+                <div style={{ fontSize: 9, color: C.mut }}>{exercises.length} exercises</div>
+              </div>
+            </div>
+
+            {/* Expanded detail */}
+            {isExpanded && (
+              <div style={{ padding: "0 12px 12px", borderTop: `1px solid ${C.bdr}` }}>
+                {session.status === 'completed' && (
+                  <div style={{ fontSize: 9, color: C.grn, padding: "6px 0 4px", fontWeight: 600 }}>✓ Completed</div>
+                )}
+                {exercises.map((ex, i) => (
+                  <div key={i} style={{ marginTop: 8 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: C.txt }}>{ex.name}</div>
+                    <div style={{ fontSize: 9, color: C.mut, marginBottom: 4 }}>{ex.muscles}</div>
+                    {ex.sets.map((s, j) => (
+                      <div key={j} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 2, paddingLeft: 8 }}>
+                        <div style={{ width: 20, height: 20, borderRadius: "50%", background: C.grn + "22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: C.grn, flexShrink: 0 }}>
+                          {s.set_number}
+                        </div>
+                        <div style={{ fontSize: 13, fontFamily: "monospace", fontWeight: 700 }}>
+                          <span style={{ color: C.blu }}>{s.reps}</span>
+                          <span style={{ color: C.mut }}> × </span>
+                          <span style={{ color: C.gld }}>{s.weight === 0 ? "BW" : s.weight}</span>
+                          {s.weight > 0 && <span style={{ color: C.mut, fontSize: 9 }}> lb</span>}
+                        </div>
+                        {s.rest_seconds && (
+                          <span style={{ fontSize: 9, color: C.mut }}>rest {fmtRest(s.rest_seconds)}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+                {totalVolume > 0 && (
+                  <div style={{ marginTop: 10, padding: "6px 8px", background: C.c2, borderRadius: 6, fontSize: 10, color: C.mut, display: "flex", justifyContent: "space-between" }}>
+                    <span>Total volume: <span style={{ color: C.gld, fontWeight: 600 }}>{totalVolume.toLocaleString()} lb</span></span>
+                    <span>{totalSets} sets across {exercises.length} exercises</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function App() {
   const [routine, setRoutine] = useState(0);
   const [week, setWeek] = useState(0);
@@ -823,10 +1059,17 @@ export default function App() {
   const [currentSession, setCurrentSession] = useState(null);
   const [syncStatus, setSyncStatus] = useState("");
   const [dbConnected, setDbConnected] = useState(false);
+  const [view, setView] = useState("workout"); // "workout" or "history"
+  const [sessionStartTime] = useState(Date.now());
+  const [mesoIdx, setMesoIdx] = useState(() => getActiveMeso(new Date().toISOString().slice(0, 10)));
+  const activeMeso = MESOCYCLES[mesoIdx];
+  const activeWeeks = activeMeso.weeks;
+  const activeRoutines = activeMeso.routines;
   const [soundOn, setSoundOn] = useState(false);
 
-  const r = ROUTINES[ROUTINE_KEYS[routine]];
-  const rKey = ROUTINE_KEYS[routine];
+  const activeRoutineKeys = Object.keys(activeRoutines);
+  const r = activeRoutines[activeRoutineKeys[routine]];
+  const rKey = activeRoutineKeys[routine];
   const today = new Date().toISOString().slice(0, 10);
   const sessionKey = today + "-" + rKey.replace(/\s+/g, "") + "-W" + (week + 1);
 
@@ -838,7 +1081,7 @@ export default function App() {
         setSyncStatus("loading...");
         // Include week number in session lookup so W1 and W2 are separate
         const weekTag = `W${week + 1}-${rKey}`;
-        const session = await db.getOrCreateSession(today, weekTag, week + 1, WEEKS[week].rir);
+        const session = await db.getOrCreateSession(today, weekTag, week + 1, activeWeeks[week].rir);
         if (cancelled) return;
 
         if (session) {
@@ -905,7 +1148,7 @@ export default function App() {
 
   // Export data for Claude
   const exportData = () => {
-    const lines = [`SESSION: ${rKey} | ${today} | Week ${week + 1} | ${WEEKS[week].rir}`];
+    const lines = [`SESSION: ${rKey} | ${today} | Week ${week + 1} | ${activeWeeks[week].rir}`];
     r.sections.forEach(sec => {
       sec.exercises.forEach(ex => {
         const key = `${sessionKey}|${ex.name}`;
@@ -945,11 +1188,14 @@ export default function App() {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ fontSize: 20, fontWeight: 800, color: C.blu, letterSpacing: -0.5 }}>TRAINING HUB</div>
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <button onClick={() => { const ok = enableSound(); setSoundOn(ok); }}
+            <button onClick={() => {
+                if (soundOn) { disableSound(); setSoundOn(false); }
+                else { enableSound(); setSoundOn(true); }
+              }}
               style={{ padding: "3px 8px", borderRadius: 6, border: `1px solid ${soundOn ? C.grn + "44" : C.org + "44"}`,
                 background: soundOn ? C.grn + "15" : C.org + "15",
                 color: soundOn ? C.grn : C.org, fontSize: 9, fontWeight: 600, cursor: "pointer" }}>
-              {soundOn ? "🔊 Sound On" : "🔇 Tap for Sound"}
+              {soundOn ? "🔊 On" : "🔇 Sound"}
             </button>
             {syncStatus && (
               <div style={{ fontSize: 8, color: syncStatus.includes("✓") || syncStatus === "ready" ? C.grn : syncStatus.includes("err") || syncStatus.includes("offline") ? C.red : C.mut }}>
@@ -964,9 +1210,41 @@ export default function App() {
             <div style={{ width: 8, height: 8, borderRadius: "50%", background: dbConnected ? C.grn : C.red }} title={dbConnected ? "Connected to database" : "Offline"} />
           </div>
         </div>
-        <div style={{ fontSize: 10, color: C.mut }}>Tap exercise → tap ① to quick-log → timer auto-starts</div>
+        <div style={{ display: "flex", gap: 4, marginTop: 6 }}>
+          <button onClick={() => setView("workout")}
+            style={{ flex: 1, padding: "6px", borderRadius: 8, border: `1px solid ${view === "workout" ? C.blu : C.bdr}`, background: view === "workout" ? C.blu + "22" : "transparent", color: view === "workout" ? C.blu : C.mut, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+            Workout
+          </button>
+          <button onClick={() => setView("history")}
+            style={{ flex: 1, padding: "6px", borderRadius: 8, border: `1px solid ${view === "history" ? C.gld : C.bdr}`, background: view === "history" ? C.gld + "22" : "transparent", color: view === "history" ? C.gld : C.mut, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+            History
+          </button>
+        </div>
       </div>
 
+      {/* Mesocycle selector */}
+      {view === "workout" && MESOCYCLES.length > 1 && (
+        <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
+          {MESOCYCLES.map((m, i) => {
+            const isActive = i === mesoIdx;
+            const isCurrent = i === getActiveMeso(new Date().toISOString().slice(0, 10));
+            return (
+              <button key={m.id} onClick={() => { setMesoIdx(i); setWeek(0); setRoutine(0); }}
+                style={{ flex: 1, padding: "5px 4px", borderRadius: 6, border: `1px solid ${isActive ? C.gld : C.bdr}`,
+                  background: isActive ? C.gld + "22" : "transparent",
+                  color: isActive ? C.gld : C.mut, fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
+                {m.shortName}{isCurrent ? " ●" : ""}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* HISTORY VIEW */}
+      {view === "history" && <HistoryView />}
+
+      {/* WORKOUT VIEW */}
+      {view === "workout" && <>
       {!loaded && (
         <div style={{ textAlign: "center", padding: 40, color: C.mut, fontSize: 12 }}>Loading session data...</div>
       )}
@@ -974,20 +1252,20 @@ export default function App() {
       {loaded && (<>
         {/* Routine tabs */}
         <div style={{ display: "flex", gap: 4, marginBottom: 6, position: "sticky", top: 0, background: C.bg, zIndex: 10, paddingBottom: 4 }}>
-          {ROUTINE_KEYS.map((k, i) => (
+          {activeRoutineKeys.map((k, i) => (
             <button key={k} onClick={() => setRoutine(i)}
               style={{ flex: 1, padding: "7px 2px", borderRadius: 8, border: `1px solid ${i === routine ? C.blu : C.bdr}`, background: i === routine ? C.blu + "22" : C.card, color: i === routine ? C.blu : C.mut, fontSize: 11, fontWeight: 700, cursor: "pointer", textAlign: "center" }}>
-              {k}<br /><span style={{ fontSize: 8 }}>{ROUTINES[k].day}</span>
+              {k}<br /><span style={{ fontSize: 8 }}>{activeRoutines[k].day}</span>
             </button>
           ))}
         </div>
 
         {/* Week selector */}
         <div style={{ display: "flex", gap: 3, marginBottom: 8 }}>
-          {WEEKS.map((w, i) => (
+          {activeWeeks.map((w, i) => (
             <button key={i} onClick={() => setWeek(i)}
               style={{ flex: 1, padding: "4px 2px", borderRadius: 6, border: `1px solid ${i === week ? C.pur : C.bdr}`, background: i === week ? C.pur + "22" : "transparent", color: i === week ? C.pur : C.mut, fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
-              {i < 5 ? `W${i + 1}` : "DL"}
+              {w.deload ? "DL" : `W${i + 1}`}
             </button>
           ))}
         </div>
@@ -995,8 +1273,8 @@ export default function App() {
         {/* Week info */}
         <div style={{ background: C.c2, borderRadius: 8, padding: "7px 10px", marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
-            <span style={{ fontSize: 14, fontWeight: 800, color: week === 5 ? C.org : C.pur }}>{WEEKS[week].rir}</span>
-            <span style={{ fontSize: 10, color: C.mut, marginLeft: 8 }}>{WEEKS[week].note}</span>
+            <span style={{ fontSize: 14, fontWeight: 800, color: activeWeeks[week].deload ? C.org : C.pur }}>{activeWeeks[week].rir}</span>
+            <span style={{ fontSize: 10, color: C.mut, marginLeft: 8 }}>{activeWeeks[week].note}</span>
           </div>
           <div style={{ fontSize: 10, color: doneExercises === totalExercises ? C.grn : C.mut, fontWeight: 600 }}>
             {doneExercises}/{totalExercises}
@@ -1008,51 +1286,50 @@ export default function App() {
           <div style={{ height: "100%", width: `${(doneExercises / totalExercises) * 100}%`, background: `linear-gradient(90deg, ${C.blu}, ${C.grn})`, transition: "width 0.3s" }} />
         </div>
 
-        {/* Warmup */}
-        <div style={{ background: `linear-gradient(135deg,${C.org}11,${C.card})`, border: `1px solid ${C.org}22`, borderRadius: 8, padding: "8px 10px", marginBottom: 10, fontSize: 11 }}>
-          <b style={{ color: C.gld }}>Warmup:</b> 5-min flat walk → dynamic stretch · <b style={{ color: C.org }}>Post:</b> {r.cardio}
-        </div>
 
         {/* Exercise cards by section */}
         {r.sections.map((sec, si) => (
           <div key={si}>
             <div style={{ fontSize: 11, fontWeight: 700, color: C.mut, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4, marginTop: si > 0 ? 12 : 0 }}>{sec.name}</div>
             {sec.exercises.map((ex, ei) => (
-              <ExerciseCard key={ei} ex={ex} week={week} sessionKey={sessionKey} allSets={allSets} setAllSets={setAllSets} onStartRest={startRest} onSave={saveToStorage} onSync={syncToDb} onDeleteFromDb={deleteFromDb} />
+              <ExerciseCard key={ei} ex={ex} week={week} weeksConfig={activeWeeks} sessionKey={sessionKey} allSets={allSets} setAllSets={setAllSets} onStartRest={startRest} onSave={saveToStorage} onSync={syncToDb} onDeleteFromDb={deleteFromDb} />
             ))}
           </div>
         ))}
 
-        {/* Export button */}
-        <div style={{ marginTop: 16 }}>
-          <button onClick={() => setShowExport(!showExport)}
-            style={{ width: "100%", padding: "14px", borderRadius: 10, border: `1px solid ${C.blu}44`, background: C.blu + "11", color: C.blu, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
-            {showExport ? "Hide Export" : "📋 Done — Send to Claude"}
+        {/* Finish Session + Export */}
+        <div style={{ marginTop: 16, display: "flex", gap: 6 }}>
+          <button onClick={async () => {
+              if (!currentSession) return;
+              const mins = Math.round((Date.now() - sessionStartTime) / 60000);
+              await db.finishSession(currentSession.id, mins);
+              setSyncStatus("session saved ✓");
+              setTimeout(() => setSyncStatus(""), 3000);
+            }}
+            style={{ flex: 1, padding: "14px", borderRadius: 10, border: `1px solid ${C.grn}44`, background: C.grn + "11", color: C.grn, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+            ✓ Finish Session
           </button>
-          {showExport && (
-            <div style={{ marginTop: 8 }}>
-              <pre style={{ background: C.c2, padding: 10, borderRadius: 8, fontSize: 10, color: C.txt, overflow: "auto", whiteSpace: "pre-wrap" }}>
-                {exportData()}
-              </pre>
-              <button onClick={() => { navigator.clipboard?.writeText(exportData()); setCopied(true); setTimeout(() => setCopied(false), 3000); }}
-                style={{ marginTop: 6, width: "100%", padding: "12px", borderRadius: 8, border: "none", background: copied ? C.grn : C.blu, color: C.bg, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-                {copied ? "Copied ✓ — Now paste in your chat with Claude" : "Copy to Clipboard"}
-              </button>
-              <div style={{ marginTop: 8, padding: "8px 10px", background: C.pur + "11", borderRadius: 8, border: `1px solid ${C.pur}22` }}>
-                <div style={{ fontSize: 10, color: C.pur, fontWeight: 600, marginBottom: 3 }}>After copying:</div>
-                <div style={{ fontSize: 10, color: C.mut, lineHeight: 1.5 }}>
-                  1. Close this artifact<br/>
-                  2. Paste into your chat with Claude<br/>
-                  3. I'll update your spreadsheet, dashboard, and give coaching notes for your next session
-                </div>
-              </div>
-            </div>
-          )}
+          <button onClick={() => setShowExport(!showExport)}
+            style={{ flex: 1, padding: "14px", borderRadius: 10, border: `1px solid ${C.blu}44`, background: C.blu + "11", color: C.blu, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+            {showExport ? "Hide" : "📋 Export"}
+          </button>
         </div>
+        {showExport && (
+          <div style={{ marginTop: 8 }}>
+            <pre style={{ background: C.c2, padding: 10, borderRadius: 8, fontSize: 10, color: C.txt, overflow: "auto", whiteSpace: "pre-wrap" }}>
+              {exportData()}
+            </pre>
+            <button onClick={() => { navigator.clipboard?.writeText(exportData()); setCopied(true); setTimeout(() => setCopied(false), 3000); }}
+              style={{ marginTop: 6, width: "100%", padding: "12px", borderRadius: 8, border: "none", background: copied ? C.grn : C.blu, color: C.bg, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+              {copied ? "Copied ✓" : "Copy to Clipboard"}
+            </button>
+          </div>
+        )}
         <div style={{ fontSize: 9, color: C.mut, textAlign: "center", marginTop: 16 }}>
-          RP Hypertrophy · ForceUSA G3 · Meso 1 · {today} · {dbConnected ? "☁ synced" : "offline"}
+          RP Hypertrophy · ForceUSA G3 · {activeMeso.name} · {today} · {dbConnected ? "☁ synced" : "offline"}
         </div>
       </>)}
+      </>}
     </div>
   );
 }
