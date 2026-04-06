@@ -204,6 +204,36 @@ const db = {
     return data || [];
   },
 
+  // Get last session's data for an exercise (for auto-progression)
+  async getLastSessionForExercise(exerciseName, beforeDate) {
+    const { data: ex } = await supabase
+      .from('exercises')
+      .select('id')
+      .eq('name', exerciseName)
+      .single();
+    if (!ex) return null;
+
+    const { data } = await supabase
+      .from('sets')
+      .select('reps, weight, set_number, sessions(date, week_number, notes)')
+      .eq('exercise_id', ex.id)
+      .lt('sessions.date', beforeDate || '9999-12-31')
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    // Group by session, return most recent session's sets
+    const bySession = {};
+    (data || []).forEach(s => {
+      const d = s.sessions?.date;
+      if (!d || (beforeDate && d >= beforeDate)) return;
+      if (!bySession[d]) bySession[d] = [];
+      bySession[d].push(s);
+    });
+    const dates = Object.keys(bySession).sort().reverse();
+    if (dates.length === 0) return null;
+    return { date: dates[0], sets: bySession[dates[0]] };
+  },
+
   // Get exercise progression (weight over time for a specific exercise)
   async getExerciseProgression(exerciseName) {
     const { data: ex } = await supabase
@@ -497,6 +527,8 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone }) {
 
 function ExerciseCard({ ex, week, sessionKey, allSets, setAllSets, onStartRest, onSave, onSync, onDeleteFromDb }) {
   const [expanded, setExpanded] = useState(false);
+  const [smartTarget, setSmartTarget] = useState(null);
+  const [progressNote, setProgressNote] = useState(null);
   const exKey = `${sessionKey}|${ex.name}`;
   const logged = allSets[exKey] || {};
   const numDone = Object.keys(logged).length;
@@ -506,11 +538,50 @@ function ExerciseCard({ ex, week, sessionKey, allSets, setAllSets, onStartRest, 
   const wkData = WEEKS[week];
   const isCompound = ex.rest >= 120;
   const weeklyAdd = isCompound ? wkData.wtAdd : Math.floor(wkData.wtAdd / 2.5) * 2.5 * 0.5;
-  const targetWt = ex.wt 
-    ? wkData.deload 
-      ? Math.round(ex.wt * 0.5 / 5) * 5 
+  const baseTarget = ex.wt
+    ? wkData.deload
+      ? Math.round(ex.wt * 0.5 / 5) * 5
       : Math.round((ex.wt + weeklyAdd) / 2.5) * 2.5
     : null;
+
+  // Set Progression Algorithm: check last session and auto-adjust
+  useEffect(() => {
+    if (!ex.wt || wkData.deload) return;
+    const today = new Date().toISOString().slice(0, 10);
+    db.getLastSessionForExercise(ex.name, today).then(last => {
+      if (!last || !last.sets || last.sets.length === 0) return;
+      const repRange = ex.reps.split("-").map(Number);
+      const minReps = repRange[0];
+      const maxReps = repRange[1] || repRange[0];
+      const avgWt = last.sets.reduce((a, s) => a + s.weight, 0) / last.sets.length;
+      const avgReps = last.sets.reduce((a, s) => a + s.reps, 0) / last.sets.length;
+      const increment = isCompound ? 2.5 : 2.5;
+
+      let adjusted = baseTarget;
+      let note = null;
+
+      if (avgReps >= maxReps && avgWt >= baseTarget) {
+        // Exceeded rep range at or above target — extra bump
+        adjusted = Math.round((avgWt + increment) / 2.5) * 2.5;
+        note = "↑ Bumped — you exceeded rep range last time";
+      } else if (avgReps < minReps) {
+        // Couldn't hit min reps — hold weight, don't progress
+        adjusted = Math.round(avgWt / 2.5) * 2.5;
+        note = "⏸ Holding weight — reps below range last session";
+      } else if (avgWt > baseTarget) {
+        // Went heavier than programmed — adjust up from actual
+        adjusted = Math.round((avgWt + increment) / 2.5) * 2.5;
+        note = "↑ Adjusted from your actual weight last session";
+      }
+
+      if (adjusted !== baseTarget) {
+        setSmartTarget(adjusted);
+        setProgressNote(note);
+      }
+    }).catch(() => {});
+  }, [ex.name, week]);
+
+  const targetWt = smartTarget || baseTarget;
 
   const logSet = (setNum, data) => {
     const updated = { ...allSets, [exKey]: { ...logged, [setNum]: data } };
@@ -532,16 +603,16 @@ function ExerciseCard({ ex, week, sessionKey, allSets, setAllSets, onStartRest, 
   };
 
   return (
-    <div style={{ background: C.card, borderRadius: 12, padding: 12, marginBottom: 8, border: `1px solid ${allDone ? C.grn + "33" : C.bdr}`, cursor: expanded ? "default" : "pointer" }}
-      onClick={() => !expanded && setExpanded(true)}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+    <div style={{ background: C.card, borderRadius: 12, padding: 12, marginBottom: 8, border: `1px solid ${allDone ? C.grn + "33" : C.bdr}` }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", cursor: "pointer" }}
+        onClick={() => setExpanded(!expanded)}>
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: allDone ? C.grn : C.txt }}>
-              {ex.name} {allDone && <span style={{ fontSize: 10, color: C.grn }}>✓</span>}
+              {expanded ? "▾" : "▸"} {ex.name} {allDone && <span style={{ fontSize: 10, color: C.grn }}>✓</span>}
             </div>
           </div>
-          <div style={{ fontSize: 10, color: C.mut, marginTop: 1 }}>{ex.muscles}</div>
+          <div style={{ fontSize: 10, color: C.mut, marginTop: 1, marginLeft: 16 }}>{ex.muscles}</div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
           {!expanded && (
@@ -568,16 +639,20 @@ function ExerciseCard({ ex, week, sessionKey, allSets, setAllSets, onStartRest, 
             {wkData.rir} · {wkData.note}
           </div>
           
-          <div style={{ display: "flex", gap: 12, marginBottom: 8, fontSize: 10 }}>
+          <div style={{ display: "flex", gap: 12, marginBottom: 4, fontSize: 10 }}>
             <span style={{ color: C.mut }}>Target: <span style={{ color: C.grn, fontWeight: 600 }}>{totalSets}×{ex.reps}</span></span>
             <span style={{ color: C.mut }}>Rest: <span style={{ color: C.pur, fontWeight: 600 }}>{fmtRest(ex.rest)}</span></span>
-            {targetWt && <span style={{ color: C.mut }}>Wt: <span style={{ color: C.gld, fontWeight: 600 }}>{targetWt} lb</span></span>}
+            {targetWt && <span style={{ color: C.mut }}>Wt: <span style={{ color: smartTarget ? C.org : C.gld, fontWeight: 600 }}>{targetWt} lb{smartTarget ? " *" : ""}</span></span>}
           </div>
+          {progressNote && (
+            <div style={{ fontSize: 10, color: C.org, padding: "3px 7px", background: C.org + "11", borderRadius: 5, marginBottom: 8 }}>
+              {progressNote}
+            </div>
+          )}
 
           {Array.from({ length: totalSets }, (_, i) => (
             <SetRow key={i} setNum={i + 1} targetReps={ex.reps.split("-")[0]} targetWt={targetWt} logged={logged[i + 1]} onLog={logSet} onDelete={deleteSet} />
           ))}
-          <button onClick={() => setExpanded(false)} style={{ marginTop: 6, padding: "4px 12px", borderRadius: 6, border: `1px solid ${C.bdr}`, background: "transparent", color: C.mut, fontSize: 10, cursor: "pointer" }}>Collapse</button>
         </div>
       )}
     </div>
