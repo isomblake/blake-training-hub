@@ -1,0 +1,809 @@
+import { useState, useEffect, useCallback, useRef } from "react";
+import * as Tone from "tone";
+import { supabase } from "./supabaseClient";
+
+// ============================================================
+// DATABASE HELPERS
+// ============================================================
+const db = {
+  // Create or find a session for today's routine
+  async getOrCreateSession(date, routineKey, weekNum, rir) {
+    // First try to find existing session
+    const { data: existing } = await supabase
+      .from('sessions')
+      .select('*')
+      .eq('date', date)
+      .ilike('notes', `%${routineKey}%`)
+      .limit(1);
+    
+    if (existing && existing.length > 0) return existing[0];
+    
+    // Create new session
+    const { data, error } = await supabase
+      .from('sessions')
+      .insert({
+        date,
+        week_number: weekNum,
+        rir,
+        status: 'in_progress',
+        notes: routineKey
+      })
+      .select()
+      .single();
+    
+    if (error) console.error('Session create error:', error);
+    return data;
+  },
+
+  // Log a set to the database
+  async logSet(sessionId, exerciseName, setNumber, reps, weight) {
+    // Find exercise ID
+    const { data: ex } = await supabase
+      .from('exercises')
+      .select('id')
+      .eq('name', exerciseName)
+      .single();
+    
+    if (!ex) {
+      console.error('Exercise not found:', exerciseName);
+      return null;
+    }
+
+    // Upsert the set (update if exists, insert if not)
+    const { data: existingSets } = await supabase
+      .from('sets')
+      .select('id')
+      .eq('session_id', sessionId)
+      .eq('exercise_id', ex.id)
+      .eq('set_number', setNumber);
+
+    if (existingSets && existingSets.length > 0) {
+      const { data, error } = await supabase
+        .from('sets')
+        .update({ reps, weight })
+        .eq('id', existingSets[0].id)
+        .select()
+        .single();
+      if (error) console.error('Set update error:', error);
+      return data;
+    } else {
+      const { data, error } = await supabase
+        .from('sets')
+        .insert({
+          session_id: sessionId,
+          exercise_id: ex.id,
+          set_number: setNumber,
+          reps,
+          weight
+        })
+        .select()
+        .single();
+      if (error) console.error('Set insert error:', error);
+      return data;
+    }
+  },
+
+  // Delete a set
+  async deleteSet(sessionId, exerciseName, setNumber) {
+    const { data: ex } = await supabase
+      .from('exercises')
+      .select('id')
+      .eq('name', exerciseName)
+      .single();
+    
+    if (!ex) return;
+
+    await supabase
+      .from('sets')
+      .delete()
+      .eq('session_id', sessionId)
+      .eq('exercise_id', ex.id)
+      .eq('set_number', setNumber);
+  },
+
+  // Load all sets for a session
+  async loadSession(sessionId) {
+    const { data, error } = await supabase
+      .from('sets')
+      .select('*, exercises(name)')
+      .eq('session_id', sessionId);
+    
+    if (error) {
+      console.error('Load session error:', error);
+      return {};
+    }
+
+    // Convert to the allSets format: { "sessionKey|ExerciseName": { 1: {reps, wt}, 2: {reps, wt} } }
+    const result = {};
+    (data || []).forEach(s => {
+      const exName = s.exercises?.name;
+      if (!exName) return;
+      // We'll use a placeholder key that gets resolved in the component
+      if (!result[exName]) result[exName] = {};
+      result[exName][s.set_number] = { reps: s.reps, wt: s.weight };
+    });
+    return result;
+  },
+
+  // Get recent sessions for history
+  async getRecentSessions(limit = 20) {
+    const { data } = await supabase
+      .from('sessions')
+      .select('*, sets(*, exercises(name))')
+      .order('date', { ascending: false })
+      .limit(limit);
+    return data || [];
+  },
+
+  // Get volume data for a week
+  async getWeeklyVolume(startDate, endDate) {
+    const { data } = await supabase
+      .from('sessions')
+      .select('*, sets(*, exercises(name, muscle_group))')
+      .gte('date', startDate)
+      .lte('date', endDate);
+    
+    // Aggregate by muscle group
+    const volume = {};
+    (data || []).forEach(session => {
+      (session.sets || []).forEach(s => {
+        const mg = s.exercises?.muscle_group;
+        if (!mg) return;
+        if (!volume[mg]) volume[mg] = { sets: 0, reps: 0, volume: 0 };
+        volume[mg].sets += 1;
+        volume[mg].reps += s.reps;
+        volume[mg].volume += s.reps * s.weight;
+      });
+    });
+    return volume;
+  },
+
+  // Get volume landmarks
+  async getVolumeLandmarks() {
+    const { data } = await supabase
+      .from('volume_landmarks')
+      .select('*');
+    return data || [];
+  },
+
+  // Log body comp
+  async logBodyComp(entry) {
+    const { data, error } = await supabase
+      .from('body_comp')
+      .insert(entry)
+      .select()
+      .single();
+    if (error) console.error('Body comp error:', error);
+    return data;
+  },
+
+  // Get body comp history
+  async getBodyCompHistory(limit = 30) {
+    const { data } = await supabase
+      .from('body_comp')
+      .select('*')
+      .order('date', { ascending: false })
+      .limit(limit);
+    return data || [];
+  },
+
+  // Get exercise progression (weight over time for a specific exercise)
+  async getExerciseProgression(exerciseName) {
+    const { data: ex } = await supabase
+      .from('exercises')
+      .select('id')
+      .eq('name', exerciseName)
+      .single();
+    
+    if (!ex) return [];
+
+    const { data } = await supabase
+      .from('sets')
+      .select('reps, weight, set_number, created_at, sessions(date, week_number)')
+      .eq('exercise_id', ex.id)
+      .order('created_at', { ascending: true });
+    
+    return data || [];
+  }
+};
+
+const C = {
+  bg: "#06060b", card: "#0d0d15", c2: "#141420", bdr: "#1c1c2e",
+  txt: "#e8e8f0", mut: "#6b6b80", grn: "#00e5a0", red: "#ff5c5c",
+  gld: "#ffd166", blu: "#4ea8ff", pur: "#a78bfa", org: "#ff8c42", teal: "#00f2ea"
+};
+
+const WEEKS = [
+  { rir: "4 RIR", note: "Technique focus · moderate effort", wtAdd: 0, deload: false },
+  { rir: "3 RIR", note: "+2.5 lb compounds · add sets if easy", wtAdd: 2.5, deload: false },
+  { rir: "2 RIR", note: "Getting harder · hold reps stable", wtAdd: 5, deload: false },
+  { rir: "2 RIR", note: "Sustained effort · stay consistent", wtAdd: 7.5, deload: false },
+  { rir: "0-1 RIR", note: "PEAK · push near failure · max volume", wtAdd: 10, deload: false },
+  { rir: "4 RIR", note: "DELOAD · 50% weight · 50% sets · recover", wtAdd: 0, deload: true },
+];
+
+const ROUTINES = {
+  "Upper A": {
+    day: "Mon", cardio: "20-min incline walk", sections: [
+      { name: "Chest", exercises: [
+        { name: "Smith Flat Bench Press", muscles: "Chest", sets: 3, reps: "8-10", rest: 150, wt: 120,
+          vid: "https://www.muscleandstrength.com/exercises/smith-machine-bench-press.html", src: "M&S" },
+        { name: "Smith Incline Press (30°)", muscles: "Upper Chest", sets: 3, reps: "10-12", rest: 120, wt: 75,
+          vid: "https://www.muscleandstrength.com/exercises/incline-smith-machine-bench-press.html", src: "M&S" },
+      ]},
+      { name: "Back", exercises: [
+        { name: "Chin-Ups (Wide Overhand)", muscles: "Lats · Upper Back", sets: 3, reps: "6-10", rest: 150, wt: null,
+          vid: "https://www.muscleandstrength.com/exercises/wide-grip-pull-up.html", src: "M&S" },
+        { name: "Seated Cable Row (Neutral)", muscles: "Upper Back · Lats", sets: 3, reps: "10-12", rest: 120, wt: 140,
+          vid: "https://www.muscleandstrength.com/exercises/seated-row.html", src: "M&S" },
+      ]},
+      { name: "Shoulders", exercises: [
+        { name: "Cable Lateral Raise", muscles: "Side Delts", sets: 3, reps: "12-15", rest: 60, wt: 15,
+          vid: "https://www.muscleandstrength.com/exercises/two-arm-cable-lateral-raise.html", src: "M&S" },
+        { name: "Cable Face Pull (Rope)", muscles: "Rear Delts", sets: 3, reps: "15-20", rest: 60, wt: 70,
+          vid: "https://www.muscleandstrength.com/exercises/cable-face-pull", src: "M&S" },
+      ]},
+      { name: "Arms", exercises: [
+        { name: "Cable EZ Bar Curl", muscles: "Biceps", sets: 3, reps: "10-12", rest: 90, wt: 65,
+          vid: "https://www.muscleandstrength.com/exercises/cable-curl.html", src: "M&S" },
+        { name: "Cable OH Tricep Extension", muscles: "Triceps", sets: 3, reps: "10-12", rest: 90, wt: 60,
+          vid: "https://www.muscleandstrength.com/exercises/standing-low-pulley-overhead-tricep-extension-(rope-extension).html", src: "M&S" },
+      ]},
+    ]
+  },
+  "Lower A": {
+    day: "Tue", cardio: "10-min incline walk", sections: [
+      { name: "Quads", exercises: [
+        { name: "Smith Front Squat", muscles: "Quads · Glutes", sets: 3, reps: "8-10", rest: 150, wt: 105,
+          vid: "https://www.muscleandstrength.com/exercises/smith-machine-front-squat.html", src: "M&S" },
+      ]},
+      { name: "Hamstrings", exercises: [
+        { name: "Smith Stiff-Leg Deadlift", muscles: "Hams · Glutes", sets: 3, reps: "8-10", rest: 150, wt: 115,
+          vid: "https://www.muscleandstrength.com/exercises/smith-machine-stiff-leg-deadlift.html", src: "M&S" },
+      ]},
+      { name: "Quads (Volume)", exercises: [
+        { name: "Landmine Goblet Squat", muscles: "Quads · Glutes", sets: 3, reps: "12-15", rest: 90, wt: 30,
+          vid: "https://www.muscleandstrength.com/exercises/landmine-goblet-squat", src: "M&S" },
+      ]},
+      { name: "Calves + Core + Delts", exercises: [
+        { name: "Smith Deficit Calf Raise", muscles: "Calves", sets: 3, reps: "12-15", rest: 60, wt: 115,
+          vid: "https://www.muscleandstrength.com/exercises/smith-machine-calf-raise.html", src: "M&S" },
+        { name: "Cable Crunch (Kneeling)", muscles: "Abs", sets: 3, reps: "12-15", rest: 60, wt: 45,
+          vid: "https://www.muscleandstrength.com/exercises/cable-crunch.html", src: "M&S" },
+        { name: "Cable Upright Row", muscles: "Side Delts", sets: 2, reps: "12-15", rest: 60, wt: 40,
+          vid: "https://www.muscleandstrength.com/exercises/cable-upright-row.html", src: "M&S" },
+      ]},
+    ]
+  },
+  "Upper B": {
+    day: "Thu", cardio: "20-min incline walk", sections: [
+      { name: "Chest", exercises: [
+        { name: "Smith Close-Grip Bench", muscles: "Chest · Triceps", sets: 3, reps: "8-10", rest: 150, wt: 75,
+          vid: "https://www.muscleandstrength.com/exercises/smith-machine-close-grip-bench-press.html", src: "M&S" },
+        { name: "Cable Fly (Low-to-High)", muscles: "Chest", sets: 2, reps: "12-15", rest: 90, wt: 15,
+          vid: "https://www.muscleandstrength.com/exercises/cable-lower-chest-raise.html", src: "M&S" },
+      ]},
+      { name: "Back", exercises: [
+        { name: "Cable Lat Pulldown (Close)", muscles: "Lats", sets: 3, reps: "10-12", rest: 120, wt: 180,
+          vid: "https://www.muscleandstrength.com/exercises/close-grip-pull-down.html", src: "M&S" },
+        { name: "Landmine Row (Per Arm)", muscles: "Upper Back · Lats", sets: 3, reps: "10-12", rest: 90, wt: 20,
+          vid: "https://www.muscleandstrength.com/exercises/one-arm-bent-over-row.html", src: "M&S" },
+      ]},
+      { name: "Shoulders", exercises: [
+        { name: "Cable Cross-Body Lateral", muscles: "Side Delts", sets: 3, reps: "15-20", rest: 60, wt: 10,
+          vid: "https://www.muscleandstrength.com/exercises/one-arm-cable-lateral-raise.html", src: "M&S" },
+        { name: "Cable Rear Delt Fly", muscles: "Rear Delts", sets: 3, reps: "15-20", rest: 60, wt: 10,
+          vid: "https://www.muscleandstrength.com/exercises/standing-cable-flys.html", src: "M&S" },
+      ]},
+      { name: "Arms", exercises: [
+        { name: "Cable Bayesian Curl", muscles: "Biceps", sets: 3, reps: "10-12", rest: 90, wt: 20,
+          vid: "https://barbend.com/bayesian-curl/", src: "BarBend" },
+        { name: "Cable Pushdown (Bar)", muscles: "Triceps", sets: 3, reps: "10-12", rest: 90, wt: 65,
+          vid: "https://www.muscleandstrength.com/exercises/tricep-extension.html", src: "M&S" },
+      ]},
+    ]
+  },
+  "Lower B": {
+    day: "Sat", cardio: "10-min incline walk", sections: [
+      { name: "Quads", exercises: [
+        { name: "Smith Hack Squat (Feet Fwd)", muscles: "Quads", sets: 3, reps: "10-12", rest: 120, wt: 95,
+          vid: "https://www.muscleandstrength.com/exercises/feet-forward-smith-machine-squat.html", src: "M&S" },
+      ]},
+      { name: "Hamstrings", exercises: [
+        { name: "Smith Good Morning", muscles: "Hams · Glutes", sets: 3, reps: "10-12", rest: 120, wt: 75,
+          vid: "https://www.tiktok.com/@drmikeisraetel/video/7340302191909031211", src: "Dr. Mike" },
+      ]},
+      { name: "Glutes", exercises: [
+        { name: "Smith Lunge (Front Elevated)", muscles: "Glutes · Quads", sets: 2, reps: "12-15", rest: 90, wt: 40,
+          vid: "https://www.muscleandstrength.com/exercises/front-foot-elevated-smith-machine-split-squat", src: "M&S" },
+      ]},
+      { name: "Calves + Core + Delts", exercises: [
+        { name: "Smith Deficit Calf Raise", muscles: "Calves", sets: 3, reps: "12-15", rest: 60, wt: 115,
+          vid: "https://www.muscleandstrength.com/exercises/smith-machine-calf-raise.html", src: "M&S" },
+        { name: "Hanging Knee Raise", muscles: "Abs", sets: 3, reps: "12-15", rest: 60, wt: null,
+          vid: "https://www.muscleandstrength.com/exercises/hanging-knee-raise.html", src: "M&S" },
+        { name: "Cable Upright Row", muscles: "Side Delts", sets: 2, reps: "12-15", rest: 60, wt: 40,
+          vid: "https://www.muscleandstrength.com/exercises/cable-upright-row.html", src: "M&S" },
+      ]},
+    ]
+  },
+};
+
+const ROUTINE_KEYS = Object.keys(ROUTINES);
+
+const fmtRest = s => s >= 60 ? `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}` : `${s}s`;
+const fmtTimer = s => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`;
+
+function SetRow({ setNum, targetReps, targetWt, onLog, onDelete, logged }) {
+  const [reps, setReps] = useState(logged?.reps?.toString() || targetReps || "");
+  const [wt, setWt] = useState(logged?.wt?.toString() || (targetWt?.toString() || ""));
+  const [editing, setEditing] = useState(false);
+  const isDone = logged != null && !editing;
+
+  useEffect(() => {
+    if (logged && !editing) {
+      setReps(logged.reps.toString());
+      setWt(logged.wt.toString());
+    }
+  }, [logged, editing]);
+
+  const handleLog = () => {
+    if (reps && wt) {
+      onLog(setNum, { reps: parseInt(reps), wt: parseFloat(wt) });
+      setEditing(false);
+    }
+  };
+
+  const handleEdit = (e) => {
+    e.stopPropagation();
+    setEditing(true);
+  };
+
+  const handleDelete = (e) => {
+    e.stopPropagation();
+    onDelete(setNum);
+    setReps("");
+    setWt(targetWt?.toString() || "");
+    setEditing(false);
+  };
+
+  const handleQuickLog = (e) => {
+    e.stopPropagation();
+    if (isDone) return;
+    const r = reps || targetReps;
+    const w = wt || targetWt || "";
+    if (r && w) {
+      onLog(setNum, { reps: parseInt(r), wt: parseFloat(w) });
+      setEditing(false);
+    }
+  };
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+      <div onClick={handleQuickLog} style={{ width: 28, height: 28, borderRadius: "50%", background: isDone ? C.grn : C.c2, border: `1px solid ${isDone ? C.grn : C.bdr}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: isDone ? C.bg : C.mut, cursor: "pointer", flexShrink: 0 }}>
+        {isDone ? "✓" : setNum}
+      </div>
+      {isDone ? (
+        <>
+          <div style={{ fontSize: 14, fontFamily: "monospace", fontWeight: 700, color: C.txt, flex: 1 }}>
+            <span style={{ color: C.blu }}>{logged.reps}</span>
+            <span style={{ color: C.mut }}> × </span>
+            <span style={{ color: C.gld }}>{logged.wt}</span>
+            <span style={{ color: C.mut, fontSize: 9 }}> lb</span>
+          </div>
+          <button onClick={handleEdit} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${C.bdr}`, background: C.c2, color: C.mut, fontSize: 10, cursor: "pointer" }}>Edit</button>
+          <button onClick={handleDelete} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${C.red}22`, background: C.red + "11", color: C.red, fontSize: 10, cursor: "pointer" }}>✕</button>
+        </>
+      ) : (
+        <>
+          <input type="number" inputMode="numeric" placeholder={targetReps} value={reps} onChange={e => setReps(e.target.value)}
+            style={{ width: 48, padding: "5px 4px", borderRadius: 6, border: `1px solid ${C.bdr}`, background: C.c2, color: C.txt, fontSize: 13, textAlign: "center" }}
+          />
+          <span style={{ fontSize: 9, color: C.mut }}>reps</span>
+          <span style={{ fontSize: 12, color: C.mut }}>×</span>
+          <input type="number" inputMode="decimal" placeholder={targetWt || "BW"} value={wt} onChange={e => setWt(e.target.value)}
+            style={{ width: 56, padding: "5px 4px", borderRadius: 6, border: `1px solid ${C.bdr}`, background: C.c2, color: C.txt, fontSize: 13, textAlign: "center" }}
+          />
+          <span style={{ fontSize: 9, color: C.mut }}>lb</span>
+          {reps && wt && (
+            <button onClick={handleLog} style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: C.grn, color: C.bg, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+              {editing ? "Save" : "Log"}
+            </button>
+          )}
+          {editing && (
+            <button onClick={() => setEditing(false)} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${C.bdr}`, background: C.c2, color: C.mut, fontSize: 10, cursor: "pointer" }}>Cancel</button>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function RestTimer({ seconds, exName, setNum, totalSets, onDone }) {
+  const [elapsed, setElapsed] = useState(0);
+  const ref = useRef(null);
+  const alertedRef = useRef(false);
+
+  useEffect(() => {
+    ref.current = setInterval(() => setElapsed(e => e + 1), 1000);
+    return () => clearInterval(ref.current);
+  }, []);
+
+  useEffect(() => {
+    if (elapsed >= seconds && !alertedRef.current) {
+      alertedRef.current = true;
+      try {
+        const synth = new Tone.Synth({ oscillator: { type: "triangle" }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.3 } }).toDestination();
+        Tone.start().then(() => {
+          synth.triggerAttackRelease("C5", "0.15", Tone.now());
+          synth.triggerAttackRelease("E5", "0.15", Tone.now() + 0.18);
+          synth.triggerAttackRelease("G5", "0.2", Tone.now() + 0.36);
+        });
+      } catch(e) {}
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+    }
+  }, [elapsed, seconds]);
+
+  const remaining = Math.max(seconds - elapsed, 0);
+  const isOver = elapsed >= seconds;
+  const overBy = elapsed - seconds;
+  const pct = Math.min(elapsed / seconds, 1);
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(6,6,11,0.97)", zIndex: 1000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div style={{ fontSize: 12, color: C.mut, marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>Rest Timer</div>
+      <div style={{ fontSize: 14, color: C.txt, fontWeight: 600, marginBottom: 16 }}>{exName}</div>
+      
+      <div style={{ fontSize: 88, fontWeight: 800, fontFamily: "monospace", color: isOver ? C.grn : C.txt, lineHeight: 1 }}>
+        {isOver ? "+" + fmtTimer(overBy) : fmtTimer(remaining)}
+      </div>
+      <div style={{ fontSize: 12, color: isOver ? C.grn : C.mut, fontWeight: 600, marginBottom: 24 }}>
+        {isOver ? "GO — you're rested" : `${fmtTimer(elapsed)} / ${fmtRest(seconds)}`}
+      </div>
+
+      <div style={{ width: 180, height: 6, background: C.c2, borderRadius: 3, marginBottom: 32 }}>
+        <div style={{ width: `${pct * 100}%`, height: "100%", background: isOver ? C.grn : C.pur, borderRadius: 3, transition: "width 1s linear" }} />
+      </div>
+
+      <div style={{ fontSize: 11, color: C.mut, marginBottom: 20 }}>
+        Set {setNum} of {totalSets} complete
+        {setNum < totalSets && <span style={{ color: C.blu }}> — Set {setNum + 1} next</span>}
+        {setNum >= totalSets && <span style={{ color: C.grn }}> — Exercise done!</span>}
+      </div>
+
+      <button onClick={() => { clearInterval(ref.current); onDone(); }}
+        style={{ padding: "16px 60px", borderRadius: 14, border: "none", background: isOver ? C.grn : C.pur, color: C.bg, fontSize: 16, fontWeight: 800, cursor: "pointer" }}>
+        {setNum < totalSets ? "Next Set →" : "Done ✓"}
+      </button>
+      <button onClick={() => { clearInterval(ref.current); onDone(); }}
+        style={{ marginTop: 12, padding: "8px 20px", borderRadius: 8, border: `1px solid ${C.bdr}`, background: "transparent", color: C.mut, fontSize: 11, cursor: "pointer" }}>
+        Skip rest
+      </button>
+    </div>
+  );
+}
+
+function ExerciseCard({ ex, week, sessionKey, allSets, setAllSets, onStartRest, onSave, onSync, onDeleteFromDb }) {
+  const [expanded, setExpanded] = useState(false);
+  const exKey = `${sessionKey}|${ex.name}`;
+  const logged = allSets[exKey] || {};
+  const numDone = Object.keys(logged).length;
+  const totalSets = ex.sets;
+  const allDone = numDone >= totalSets;
+
+  const wkData = WEEKS[week];
+  const isCompound = ex.rest >= 120;
+  const weeklyAdd = isCompound ? wkData.wtAdd : Math.floor(wkData.wtAdd / 2.5) * 2.5 * 0.5;
+  const targetWt = ex.wt 
+    ? wkData.deload 
+      ? Math.round(ex.wt * 0.5 / 5) * 5 
+      : Math.round((ex.wt + weeklyAdd) / 2.5) * 2.5
+    : null;
+
+  const logSet = (setNum, data) => {
+    const updated = { ...allSets, [exKey]: { ...logged, [setNum]: data } };
+    setAllSets(updated);
+    onSave(updated, sessionKey);
+    onSync(ex.name, setNum, data.reps, data.wt);
+    if (setNum < totalSets) {
+      onStartRest(ex.rest, ex.name, setNum, totalSets);
+    }
+  };
+
+  const deleteSet = (setNum) => {
+    const updatedEx = { ...logged };
+    delete updatedEx[setNum];
+    const updated = { ...allSets, [exKey]: updatedEx };
+    setAllSets(updated);
+    onSave(updated, sessionKey);
+    if (onDeleteFromDb) onDeleteFromDb(ex.name, setNum);
+  };
+
+  return (
+    <div style={{ background: C.card, borderRadius: 12, padding: 12, marginBottom: 8, border: `1px solid ${allDone ? C.grn + "33" : C.bdr}`, cursor: expanded ? "default" : "pointer" }}
+      onClick={() => !expanded && setExpanded(true)}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: allDone ? C.grn : C.txt }}>
+              {ex.name} {allDone && <span style={{ fontSize: 10, color: C.grn }}>✓</span>}
+            </div>
+          </div>
+          <div style={{ fontSize: 10, color: C.mut, marginTop: 1 }}>{ex.muscles}</div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+          {!expanded && (
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700 }}>
+                <span style={{ color: C.grn }}>{totalSets}</span>
+                <span style={{ color: C.mut }}>×</span>
+                <span style={{ color: C.blu }}>{ex.reps}</span>
+                {targetWt && <span style={{ color: C.gld, marginLeft: 4 }}>@{targetWt}</span>}
+              </div>
+              <div style={{ fontSize: 9, color: C.mut }}>{numDone}/{totalSets} logged</div>
+            </div>
+          )}
+          <a href={ex.vid} target="_blank" rel="noopener" onClick={e => e.stopPropagation()}
+            style={{ display: "inline-flex", alignItems: "center", gap: 3, background: C.teal + "15", border: `1px solid ${C.teal}33`, borderRadius: 6, padding: "3px 7px", fontSize: 9, color: C.teal, textDecoration: "none", fontWeight: 600 }}>
+            ▶ {ex.src}
+          </a>
+        </div>
+      </div>
+
+      {expanded && (
+        <div onClick={e => e.stopPropagation()}>
+          <div style={{ fontSize: 11, color: C.pur, padding: "5px 7px", background: C.pur + "11", borderRadius: 6, marginTop: 8, marginBottom: 8 }}>
+            {wkData.rir} · {wkData.note}
+          </div>
+          
+          <div style={{ display: "flex", gap: 12, marginBottom: 8, fontSize: 10 }}>
+            <span style={{ color: C.mut }}>Target: <span style={{ color: C.grn, fontWeight: 600 }}>{totalSets}×{ex.reps}</span></span>
+            <span style={{ color: C.mut }}>Rest: <span style={{ color: C.pur, fontWeight: 600 }}>{fmtRest(ex.rest)}</span></span>
+            {targetWt && <span style={{ color: C.mut }}>Wt: <span style={{ color: C.gld, fontWeight: 600 }}>{targetWt} lb</span></span>}
+          </div>
+
+          {Array.from({ length: totalSets }, (_, i) => (
+            <SetRow key={i} setNum={i + 1} targetReps={ex.reps.split("-")[0]} targetWt={targetWt} logged={logged[i + 1]} onLog={logSet} onDelete={deleteSet} />
+          ))}
+          <button onClick={() => setExpanded(false)} style={{ marginTop: 6, padding: "4px 12px", borderRadius: 6, border: `1px solid ${C.bdr}`, background: "transparent", color: C.mut, fontSize: 10, cursor: "pointer" }}>Collapse</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function App() {
+  const [routine, setRoutine] = useState(0);
+  const [week, setWeek] = useState(0);
+  const [allSets, setAllSets] = useState({});
+  const [showExport, setShowExport] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [timer, setTimer] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+  const [currentSession, setCurrentSession] = useState(null);
+  const [syncStatus, setSyncStatus] = useState("");
+  const [dbConnected, setDbConnected] = useState(false);
+
+  const r = ROUTINES[ROUTINE_KEYS[routine]];
+  const rKey = ROUTINE_KEYS[routine];
+  const today = new Date().toISOString().slice(0, 10);
+  const sessionKey = today + "-" + rKey.replace(/\s+/g, "");
+
+  // Load session from Supabase on mount or when routine/week changes
+  useEffect(() => {
+    let cancelled = false;
+    const loadSession = async () => {
+      try {
+        setSyncStatus("loading...");
+        const session = await db.getOrCreateSession(today, rKey, week + 1, WEEKS[week].rir);
+        if (cancelled) return;
+        
+        if (session) {
+          setCurrentSession(session);
+          setDbConnected(true);
+          const sessionSets = await db.loadSession(session.id);
+          if (cancelled) return;
+          
+          // Convert to allSets format
+          const rebuilt = {};
+          Object.entries(sessionSets).forEach(([exName, sets]) => {
+            rebuilt[`${sessionKey}|${exName}`] = sets;
+          });
+          setAllSets(rebuilt);
+          const count = Object.values(sessionSets).reduce((s, ex) => s + Object.keys(ex).length, 0);
+          setSyncStatus(count > 0 ? `restored ${count} sets` : "ready");
+        } else {
+          setSyncStatus("offline mode");
+        }
+      } catch (e) {
+        console.error('Load error:', e);
+        if (!cancelled) setSyncStatus("offline — using local");
+      }
+      if (!cancelled) setLoaded(true);
+    };
+    loadSession();
+    return () => { cancelled = true; };
+  }, [today, rKey, week, sessionKey]);
+
+  // Sync a set to Supabase
+  const syncToDb = useCallback(async (exercise, setNum, reps, weight) => {
+    if (!currentSession) return;
+    try {
+      setSyncStatus("saving...");
+      await db.logSet(currentSession.id, exercise, setNum, reps, weight);
+      setSyncStatus("saved ✓");
+      setTimeout(() => setSyncStatus(""), 2000);
+    } catch (e) {
+      console.error('Sync error:', e);
+      setSyncStatus("save err");
+    }
+  }, [currentSession]);
+
+  // Delete a set from Supabase
+  const deleteFromDb = useCallback(async (exercise, setNum) => {
+    if (!currentSession) return;
+    try {
+      await db.deleteSet(currentSession.id, exercise, setNum);
+    } catch (e) {
+      console.error('Delete error:', e);
+    }
+  }, [currentSession]);
+
+  const saveToStorage = useCallback(() => {}, []);
+
+  // Count progress
+  const totalExercises = r.sections.reduce((s, sec) => s + sec.exercises.length, 0);
+  const doneExercises = r.sections.reduce((s, sec) => {
+    return s + sec.exercises.filter(ex => {
+      const key = `${sessionKey}|${ex.name}`;
+      return Object.keys(allSets[key] || {}).length >= ex.sets;
+    }).length;
+  }, 0);
+
+  // Export data for Claude
+  const exportData = () => {
+    const lines = [`SESSION: ${rKey} | ${today} | Week ${week + 1} | ${WEEKS[week].rir}`];
+    r.sections.forEach(sec => {
+      sec.exercises.forEach(ex => {
+        const key = `${sessionKey}|${ex.name}`;
+        const sets = allSets[key] || {};
+        const setEntries = Object.entries(sets).sort((a, b) => a[0] - b[0]);
+        if (setEntries.length > 0) {
+          lines.push(`${ex.name}: ${setEntries.map(([n, d]) => `${d.reps}×${d.wt}`).join(", ")}`);
+        }
+      });
+    });
+    return lines.join("\n");
+  };
+
+  const totalSetsLogged = Object.values(allSets).reduce((s, ex) => s + Object.keys(ex).length, 0);
+
+  const startRest = useCallback((seconds, exName, setNum, totalSets) => {
+    setTimer({ seconds, exName, setNum, totalSets });
+  }, []);
+
+  const W = { background: C.bg, minHeight: "100vh", color: C.txt, fontFamily: "'SF Pro Display',system-ui,sans-serif", padding: "12px 10px", maxWidth: 480, margin: "0 auto" };
+
+  return (
+    <div style={W}>
+      {/* GLOBAL REST TIMER */}
+      {timer && (
+        <RestTimer
+          seconds={timer.seconds}
+          exName={timer.exName}
+          setNum={timer.setNum}
+          totalSets={timer.totalSets}
+          onDone={() => setTimer(null)}
+        />
+      )}
+
+      {/* Header */}
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: C.blu, letterSpacing: -0.5 }}>TRAINING HUB</div>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            {syncStatus && (
+              <div style={{ fontSize: 8, color: syncStatus.includes("✓") || syncStatus === "ready" ? C.grn : syncStatus.includes("err") || syncStatus.includes("offline") ? C.red : C.mut }}>
+                {syncStatus}
+              </div>
+            )}
+            {totalSetsLogged > 0 && (
+              <div style={{ fontSize: 9, color: C.grn, background: C.grn + "15", padding: "3px 8px", borderRadius: 10, fontWeight: 600 }}>
+                {totalSetsLogged} sets
+              </div>
+            )}
+            <div style={{ width: 8, height: 8, borderRadius: "50%", background: dbConnected ? C.grn : C.red }} title={dbConnected ? "Connected to database" : "Offline"} />
+          </div>
+        </div>
+        <div style={{ fontSize: 10, color: C.mut }}>Tap exercise → tap ① to quick-log → timer auto-starts</div>
+      </div>
+
+      {!loaded && (
+        <div style={{ textAlign: "center", padding: 40, color: C.mut, fontSize: 12 }}>Loading session data...</div>
+      )}
+
+      {loaded && (<>
+        {/* Routine tabs */}
+        <div style={{ display: "flex", gap: 4, marginBottom: 6, position: "sticky", top: 0, background: C.bg, zIndex: 10, paddingBottom: 4 }}>
+          {ROUTINE_KEYS.map((k, i) => (
+            <button key={k} onClick={() => setRoutine(i)}
+              style={{ flex: 1, padding: "7px 2px", borderRadius: 8, border: `1px solid ${i === routine ? C.blu : C.bdr}`, background: i === routine ? C.blu + "22" : C.card, color: i === routine ? C.blu : C.mut, fontSize: 11, fontWeight: 700, cursor: "pointer", textAlign: "center" }}>
+              {k}<br /><span style={{ fontSize: 8 }}>{ROUTINES[k].day}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Week selector */}
+        <div style={{ display: "flex", gap: 3, marginBottom: 8 }}>
+          {WEEKS.map((w, i) => (
+            <button key={i} onClick={() => setWeek(i)}
+              style={{ flex: 1, padding: "4px 2px", borderRadius: 6, border: `1px solid ${i === week ? C.pur : C.bdr}`, background: i === week ? C.pur + "22" : "transparent", color: i === week ? C.pur : C.mut, fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
+              {i < 5 ? `W${i + 1}` : "DL"}
+            </button>
+          ))}
+        </div>
+
+        {/* Week info */}
+        <div style={{ background: C.c2, borderRadius: 8, padding: "7px 10px", marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <span style={{ fontSize: 14, fontWeight: 800, color: week === 5 ? C.org : C.pur }}>{WEEKS[week].rir}</span>
+            <span style={{ fontSize: 10, color: C.mut, marginLeft: 8 }}>{WEEKS[week].note}</span>
+          </div>
+          <div style={{ fontSize: 10, color: doneExercises === totalExercises ? C.grn : C.mut, fontWeight: 600 }}>
+            {doneExercises}/{totalExercises}
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        <div style={{ height: 3, background: C.c2, borderRadius: 2, marginBottom: 10, overflow: "hidden" }}>
+          <div style={{ height: "100%", width: `${(doneExercises / totalExercises) * 100}%`, background: `linear-gradient(90deg, ${C.blu}, ${C.grn})`, transition: "width 0.3s" }} />
+        </div>
+
+        {/* Warmup */}
+        <div style={{ background: `linear-gradient(135deg,${C.org}11,${C.card})`, border: `1px solid ${C.org}22`, borderRadius: 8, padding: "8px 10px", marginBottom: 10, fontSize: 11 }}>
+          <b style={{ color: C.gld }}>Warmup:</b> 5-min flat walk → dynamic stretch · <b style={{ color: C.org }}>Post:</b> {r.cardio}
+        </div>
+
+        {/* Exercise cards by section */}
+        {r.sections.map((sec, si) => (
+          <div key={si}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.mut, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4, marginTop: si > 0 ? 12 : 0 }}>{sec.name}</div>
+            {sec.exercises.map((ex, ei) => (
+              <ExerciseCard key={ei} ex={ex} week={week} sessionKey={sessionKey} allSets={allSets} setAllSets={setAllSets} onStartRest={startRest} onSave={saveToStorage} onSync={syncToDb} onDeleteFromDb={deleteFromDb} />
+            ))}
+          </div>
+        ))}
+
+        {/* Export button */}
+        <div style={{ marginTop: 16 }}>
+          <button onClick={() => setShowExport(!showExport)}
+            style={{ width: "100%", padding: "14px", borderRadius: 10, border: `1px solid ${C.blu}44`, background: C.blu + "11", color: C.blu, fontSize: 14, fontWeight: 700, cursor: "pointer" }}>
+            {showExport ? "Hide Export" : "📋 Done — Send to Claude"}
+          </button>
+          {showExport && (
+            <div style={{ marginTop: 8 }}>
+              <pre style={{ background: C.c2, padding: 10, borderRadius: 8, fontSize: 10, color: C.txt, overflow: "auto", whiteSpace: "pre-wrap" }}>
+                {exportData()}
+              </pre>
+              <button onClick={() => { navigator.clipboard?.writeText(exportData()); setCopied(true); setTimeout(() => setCopied(false), 3000); }}
+                style={{ marginTop: 6, width: "100%", padding: "12px", borderRadius: 8, border: "none", background: copied ? C.grn : C.blu, color: C.bg, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
+                {copied ? "Copied ✓ — Now paste in your chat with Claude" : "Copy to Clipboard"}
+              </button>
+              <div style={{ marginTop: 8, padding: "8px 10px", background: C.pur + "11", borderRadius: 8, border: `1px solid ${C.pur}22` }}>
+                <div style={{ fontSize: 10, color: C.pur, fontWeight: 600, marginBottom: 3 }}>After copying:</div>
+                <div style={{ fontSize: 10, color: C.mut, lineHeight: 1.5 }}>
+                  1. Close this artifact<br/>
+                  2. Paste into your chat with Claude<br/>
+                  3. I'll update your spreadsheet, dashboard, and give coaching notes for your next session
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+        <div style={{ fontSize: 9, color: C.mut, textAlign: "center", marginTop: 16 }}>
+          RP Hypertrophy · ForceUSA G3 · Meso 1 · {today} · {dbConnected ? "☁ synced" : "offline"}
+        </div>
+      </>)}
+    </div>
+  );
+}

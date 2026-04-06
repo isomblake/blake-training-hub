@@ -1,0 +1,8 @@
+{
+  "short_name": "Training Hub",
+  "name": "Blake's Training Hub",
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#06060b",
+  "background_color": "#06060b"
+}
