@@ -1,65 +1,53 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
 // === SOUND SYSTEM ===
-// iOS requires AudioContext.resume() from a direct user gesture before
-// it will play any sound. But resuming it also pauses Spotify.
-// Solution: provide an explicit "Enable Sound" button that the user
-// taps ONCE per session. This is a deliberate gesture so iOS allows
-// sound AND the user knowingly accepts the Spotify interaction.
-// After that first tap, all timer sounds work without further gestures.
-// If they skip the button, they still get vibration alerts.
+// Uses an HTML Audio element loaded from a CDN sound file.
+// On "Enable Sound" tap, we load + play the audio element at volume 0
+// to unlock it for iOS. Then we reuse that same element for all sounds.
+// This is the most battle-tested approach for mobile web audio.
 
-let _ctx = null;
+let _audio = null;
 let _soundEnabled = false;
 
-function getCtx() {
-  if (!_ctx) _ctx = new (window.AudioContext || window.webkitAudioContext)();
-  return _ctx;
-}
+// Free notification sounds from CDN
+const SOUND_WARNING = "https://cdn.freesound.org/previews/536/536108_11943040-lq.mp3";
+const SOUND_DONE = "https://cdn.freesound.org/previews/341/341695_5858296-lq.mp3";
 
-// Called from the "Enable Sound" button — this is the user gesture iOS needs
 function enableSound() {
-  const ctx = getCtx();
-  if (ctx.state === 'suspended') ctx.resume();
-  // Play a quick test tone so user knows it worked
-  try {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain); gain.connect(ctx.destination);
-    osc.type = 'sine'; osc.frequency.value = 660;
-    gain.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
-    osc.start(); osc.stop(ctx.currentTime + 0.25);
-  } catch(e) {}
+  // Create and unlock audio element on user gesture
+  _audio = new Audio();
+  _audio.volume = 0.01;
+  _audio.src = SOUND_WARNING;
+  const p = _audio.play();
+  if (p) p.then(() => { _audio.pause(); _audio.currentTime = 0; _audio.volume = 0.8; }).catch(() => {});
   _soundEnabled = true;
+  // Pre-fetch both sounds
+  fetch(SOUND_WARNING).catch(() => {});
+  fetch(SOUND_DONE).catch(() => {});
   return true;
 }
 
-function playTone(freq, dur, vol, startOffset = 0) {
-  if (!_soundEnabled) return; // skip if user hasn't enabled sound
-  try {
-    const ctx = getCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain); gain.connect(ctx.destination);
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(freq, ctx.currentTime + startOffset);
-    gain.gain.setValueAtTime(vol, ctx.currentTime + startOffset);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + startOffset + dur);
-    osc.start(ctx.currentTime + startOffset);
-    osc.stop(ctx.currentTime + startOffset + dur);
-  } catch(e) {}
-}
-
 function playWarningSound() {
-  playTone(880, 0.3, 0.5);
+  if (_soundEnabled && _audio) {
+    try {
+      _audio.src = SOUND_WARNING;
+      _audio.volume = 0.7;
+      _audio.currentTime = 0;
+      _audio.play().catch(() => {});
+    } catch(e) {}
+  }
   if (navigator.vibrate) navigator.vibrate([150, 80, 150]);
 }
 
 function playRestBeep() {
-  playTone(523, 0.4, 0.6, 0);
-  playTone(659, 0.4, 0.6, 0.2);
-  playTone(784, 0.5, 0.7, 0.4);
+  if (_soundEnabled && _audio) {
+    try {
+      _audio.src = SOUND_DONE;
+      _audio.volume = 0.9;
+      _audio.currentTime = 0;
+      _audio.play().catch(() => {});
+    } catch(e) {}
+  }
   if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 300]);
 }
 import { supabase } from "./supabaseClient";
