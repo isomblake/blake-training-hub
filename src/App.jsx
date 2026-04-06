@@ -1,5 +1,22 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Synth, start, now } from "tone";
+// Simple beep using Web Audio API (replaces Tone.js)
+function playRestBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
+    notes.forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "triangle";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.18);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.18 + 0.2);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(ctx.currentTime + i * 0.18);
+      osc.stop(ctx.currentTime + i * 0.18 + 0.25);
+    });
+  } catch(e) {}
+}
 import { supabase } from "./supabaseClient";
 
 // ============================================================
@@ -433,12 +450,7 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone }) {
     if (elapsed >= seconds && !alertedRef.current) {
       alertedRef.current = true;
       try {
-        const synth = new Synth({ oscillator: { type: "triangle" }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.3 } }).toDestination();
-        start().then(() => {
-          synth.triggerAttackRelease("C5", "0.15", now());
-          synth.triggerAttackRelease("E5", "0.15", now() + 0.18);
-          synth.triggerAttackRelease("G5", "0.2", now() + 0.36);
-        });
+        playRestBeep();
       } catch(e) {}
       if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
     }
