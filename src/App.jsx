@@ -1,21 +1,80 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-// Simple beep using Web Audio API (replaces Tone.js)
+
+// Persistent AudioContext for playing over music without interrupting it
+let _audioCtx = null;
+function getAudioCtx() {
+  if (!_audioCtx) {
+    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return _audioCtx;
+}
+
+// Resume audio context on first user interaction (required by mobile browsers)
+function unlockAudio() {
+  const ctx = getAudioCtx();
+  if (ctx.state === "suspended") {
+    ctx.resume();
+  }
+  // Play a silent buffer to fully unlock on iOS
+  const buf = ctx.createBuffer(1, 1, 22050);
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+  src.connect(ctx.destination);
+  src.start(0);
+}
+
+// Call unlockAudio on first touch/click
+if (typeof window !== 'undefined') {
+  const handleFirst = () => {
+    unlockAudio();
+    document.removeEventListener('touchstart', handleFirst);
+    document.removeEventListener('click', handleFirst);
+  };
+  document.addEventListener('touchstart', handleFirst, { once: true });
+  document.addEventListener('click', handleFirst, { once: true });
+}
+
+// Pleasant ding sound that plays over music
 function playRestBeep() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const notes = [523.25, 659.25, 783.99]; // C5, E5, G5
+    const ctx = getAudioCtx();
+    if (ctx.state === "suspended") ctx.resume();
+    const t = ctx.currentTime;
+
+    // Three-note ascending chime: C5, E5, G5
+    const notes = [523.25, 659.25, 783.99];
     notes.forEach((freq, i) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.type = "triangle";
+      osc.type = "sine"; // sine = cleaner ding that cuts through music
       osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.3, ctx.currentTime + i * 0.18);
-      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.18 + 0.2);
+      gain.gain.setValueAtTime(0, t + i * 0.2);
+      gain.gain.linearRampToValueAtTime(0.4, t + i * 0.2 + 0.02); // quick attack
+      gain.gain.exponentialRampToValueAtTime(0.01, t + i * 0.2 + 0.4); // gentle decay
       osc.connect(gain).connect(ctx.destination);
-      osc.start(ctx.currentTime + i * 0.18);
-      osc.stop(ctx.currentTime + i * 0.18 + 0.25);
+      osc.start(t + i * 0.2);
+      osc.stop(t + i * 0.2 + 0.45);
     });
-  } catch(e) {}
+
+    // Also play the sound a second time 1 second later in case they missed it
+    setTimeout(() => {
+      try {
+        const t2 = ctx.currentTime;
+        notes.forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "sine";
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0, t2 + i * 0.2);
+          gain.gain.linearRampToValueAtTime(0.5, t2 + i * 0.2 + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.01, t2 + i * 0.2 + 0.4);
+          osc.connect(gain).connect(ctx.destination);
+          osc.start(t2 + i * 0.2);
+          osc.stop(t2 + i * 0.2 + 0.45);
+        });
+      } catch(e) {}
+    }, 1200);
+  } catch(e) { console.warn('Audio error:', e); }
 }
 import { supabase } from "./supabaseClient";
 
