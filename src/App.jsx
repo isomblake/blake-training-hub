@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import * as Tone from "tone";
+import { Synth, start, now } from "tone";
 import { supabase } from "./supabaseClient";
 
 // ============================================================
@@ -433,11 +433,11 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone }) {
     if (elapsed >= seconds && !alertedRef.current) {
       alertedRef.current = true;
       try {
-        const synth = new Tone.Synth({ oscillator: { type: "triangle" }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.3 } }).toDestination();
-        Tone.start().then(() => {
-          synth.triggerAttackRelease("C5", "0.15", Tone.now());
-          synth.triggerAttackRelease("E5", "0.15", Tone.now() + 0.18);
-          synth.triggerAttackRelease("G5", "0.2", Tone.now() + 0.36);
+        const synth = new Synth({ oscillator: { type: "triangle" }, envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.3 } }).toDestination();
+        start().then(() => {
+          synth.triggerAttackRelease("C5", "0.15", now());
+          synth.triggerAttackRelease("E5", "0.15", now() + 0.18);
+          synth.triggerAttackRelease("G5", "0.2", now() + 0.36);
         });
       } catch(e) {}
       if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
