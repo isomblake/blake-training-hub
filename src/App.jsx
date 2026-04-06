@@ -514,15 +514,21 @@ const DELOAD_WEEKS = [
 ];
 
 // All mesocycles
+// Sculpted Strength W9 deload uses Meso 1 exercises at 50% weight, 2 sets
+const SCULPTED_DELOAD_WEEKS = [
+  { rir: "4+ RIR", note: "W9 DELOAD · 2 sets · 50% weight · learn Meso 1 moves", smith: 0, cable: 0, iso: 0, deload: true },
+];
+
 const MESOCYCLES = [
   {
-    id: "deload-pre-meso1",
-    name: "RP Deload",
-    shortName: "Deload",
-    startDate: "2026-04-06",
+    id: "sculpted-strength",
+    name: "Sculpted Strength",
+    shortName: "Sculpted",
+    startDate: "2026-02-09",
     endDate: "2026-04-12",
-    weeks: DELOAD_WEEKS,
+    weeks: SCULPTED_DELOAD_WEEKS, // Only W9 deload is active in app (W1-W8 data is in history)
     routines: DELOAD_ROUTINES,
+    note: "8 weeks completed (Feb 9 – Apr 4) · W9 Deload (Apr 6–12)",
   },
   {
     id: "rp-meso-1",
@@ -1265,7 +1271,7 @@ export default function App() {
           {activeWeeks.map((w, i) => (
             <button key={i} onClick={() => setWeek(i)}
               style={{ flex: 1, padding: "4px 2px", borderRadius: 6, border: `1px solid ${i === week ? C.pur : C.bdr}`, background: i === week ? C.pur + "22" : "transparent", color: i === week ? C.pur : C.mut, fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
-              {w.deload ? "DL" : `W${i + 1}`}
+              {w.deload ? (activeMeso.id === "sculpted-strength" ? "W9 DL" : "DL") : `W${i + 1}`}
             </button>
           ))}
         </div>
