@@ -1,88 +1,87 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
 // === SOUND SYSTEM ===
-// Uses both Web Audio API AND HTML5 Audio for maximum mobile compatibility
-// Generates audio data URLs so no external files needed
+// Uses a single pre-loaded Audio element that gets "unlocked" on first tap.
+// This is the most reliable approach for mobile browsers (iOS + Android).
+// The trick: create the Audio on user gesture, then reuse it.
 
-// Generate a WAV file as a data URL for a ding sound
-function generateDingWav(freq, duration, volume) {
-  const sampleRate = 22050;
-  const samples = Math.floor(sampleRate * duration);
-  const buffer = new ArrayBuffer(44 + samples * 2);
-  const view = new DataView(buffer);
-  // WAV header
-  const writeStr = (o, s) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
-  writeStr(0, 'RIFF'); view.setUint32(4, 36 + samples * 2, true); writeStr(8, 'WAVE');
-  writeStr(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true); view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true);
-  writeStr(36, 'data'); view.setUint32(40, samples * 2, true);
-  for (let i = 0; i < samples; i++) {
-    const t = i / sampleRate;
-    const envelope = Math.max(0, 1 - t / duration) * Math.max(0, 1 - t * 3); // quick decay
-    const sample = Math.sin(2 * Math.PI * freq * t) * envelope * volume;
-    view.setInt16(44 + i * 2, Math.max(-32768, Math.min(32767, sample * 32767)), true);
-  }
-  const blob = new Blob([buffer], { type: 'audio/wav' });
-  return URL.createObjectURL(blob);
+let _audioEl = null;   // warning ding
+let _audioEl2 = null;  // done chime
+let _unlocked = false;
+
+// Base64-encoded tiny MP3 silence (needed to prime Audio on iOS)
+const SILENCE = "data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAABhgC7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7u7//////////////////////////////////////////////////////////////////8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAAAAAAAAAAAAYYoRwMHAAAAAAD/+1DEAAAGAAGn9AAAIgAANP8AAABM//tQxBUAAADSAAAAAAAAANIAAAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV//tQxCgAAADSAAAAAAAAANIAAAAATEFNRTMuMTAwVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV";
+
+function unlockAudio() {
+  if (_unlocked) return;
+  _unlocked = true;
+  // Create and prime two audio elements on user gesture
+  _audioEl = new Audio(SILENCE);
+  _audioEl.volume = 1;
+  _audioEl.play().catch(() => {});
+
+  _audioEl2 = new Audio(SILENCE);
+  _audioEl2.volume = 1;
+  _audioEl2.play().catch(() => {});
 }
 
-// Pre-generate sound URLs
-let _warningSound = null;
-let _doneSound = null;
-function getSounds() {
-  if (!_warningSound) {
-    // Warning: single soft ding (A5 = 880Hz)
-    _warningSound = generateDingWav(880, 0.3, 0.5);
-    // Done: ascending three-note chime (C5, E5, G5)
-    // We'll chain three Audio elements for this
-    _doneSound = [
-      generateDingWav(523.25, 0.4, 0.6),
-      generateDingWav(659.25, 0.4, 0.6),
-      generateDingWav(783.99, 0.5, 0.7),
-    ];
-  }
-  return { warning: _warningSound, done: _doneSound };
+// Attach to first user interaction
+if (typeof document !== 'undefined') {
+  const h = () => { unlockAudio(); document.removeEventListener('touchstart', h); document.removeEventListener('click', h); };
+  document.addEventListener('touchstart', h, { once: true });
+  document.addEventListener('click', h, { once: true });
 }
 
-// Play the 5-second warning sound (single ding)
+// Generate a ding sound as a WAV data URL
+function makeDing(freq, dur, vol) {
+  const sr = 22050, n = Math.floor(sr * dur);
+  const buf = new ArrayBuffer(44 + n * 2);
+  const d = new DataView(buf);
+  const w = (o, s) => { for (let i = 0; i < s.length; i++) d.setUint8(o + i, s.charCodeAt(i)); };
+  w(0,'RIFF'); d.setUint32(4,36+n*2,true); w(8,'WAVE'); w(12,'fmt ');
+  d.setUint32(16,16,true); d.setUint16(20,1,true); d.setUint16(22,1,true);
+  d.setUint32(24,sr,true); d.setUint32(28,sr*2,true); d.setUint16(32,2,true);
+  d.setUint16(34,16,true); w(36,'data'); d.setUint32(40,n*2,true);
+  for (let i = 0; i < n; i++) {
+    const t = i/sr;
+    const env = Math.exp(-t * 6) * vol; // exponential decay
+    const s = Math.sin(2 * Math.PI * freq * t) * env;
+    d.setInt16(44+i*2, Math.max(-32768, Math.min(32767, s * 32767)), true);
+  }
+  return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+}
+
+// Pre-generate sounds lazily
+let _warnUrl = null, _doneUrls = null;
+function ensureSounds() {
+  if (!_warnUrl) {
+    _warnUrl = makeDing(880, 0.4, 0.7);
+    _doneUrls = [makeDing(523, 0.5, 0.8), makeDing(659, 0.5, 0.8), makeDing(784, 0.6, 0.9)];
+  }
+}
+
 function playWarningSound() {
+  ensureSounds();
   try {
-    const { warning } = getSounds();
-    const audio = new Audio(warning);
-    audio.volume = 0.6;
-    audio.play().catch(() => {});
+    if (_audioEl) { _audioEl.src = _warnUrl; _audioEl.volume = 0.8; _audioEl.play().catch(() => {}); }
+    else { const a = new Audio(_warnUrl); a.volume = 0.8; a.play().catch(() => {}); }
   } catch(e) {}
   if (navigator.vibrate) navigator.vibrate(200);
 }
 
-// Play the "rest complete" chime (three ascending notes)
 function playRestBeep() {
-  try {
-    const { done } = getSounds();
-    done.forEach((url, i) => {
-      setTimeout(() => {
-        const audio = new Audio(url);
-        audio.volume = 0.8;
-        audio.play().catch(() => {});
-      }, i * 200);
-    });
-  } catch(e) {}
+  ensureSounds();
+  _doneUrls.forEach((url, i) => {
+    setTimeout(() => {
+      try {
+        // Alternate between the two pre-unlocked audio elements, fall back to new Audio
+        const el = i % 2 === 0 ? _audioEl : _audioEl2;
+        if (el) { el.src = url; el.volume = 0.9; el.play().catch(() => {}); }
+        else { const a = new Audio(url); a.volume = 0.9; a.play().catch(() => {}); }
+      } catch(e) {}
+    }, i * 220);
+  });
   if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 300]);
-}
-
-// Unlock audio on first user interaction (iOS requirement)
-if (typeof window !== 'undefined') {
-  const unlock = () => {
-    getSounds(); // pre-generate
-    const a = new Audio(getSounds().warning);
-    a.volume = 0;
-    a.play().then(() => a.pause()).catch(() => {});
-    document.removeEventListener('touchstart', unlock);
-    document.removeEventListener('click', unlock);
-  };
-  document.addEventListener('touchstart', unlock, { once: true });
-  document.addEventListener('click', unlock, { once: true });
 }
 import { supabase } from "./supabaseClient";
 
