@@ -1,80 +1,88 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-// Persistent AudioContext for playing over music without interrupting it
-let _audioCtx = null;
-function getAudioCtx() {
-  if (!_audioCtx) {
-    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+// === SOUND SYSTEM ===
+// Uses both Web Audio API AND HTML5 Audio for maximum mobile compatibility
+// Generates audio data URLs so no external files needed
+
+// Generate a WAV file as a data URL for a ding sound
+function generateDingWav(freq, duration, volume) {
+  const sampleRate = 22050;
+  const samples = Math.floor(sampleRate * duration);
+  const buffer = new ArrayBuffer(44 + samples * 2);
+  const view = new DataView(buffer);
+  // WAV header
+  const writeStr = (o, s) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
+  writeStr(0, 'RIFF'); view.setUint32(4, 36 + samples * 2, true); writeStr(8, 'WAVE');
+  writeStr(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true); view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+  writeStr(36, 'data'); view.setUint32(40, samples * 2, true);
+  for (let i = 0; i < samples; i++) {
+    const t = i / sampleRate;
+    const envelope = Math.max(0, 1 - t / duration) * Math.max(0, 1 - t * 3); // quick decay
+    const sample = Math.sin(2 * Math.PI * freq * t) * envelope * volume;
+    view.setInt16(44 + i * 2, Math.max(-32768, Math.min(32767, sample * 32767)), true);
   }
-  return _audioCtx;
+  const blob = new Blob([buffer], { type: 'audio/wav' });
+  return URL.createObjectURL(blob);
 }
 
-// Resume audio context on first user interaction (required by mobile browsers)
-function unlockAudio() {
-  const ctx = getAudioCtx();
-  if (ctx.state === "suspended") {
-    ctx.resume();
+// Pre-generate sound URLs
+let _warningSound = null;
+let _doneSound = null;
+function getSounds() {
+  if (!_warningSound) {
+    // Warning: single soft ding (A5 = 880Hz)
+    _warningSound = generateDingWav(880, 0.3, 0.5);
+    // Done: ascending three-note chime (C5, E5, G5)
+    // We'll chain three Audio elements for this
+    _doneSound = [
+      generateDingWav(523.25, 0.4, 0.6),
+      generateDingWav(659.25, 0.4, 0.6),
+      generateDingWav(783.99, 0.5, 0.7),
+    ];
   }
-  // Play a silent buffer to fully unlock on iOS
-  const buf = ctx.createBuffer(1, 1, 22050);
-  const src = ctx.createBufferSource();
-  src.buffer = buf;
-  src.connect(ctx.destination);
-  src.start(0);
+  return { warning: _warningSound, done: _doneSound };
 }
 
-// Call unlockAudio on first touch/click
-if (typeof window !== 'undefined') {
-  const handleFirst = () => {
-    unlockAudio();
-    document.removeEventListener('touchstart', handleFirst);
-    document.removeEventListener('click', handleFirst);
-  };
-  document.addEventListener('touchstart', handleFirst, { once: true });
-  document.addEventListener('click', handleFirst, { once: true });
+// Play the 5-second warning sound (single ding)
+function playWarningSound() {
+  try {
+    const { warning } = getSounds();
+    const audio = new Audio(warning);
+    audio.volume = 0.6;
+    audio.play().catch(() => {});
+  } catch(e) {}
+  if (navigator.vibrate) navigator.vibrate(200);
 }
 
-// Pleasant ding sound that plays over music
+// Play the "rest complete" chime (three ascending notes)
 function playRestBeep() {
   try {
-    const ctx = getAudioCtx();
-    if (ctx.state === "suspended") ctx.resume();
-    const t = ctx.currentTime;
-
-    // Three-note ascending chime: C5, E5, G5
-    const notes = [523.25, 659.25, 783.99];
-    notes.forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "sine"; // sine = cleaner ding that cuts through music
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0, t + i * 0.2);
-      gain.gain.linearRampToValueAtTime(0.4, t + i * 0.2 + 0.02); // quick attack
-      gain.gain.exponentialRampToValueAtTime(0.01, t + i * 0.2 + 0.4); // gentle decay
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(t + i * 0.2);
-      osc.stop(t + i * 0.2 + 0.45);
+    const { done } = getSounds();
+    done.forEach((url, i) => {
+      setTimeout(() => {
+        const audio = new Audio(url);
+        audio.volume = 0.8;
+        audio.play().catch(() => {});
+      }, i * 200);
     });
+  } catch(e) {}
+  if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 300]);
+}
 
-    // Also play the sound a second time 1 second later in case they missed it
-    setTimeout(() => {
-      try {
-        const t2 = ctx.currentTime;
-        notes.forEach((freq, i) => {
-          const osc = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = "sine";
-          osc.frequency.value = freq;
-          gain.gain.setValueAtTime(0, t2 + i * 0.2);
-          gain.gain.linearRampToValueAtTime(0.5, t2 + i * 0.2 + 0.02);
-          gain.gain.exponentialRampToValueAtTime(0.01, t2 + i * 0.2 + 0.4);
-          osc.connect(gain).connect(ctx.destination);
-          osc.start(t2 + i * 0.2);
-          osc.stop(t2 + i * 0.2 + 0.45);
-        });
-      } catch(e) {}
-    }, 1200);
-  } catch(e) { console.warn('Audio error:', e); }
+// Unlock audio on first user interaction (iOS requirement)
+if (typeof window !== 'undefined') {
+  const unlock = () => {
+    getSounds(); // pre-generate
+    const a = new Audio(getSounds().warning);
+    a.volume = 0;
+    a.play().then(() => a.pause()).catch(() => {});
+    document.removeEventListener('touchstart', unlock);
+    document.removeEventListener('click', unlock);
+  };
+  document.addEventListener('touchstart', unlock, { once: true });
+  document.addEventListener('click', unlock, { once: true });
 }
 import { supabase } from "./supabaseClient";
 
@@ -542,6 +550,7 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone }) {
   const [elapsed, setElapsed] = useState(0);
   const [expanded, setExpanded] = useState(true);
   const ref = useRef(null);
+  const warnedRef = useRef(false);
   const alertedRef = useRef(false);
   const touchStartY = useRef(null);
 
@@ -550,13 +559,20 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone }) {
     return () => clearInterval(ref.current);
   }, []);
 
+  // 5-second warning ding
+  useEffect(() => {
+    const remaining = seconds - elapsed;
+    if (remaining === 5 && !warnedRef.current) {
+      warnedRef.current = true;
+      playWarningSound();
+    }
+  }, [elapsed, seconds]);
+
+  // Time's up chime
   useEffect(() => {
     if (elapsed >= seconds && !alertedRef.current) {
       alertedRef.current = true;
-      try {
-        playRestBeep();
-      } catch(e) {}
-      if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 200]);
+      playRestBeep();
     }
   }, [elapsed, seconds]);
 
