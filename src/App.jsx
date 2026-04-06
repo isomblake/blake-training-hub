@@ -444,11 +444,13 @@ function SetRow({ setNum, targetReps, targetWt, onLog, onDelete, logged }) {
       ) : (
         <>
           <input type="number" inputMode="numeric" placeholder={targetReps} value={reps} onChange={e => setReps(e.target.value)}
+            onFocus={e => e.target.select()}
             style={{ width: 48, padding: "5px 4px", borderRadius: 6, border: `1px solid ${C.bdr}`, background: C.c2, color: C.txt, fontSize: 13, textAlign: "center" }}
           />
           <span style={{ fontSize: 9, color: C.mut }}>reps</span>
           <span style={{ fontSize: 12, color: C.mut }}>×</span>
           <input type="number" inputMode="decimal" placeholder={targetWt || "BW"} value={wt} onChange={e => setWt(e.target.value)}
+            onFocus={e => e.target.select()}
             style={{ width: 56, padding: "5px 4px", borderRadius: 6, border: `1px solid ${C.bdr}`, background: C.c2, color: C.txt, fontSize: 13, textAlign: "center" }}
           />
           <span style={{ fontSize: 9, color: C.mut }}>lb</span>
