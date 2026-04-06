@@ -201,7 +201,7 @@ const db = {
   },
 
   // Get recent sessions for history
-  async getRecentSessions(limit = 50) {
+  async getRecentSessions(limit = 200) {
     const { data } = await supabase
       .from('sessions')
       .select('*, sets(*, exercises(name, muscles, muscle_group))')
@@ -930,7 +930,7 @@ function HistoryView() {
   const [expandedId, setExpandedId] = useState(null);
 
   useEffect(() => {
-    db.getRecentSessions(50).then(data => {
+    db.getRecentSessions(200).then(data => {
       // Filter to only sessions that have sets logged
       setSessions(data.filter(s => s.sets && s.sets.length > 0));
       setLoading(false);
