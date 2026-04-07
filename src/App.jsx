@@ -92,21 +92,35 @@ const db = {
     const routineMatch = routineKey.match(/(Upper [AB]|Lower [AB])/);
     const routineSuffix = routineMatch ? routineMatch[1] : routineKey;
 
-    // Match any session for this date + routine name + week_number
-    const { data: existing } = await supabase
-      .from('sessions')
-      .select('*')
-      .eq('date', date)
-      .eq('week_number', weekNum)
-      .ilike('notes', `%${routineSuffix}%`)
-      .limit(1);
+    // Look across today AND yesterday (UTC drift safety) for matching sessions
+    const yest = new Date(date + 'T12:00:00');
+    yest.setDate(yest.getDate() - 1);
+    const yestStr = `${yest.getFullYear()}-${String(yest.getMonth()+1).padStart(2,'0')}-${String(yest.getDate()).padStart(2,'0')}`;
 
-    if (existing && existing.length > 0) {
-      // Update notes to new format if it's the legacy format
-      if (!existing[0].notes.includes('Meso')) {
-        await supabase.from('sessions').update({ notes: routineKey }).eq('id', existing[0].id);
+    // Find ALL matching sessions across today + yesterday for this routine + week
+    const { data: candidates } = await supabase
+      .from('sessions')
+      .select('*, sets(id)')
+      .in('date', [date, yestStr])
+      .eq('week_number', weekNum)
+      .ilike('notes', `%${routineSuffix}%`);
+
+    if (candidates && candidates.length > 0) {
+      // Sort: most sets first, then most recent
+      const sorted = [...candidates].sort((a, b) => {
+        const aCount = a.sets?.length || 0;
+        const bCount = b.sets?.length || 0;
+        if (bCount !== aCount) return bCount - aCount;
+        return new Date(b.created_at) - new Date(a.created_at);
+      });
+      const best = sorted[0];
+      // Upgrade legacy notes to new format
+      if (!best.notes.includes('Meso')) {
+        await supabase.from('sessions').update({ notes: routineKey }).eq('id', best.id);
       }
-      return existing[0];
+      // Strip the sets array we joined for the count
+      delete best.sets;
+      return best;
     }
 
     // Create new session
@@ -615,6 +629,12 @@ const ROUTINE_KEYS = Object.keys(MESO1_ROUTINES);
 
 const fmtRest = s => s >= 60 ? `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}` : `${s}s`;
 const fmtTimer = s => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`;
+
+// Local date in YYYY-MM-DD format (not UTC, so it doesn't shift at midnight UTC)
+const localDate = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+};
 
 const BAND_COLORS = { Green: "#22c55e", Purple: "#a78bfa", Black: "#888", Red: "#ff5c5c", None: "#00e5a0" };
 
@@ -1363,7 +1383,7 @@ export default function App() {
   const [view, setView] = useState("workout"); // "workout" or "history"
   const [sessionStartTime] = useState(Date.now());
   const [showFinishReview, setShowFinishReview] = useState(false);
-  const [mesoIdx, setMesoIdx] = useState(() => getActiveMeso(new Date().toISOString().slice(0, 10)));
+  const [mesoIdx, setMesoIdx] = useState(() => getActiveMeso(localDate()));
   const activeMeso = MESOCYCLES[mesoIdx];
   const activeWeeks = activeMeso.weeks;
   const activeRoutines = activeMeso.routines;
@@ -1372,7 +1392,7 @@ export default function App() {
   const activeRoutineKeys = Object.keys(activeRoutines);
   const r = activeRoutines[activeRoutineKeys[routine]];
   const rKey = activeRoutineKeys[routine];
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDate();
   const sessionKey = today + "-" + rKey.replace(/\s+/g, "") + "-W" + (week + 1);
 
   // One-time: rename exercise with degree symbol so DB matches app
@@ -1537,7 +1557,7 @@ export default function App() {
         <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
           {MESOCYCLES.map((m, i) => {
             const isActive = i === mesoIdx;
-            const isCurrent = i === getActiveMeso(new Date().toISOString().slice(0, 10));
+            const isCurrent = i === getActiveMeso(localDate());
             return (
               <button key={m.id} onClick={() => { setMesoIdx(i); setWeek(0); setRoutine(0); }}
                 style={{ flex: 1, padding: "5px 4px", borderRadius: 6, border: `1px solid ${isActive ? C.gld : C.bdr}`,
