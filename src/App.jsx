@@ -87,16 +87,28 @@ import { supabase } from "./supabaseClient";
 const db = {
   // Create or find a session for today's routine
   async getOrCreateSession(date, routineKey, weekNum, rir) {
-    // First try to find existing session
+    // Extract routine suffix (Upper A, Lower B, etc.) from key for flexible matching
+    // routineKey looks like "Meso 0-W1D1-Upper A" or legacy "W1-Upper A"
+    const routineMatch = routineKey.match(/(Upper [AB]|Lower [AB])/);
+    const routineSuffix = routineMatch ? routineMatch[1] : routineKey;
+
+    // Match any session for this date + routine name + week_number
     const { data: existing } = await supabase
       .from('sessions')
       .select('*')
       .eq('date', date)
-      .ilike('notes', `%${routineKey}%`)
+      .eq('week_number', weekNum)
+      .ilike('notes', `%${routineSuffix}%`)
       .limit(1);
-    
-    if (existing && existing.length > 0) return existing[0];
-    
+
+    if (existing && existing.length > 0) {
+      // Update notes to new format if it's the legacy format
+      if (!existing[0].notes.includes('Meso')) {
+        await supabase.from('sessions').update({ notes: routineKey }).eq('id', existing[0].id);
+      }
+      return existing[0];
+    }
+
     // Create new session
     const { data, error } = await supabase
       .from('sessions')
