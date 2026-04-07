@@ -115,18 +115,20 @@ const db = {
   },
 
   // Log a set to the database
-  async logSet(sessionId, exerciseName, setNumber, reps, weight) {
+  async logSet(sessionId, exerciseName, setNumber, reps, weight, band) {
     // Find exercise ID
     const { data: ex } = await supabase
       .from('exercises')
       .select('id')
       .eq('name', exerciseName)
       .single();
-    
+
     if (!ex) {
       console.error('Exercise not found:', exerciseName);
       return null;
     }
+
+    const notes = band && band !== 'None' ? `band:${band}` : null;
 
     // Upsert the set (update if exists, insert if not)
     const { data: existingSets } = await supabase
@@ -139,7 +141,7 @@ const db = {
     if (existingSets && existingSets.length > 0) {
       const { data, error } = await supabase
         .from('sets')
-        .update({ reps, weight })
+        .update({ reps, weight, notes })
         .eq('id', existingSets[0].id)
         .select()
         .single();
@@ -153,7 +155,8 @@ const db = {
           exercise_id: ex.id,
           set_number: setNumber,
           reps,
-          weight
+          weight,
+          notes
         })
         .select()
         .single();
@@ -199,7 +202,9 @@ const db = {
       if (!exName) return;
       // We'll use a placeholder key that gets resolved in the component
       if (!result[exName]) result[exName] = {};
-      result[exName][s.set_number] = { reps: s.reps, wt: s.weight };
+      const setData = { reps: s.reps, wt: s.weight };
+      if (s.notes && s.notes.startsWith('band:')) setData.band = s.notes.replace('band:', '');
+      result[exName][s.set_number] = setData;
     });
     return result;
   },
@@ -223,6 +228,26 @@ const db = {
       .select()
       .single();
     if (error) console.error('Finish session error:', error);
+    return data;
+  },
+
+  // Delete a session and all its sets
+  async deleteSession(sessionId) {
+    // Sets cascade on delete due to FK constraint
+    await supabase.from('sets').delete().eq('session_id', sessionId);
+    const { error } = await supabase.from('sessions').delete().eq('id', sessionId);
+    if (error) console.error('Delete session error:', error);
+  },
+
+  // Update session details (duration, notes, etc.)
+  async updateSession(sessionId, updates) {
+    const { data, error } = await supabase
+      .from('sessions')
+      .update(updates)
+      .eq('id', sessionId)
+      .select()
+      .single();
+    if (error) console.error('Update session error:', error);
     return data;
   },
 
@@ -902,7 +927,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
     });
     // Store the latest weight so unlogged SetRows can pick it up
     if (data.wt !== undefined) lastWeightRef.current = data.wt;
-    onSync(ex.name, setNum, data.reps, data.wt);
+    onSync(ex.name, setNum, data.reps, data.wt, data.band);
     // Always start rest timer after every set — you need rest before the next exercise too
     onStartRest(ex.rest, ex.name, setNum, totalSets);
   };
@@ -980,6 +1005,9 @@ function HistoryView() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+  const [editDuration, setEditDuration] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   useEffect(() => {
     db.getRecentSessions(200).then(data => {
@@ -1084,10 +1112,12 @@ function HistoryView() {
                           <span style={{ color: C.mut }}> × </span>
                           <span style={{ color: C.gld }}>{s.weight === 0 ? "BW" : s.weight}</span>
                           {s.weight > 0 && <span style={{ color: C.mut, fontSize: 9 }}> lb</span>}
+                          {s.notes && s.notes.startsWith('band:') && (
+                            <span style={{ fontSize: 9, color: BAND_COLORS[s.notes.replace('band:','')] || C.mut, marginLeft: 4, fontWeight: 600 }}>
+                              {s.notes.replace('band:','')}
+                            </span>
+                          )}
                         </div>
-                        {s.rest_seconds && (
-                          <span style={{ fontSize: 9, color: C.mut }}>rest {fmtRest(s.rest_seconds)}</span>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -1096,6 +1126,59 @@ function HistoryView() {
                   <div style={{ marginTop: 10, padding: "6px 8px", background: C.c2, borderRadius: 6, fontSize: 10, color: C.mut, display: "flex", justifyContent: "space-between" }}>
                     <span>Total volume: <span style={{ color: C.gld, fontWeight: 600 }}>{totalVolume.toLocaleString()} lb</span></span>
                     <span>{totalSets} sets across {exercises.length} exercises</span>
+                  </div>
+                )}
+
+                {/* Edit duration */}
+                {editingId === session.id ? (
+                  <div style={{ marginTop: 10, display: "flex", gap: 6, alignItems: "center" }}>
+                    <span style={{ fontSize: 10, color: C.mut }}>Duration:</span>
+                    <input type="number" inputMode="numeric" value={editDuration} onChange={e => setEditDuration(e.target.value)}
+                      onFocus={e => e.target.select()}
+                      style={{ width: 50, padding: "4px", borderRadius: 5, border: `1px solid ${C.bdr}`, background: C.c2, color: C.txt, fontSize: 12, textAlign: "center" }} />
+                    <span style={{ fontSize: 10, color: C.mut }}>min</span>
+                    <button onClick={async () => {
+                        await db.updateSession(session.id, { duration_minutes: parseInt(editDuration) || null });
+                        setSessions(prev => prev.map(s => s.id === session.id ? { ...s, duration_minutes: parseInt(editDuration) || null } : s));
+                        setEditingId(null);
+                      }}
+                      style={{ padding: "4px 10px", borderRadius: 5, border: "none", background: C.grn, color: C.bg, fontSize: 10, fontWeight: 700, cursor: "pointer" }}>
+                      Save
+                    </button>
+                    <button onClick={() => setEditingId(null)}
+                      style={{ padding: "4px 8px", borderRadius: 5, border: `1px solid ${C.bdr}`, background: "transparent", color: C.mut, fontSize: 10, cursor: "pointer" }}>
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ marginTop: 10, display: "flex", gap: 6 }}>
+                    <button onClick={() => { setEditingId(session.id); setEditDuration(session.duration_minutes?.toString() || ""); }}
+                      style={{ padding: "5px 12px", borderRadius: 6, border: `1px solid ${C.bdr}`, background: C.c2, color: C.mut, fontSize: 10, cursor: "pointer" }}>
+                      Edit Duration
+                    </button>
+                    {confirmDeleteId === session.id ? (
+                      <>
+                        <span style={{ fontSize: 10, color: C.red, alignSelf: "center" }}>Delete this session?</span>
+                        <button onClick={async () => {
+                            await db.deleteSession(session.id);
+                            setSessions(prev => prev.filter(s => s.id !== session.id));
+                            setConfirmDeleteId(null);
+                            setExpandedId(null);
+                          }}
+                          style={{ padding: "5px 12px", borderRadius: 6, border: "none", background: C.red, color: "#fff", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>
+                          Yes, Delete
+                        </button>
+                        <button onClick={() => setConfirmDeleteId(null)}
+                          style={{ padding: "5px 8px", borderRadius: 6, border: `1px solid ${C.bdr}`, background: "transparent", color: C.mut, fontSize: 10, cursor: "pointer" }}>
+                          No
+                        </button>
+                      </>
+                    ) : (
+                      <button onClick={() => setConfirmDeleteId(session.id)}
+                        style={{ padding: "5px 12px", borderRadius: 6, border: `1px solid ${C.red}33`, background: C.red + "11", color: C.red, fontSize: 10, cursor: "pointer" }}>
+                        Delete Session
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -1178,11 +1261,11 @@ export default function App() {
   }, [today, rKey, week, sessionKey]);
 
   // Sync a set to Supabase
-  const syncToDb = useCallback(async (exercise, setNum, reps, weight) => {
+  const syncToDb = useCallback(async (exercise, setNum, reps, weight, band) => {
     if (!currentSession) return;
     try {
       setSyncStatus("saving...");
-      await db.logSet(currentSession.id, exercise, setNum, reps, weight);
+      await db.logSet(currentSession.id, exercise, setNum, reps, weight, band);
       setSyncStatus("saved ✓");
       setTimeout(() => setSyncStatus(""), 2000);
     } catch (e) {
