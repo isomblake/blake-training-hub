@@ -564,38 +564,39 @@ const fmtTimer = s => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`
 const BAND_COLORS = { Green: "#22c55e", Purple: "#a78bfa", Black: "#888", Red: "#ff5c5c", None: "#00e5a0" };
 
 function SetRow({ setNum, targetReps, targetWt, lastWeight, isBW, bands, onLog, onDelete, logged }) {
-  // For weight: use logged value > last weight from previous set > programmed target
-  const defaultWt = logged?.wt?.toString() || (lastWeight != null ? lastWeight.toString() : (targetWt?.toString() || (isBW ? "0" : "")));
-  const [reps, setReps] = useState(logged?.reps?.toString() || targetReps || "");
-  const [wt, setWt] = useState(defaultWt);
-  const [band, setBand] = useState(logged?.band || (bands ? bands[0] : null));
+  // Local state ONLY used when actively editing or entering new data
+  const initWt = lastWeight != null ? lastWeight.toString() : (targetWt?.toString() || (isBW ? "0" : ""));
+  const [editReps, setEditReps] = useState(targetReps || "");
+  const [editWt, setEditWt] = useState(initWt);
+  const [band, setBand] = useState(bands ? bands[0] : null);
   const [editing, setEditing] = useState(false);
   const isDone = logged != null && !editing;
-  const prevLoggedRef = useRef(logged);
 
-  useEffect(() => {
-    // Only reset if the actual logged data changed (not just re-render)
-    const prev = prevLoggedRef.current;
-    const changed = logged && (!prev || prev.reps !== logged.reps || prev.wt !== logged.wt);
-    if (changed && !editing) {
-      setReps(logged.reps.toString());
-      setWt(logged.wt.toString());
+  // Display values: show logged data when done, local state when editing/entering
+  const reps = isDone ? logged.reps.toString() : editReps;
+  const wt = isDone ? logged.wt.toString() : editWt;
+
+  // When entering edit mode, populate from logged data
+  const startEdit = () => {
+    if (logged) {
+      setEditReps(logged.reps.toString());
+      setEditWt(logged.wt.toString());
       if (logged.band) setBand(logged.band);
     }
-    prevLoggedRef.current = logged;
-  }, [logged?.reps, logged?.wt, logged?.band, editing]);
+    setEditing(true);
+  };
 
-  // When a previous set logs a new weight, update this unlogged set's weight to match
+  // When lastWeight changes from a previous set, update the input for unlogged sets
   useEffect(() => {
     if (!logged && !editing && lastWeight != null && !isBW) {
-      setWt(lastWeight.toString());
+      setEditWt(lastWeight.toString());
     }
-  }, [lastWeight, logged, editing, isBW]);
+  }, [lastWeight]);
 
   const handleLog = () => {
-    const weight = isBW ? 0 : parseFloat(wt);
-    if (reps && (isBW || wt)) {
-      const data = { reps: parseInt(reps), wt: weight };
+    const weight = isBW ? 0 : parseFloat(editWt);
+    if (editReps && (isBW || editWt)) {
+      const data = { reps: parseInt(editReps), wt: weight };
       if (band) data.band = band;
       onLog(setNum, data);
       setEditing(false);
@@ -604,24 +605,26 @@ function SetRow({ setNum, targetReps, targetWt, lastWeight, isBW, bands, onLog, 
 
   const handleEdit = (e) => {
     e.stopPropagation();
-    setEditing(true);
+    startEdit();
   };
 
   const handleDelete = (e) => {
     e.stopPropagation();
     onDelete(setNum);
-    setReps("");
-    setWt(targetWt?.toString() || (isBW ? "0" : ""));
+    setEditReps(targetReps || "");
+    setEditWt(targetWt?.toString() || (isBW ? "0" : ""));
     setEditing(false);
   };
 
   const handleQuickLog = (e) => {
     e.stopPropagation();
     if (isDone) return;
-    const r = reps || targetReps;
-    const w = isBW ? 0 : parseFloat(wt || targetWt || 0);
+    const r = editReps || targetReps;
+    const w = isBW ? 0 : parseFloat(editWt || targetWt || 0);
     if (r && (isBW || w)) {
-      onLog(setNum, { reps: parseInt(r), wt: w });
+      const data = { reps: parseInt(r), wt: w };
+      if (band) data.band = band;
+      onLog(setNum, data);
       setEditing(false);
     }
   };
@@ -645,7 +648,7 @@ function SetRow({ setNum, targetReps, targetWt, lastWeight, isBW, bands, onLog, 
         </>
       ) : (
         <>
-          <input type="number" inputMode="numeric" placeholder={targetReps} value={reps} onChange={e => setReps(e.target.value)}
+          <input type="number" inputMode="numeric" placeholder={targetReps} value={editReps} onChange={e => setEditReps(e.target.value)}
             onFocus={e => e.target.select()}
             style={{ width: 48, padding: "5px 4px", borderRadius: 6, border: `1px solid ${C.bdr}`, background: C.c2, color: C.txt, fontSize: 13, textAlign: "center" }}
           />
@@ -660,14 +663,14 @@ function SetRow({ setNum, targetReps, targetWt, lastWeight, isBW, bands, onLog, 
           {!isBW && (
             <>
               <span style={{ fontSize: 12, color: C.mut }}>×</span>
-              <input type="number" inputMode="decimal" placeholder={targetWt || "wt"} value={wt} onChange={e => setWt(e.target.value)}
+              <input type="number" inputMode="decimal" placeholder={targetWt || "wt"} value={editWt} onChange={e => setEditWt(e.target.value)}
                 onFocus={e => e.target.select()}
                 style={{ width: 56, padding: "5px 4px", borderRadius: 6, border: `1px solid ${C.bdr}`, background: C.c2, color: C.txt, fontSize: 13, textAlign: "center" }}
               />
               <span style={{ fontSize: 9, color: C.mut }}>lb</span>
             </>
           )}
-          {reps && (isBW || wt) && (
+          {editReps && (isBW || editWt) && (
             <button onClick={handleLog} style={{ padding: "4px 10px", borderRadius: 6, border: "none", background: C.grn, color: C.bg, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
               {editing ? "Save" : "Log"}
             </button>
