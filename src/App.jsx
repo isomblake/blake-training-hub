@@ -553,7 +553,7 @@ const MESOCYCLES = [
   {
     id: "sculpted-strength",
     name: "Sculpted Strength",
-    shortName: "Sculpted",
+    shortName: "Meso 0",
     startDate: "2026-02-09",
     endDate: "2026-04-12",
     weeks: SCULPTED_DELOAD_WEEKS, // Only W9 deload is active in app (W1-W8 data is in history)
@@ -1048,24 +1048,37 @@ function HistoryView() {
   };
 
   // Parse routine into { name, detail } for display
-  const getRoutineInfo = (notes) => {
+  // Format: main line = program name, second line = Day Mon DD · W# / D#
+  const getRoutineInfo = (notes, date) => {
     if (!notes) return { name: 'Workout', detail: '' };
-    // Meso 1 sessions: "W1-Upper A", "W2-Lower B"
-    if (notes.includes('Upper A')) return { name: 'Upper A (Mon)', detail: '' };
-    if (notes.includes('Upper B')) return { name: 'Upper B (Thu)', detail: '' };
-    if (notes.includes('Lower A')) return { name: 'Lower A (Tue)', detail: '' };
-    if (notes.includes('Lower B')) return { name: 'Lower B (Sat)', detail: '' };
+    const dateStr = date ? fmtDate(date) : '';
+
+    // New format: "Meso 0-W1D1-Upper A" or "Meso 1-W2D3-Upper B"
+    const mesoMatch = notes.match(/^(Meso \d+)-W(\d+)D(\d)/);
+    if (mesoMatch) return { name: mesoMatch[1], detail: `${dateStr} · W${mesoMatch[2]} / D${mesoMatch[3]}` };
+
+    // Legacy: "W1-Upper A" (old format before meso tag)
+    const legacyW = notes.match(/^W(\d+)-(Upper|Lower)\s+([AB])/);
+    if (legacyW) {
+      const dayMap = { "Upper A": 1, "Lower A": 2, "Upper B": 3, "Lower B": 4 };
+      const d = dayMap[`${legacyW[2]} ${legacyW[3]}`] || 1;
+      return { name: 'Meso 0', detail: `${dateStr} · W${legacyW[1]} / D${d}` };
+    }
+
     // Sculpted Strength: "SC-W3D2 | Sculpted Strength | W3D2"
     const scMatch = notes.match(/SC-W(\d+)D(\d)/);
-    if (scMatch) return { name: 'Sculpted Strength', detail: `W${scMatch[1]} / D${scMatch[2]}` };
+    if (scMatch) return { name: 'Sculpted Strength', detail: `${dateStr} · W${scMatch[1]} / D${scMatch[2]}` };
+
     // Starting Strength: "SS-W1D1 | Starting Strength | W1D1"
     const ssMatch = notes.match(/SS-W(\d+)D(\d)/);
-    if (ssMatch) return { name: 'Starting Strength', detail: `W${ssMatch[1]} / D${ssMatch[2]}` };
+    if (ssMatch) return { name: 'Starting Strength', detail: `${dateStr} · W${ssMatch[1]} / D${ssMatch[2]}` };
+
     // Natural Strength: "NS-W1D1"
     const nsMatch = notes.match(/NS-W(\d+)D(\d)/);
-    if (nsMatch) return { name: 'Natural Strength', detail: `W${nsMatch[1]} / D${nsMatch[2]}` };
-    if (notes.includes('Natural')) return { name: 'Natural Strength', detail: '' };
-    return { name: notes.split('|')[0]?.trim() || 'Workout', detail: '' };
+    if (nsMatch) return { name: 'Natural Strength', detail: `${dateStr} · W${nsMatch[1]} / D${nsMatch[2]}` };
+
+    if (notes.includes('Natural')) return { name: 'Natural Strength', detail: dateStr };
+    return { name: notes.split('|')[0]?.trim() || 'Workout', detail: dateStr };
   };
 
   const fmtDate = (d) => {
@@ -1081,7 +1094,7 @@ function HistoryView() {
         const isExpanded = expandedId === session.id;
         const exercises = groupSets(session.sets);
         const totalSets = session.sets?.length || 0;
-        const { name: routineName, detail: routineDetail } = getRoutineInfo(session.notes);
+        const { name: routineName, detail: routineDetail } = getRoutineInfo(session.notes, session.date);
         const totalVolume = (session.sets || []).reduce((a, s) => a + (s.reps * s.weight), 0);
 
         return (
@@ -1094,10 +1107,9 @@ function HistoryView() {
                   {isExpanded ? "▾" : "▸"} {routineName}
                 </div>
                 <div style={{ fontSize: 10, color: C.mut, marginTop: 2, marginLeft: 16 }}>
-                  {fmtDate(session.date)}
-                  {routineDetail && <span> · {routineDetail}</span>}
-                  {session.duration_minutes && <span> · {session.duration_minutes} min</span>}
-                  {session.rir && <span> · {session.rir}</span>}
+                  {routineDetail || fmtDate(session.date)}
+                  {session.duration_minutes ? <span> · {session.duration_minutes} min</span> : null}
+                  {session.rir ? <span> · {session.rir}</span> : null}
                 </div>
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
@@ -1296,7 +1308,10 @@ export default function App() {
       try {
         setSyncStatus("loading...");
         // Include week number in session lookup so W1 and W2 are separate
-        const weekTag = `W${week + 1}-${rKey}`;
+        // Map routine to day number: Upper A=D1, Lower A=D2, Upper B=D3, Lower B=D4
+        const dayMap = { "Upper A": 1, "Lower A": 2, "Upper B": 3, "Lower B": 4 };
+        const dayNum = dayMap[rKey] || (activeRoutineKeys.indexOf(rKey) + 1);
+        const weekTag = `${activeMeso.shortName}-W${week + 1}D${dayNum}-${rKey}`;
         const session = await db.getOrCreateSession(today, weekTag, week + 1, activeWeeks[week].rir);
         if (cancelled) return;
 
