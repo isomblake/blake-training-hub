@@ -962,13 +962,21 @@ function HistoryView() {
   // Parse routine name from notes
   const getRoutineName = (notes) => {
     if (!notes) return 'Workout';
-    // Notes like "W1-Upper A" or "SC-W3D2 | Sculpted Strength | W3D2"
-    if (notes.includes('Upper A')) return 'Upper A';
-    if (notes.includes('Upper B')) return 'Upper B';
-    if (notes.includes('Lower A')) return 'Lower A';
-    if (notes.includes('Lower B')) return 'Lower B';
-    if (notes.includes('Sculpted')) return 'Sculpted Strength';
-    if (notes.includes('Starting')) return 'Starting Strength';
+    // Meso 1 sessions: "W1-Upper A", "W2-Lower B"
+    if (notes.includes('Upper A')) return 'Upper A (Mon)';
+    if (notes.includes('Upper B')) return 'Upper B (Thu)';
+    if (notes.includes('Lower A')) return 'Lower A (Tue)';
+    if (notes.includes('Lower B')) return 'Lower B (Sat)';
+    // Sculpted Strength: "SC-W3D2 | Sculpted Strength | W3D2"
+    const scMatch = notes.match(/SC-W(\d+)D(\d)/);
+    if (scMatch) {
+      const dayNames = { '1': 'Upper', '2': 'Lower', '3': 'Upper', '4': 'Lower' };
+      return `Sculpted · ${dayNames[scMatch[2]] || 'Day ' + scMatch[2]}`;
+    }
+    // Starting Strength: "SS-W1D1 | Starting Strength | W1D1"
+    const ssMatch = notes.match(/SS-W(\d+)D(\d)/);
+    if (ssMatch) return `Starting Strength · Day ${ssMatch[2]}`;
+    // Natural Strength
     if (notes.includes('Natural')) return 'Natural Strength';
     return notes.split('|')[0]?.trim() || 'Workout';
   };
