@@ -239,6 +239,24 @@ const db = {
     if (error) console.error('Delete session error:', error);
   },
 
+  // Update an individual set by ID
+  async updateSetById(setId, updates) {
+    const { data, error } = await supabase
+      .from('sets')
+      .update(updates)
+      .eq('id', setId)
+      .select()
+      .single();
+    if (error) console.error('Update set error:', error);
+    return data;
+  },
+
+  // Delete an individual set by ID
+  async deleteSetById(setId) {
+    const { error } = await supabase.from('sets').delete().eq('id', setId);
+    if (error) console.error('Delete set error:', error);
+  },
+
   // Update session details (duration, notes, etc.)
   async updateSession(sessionId, updates) {
     const { data, error } = await supabase
@@ -1019,6 +1037,8 @@ function HistoryView() {
   const [editingId, setEditingId] = useState(null);
   const [editFields, setEditFields] = useState({});
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [editingSetId, setEditingSetId] = useState(null);
+  const [editSetFields, setEditSetFields] = useState({ reps: '', weight: '' });
 
   useEffect(() => {
     db.getRecentSessions(200).then(data => {
@@ -1128,24 +1148,71 @@ function HistoryView() {
                   <div key={i} style={{ marginTop: 8 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: C.txt }}>{ex.name}</div>
                     <div style={{ fontSize: 9, color: C.mut, marginBottom: 4 }}>{ex.muscles}</div>
-                    {ex.sets.map((s, j) => (
-                      <div key={j} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 2, paddingLeft: 8 }}>
-                        <div style={{ width: 20, height: 20, borderRadius: "50%", background: C.grn + "22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: C.grn, flexShrink: 0 }}>
-                          {s.set_number}
-                        </div>
-                        <div style={{ fontSize: 13, fontFamily: "monospace", fontWeight: 700 }}>
-                          <span style={{ color: C.blu }}>{s.reps}</span>
-                          <span style={{ color: C.mut }}> × </span>
-                          <span style={{ color: C.gld }}>{s.weight === 0 ? "BW" : s.weight}</span>
-                          {s.weight > 0 && <span style={{ color: C.mut, fontSize: 9 }}> lb</span>}
-                          {s.notes && s.notes.startsWith('band:') && (
-                            <span style={{ fontSize: 9, color: BAND_COLORS[s.notes.replace('band:','')] || C.mut, marginLeft: 4, fontWeight: 600 }}>
-                              {s.notes.replace('band:','')}
-                            </span>
+                    {ex.sets.map((s, j) => {
+                      const isEditingSet = editingSetId === s.id;
+                      return (
+                        <div key={s.id || j} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 2, paddingLeft: 8 }}>
+                          <div style={{ width: 20, height: 20, borderRadius: "50%", background: C.grn + "22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, fontWeight: 700, color: C.grn, flexShrink: 0 }}>
+                            {s.set_number}
+                          </div>
+                          {isEditingSet ? (
+                            <>
+                              <input type="number" inputMode="numeric" value={editSetFields.reps}
+                                onChange={e => setEditSetFields(f => ({...f, reps: e.target.value}))}
+                                onFocus={e => e.target.select()}
+                                style={{ width: 36, padding: "3px", borderRadius: 4, border: `1px solid ${C.bdr}`, background: C.c2, color: C.txt, fontSize: 11, textAlign: "center" }} />
+                              <span style={{ color: C.mut, fontSize: 11 }}>×</span>
+                              <input type="number" inputMode="decimal" value={editSetFields.weight}
+                                onChange={e => setEditSetFields(f => ({...f, weight: e.target.value}))}
+                                onFocus={e => e.target.select()}
+                                style={{ width: 44, padding: "3px", borderRadius: 4, border: `1px solid ${C.bdr}`, background: C.c2, color: C.txt, fontSize: 11, textAlign: "center" }} />
+                              <button onClick={async () => {
+                                  const updates = { reps: parseInt(editSetFields.reps), weight: parseFloat(editSetFields.weight) };
+                                  await db.updateSetById(s.id, updates);
+                                  setSessions(prev => prev.map(sess => sess.id === session.id
+                                    ? { ...sess, sets: sess.sets.map(x => x.id === s.id ? {...x, ...updates} : x) }
+                                    : sess));
+                                  setEditingSetId(null);
+                                }}
+                                style={{ padding: "2px 8px", borderRadius: 4, border: "none", background: C.grn, color: C.bg, fontSize: 9, fontWeight: 700, cursor: "pointer" }}>
+                                ✓
+                              </button>
+                              <button onClick={() => setEditingSetId(null)}
+                                style={{ padding: "2px 6px", borderRadius: 4, border: `1px solid ${C.bdr}`, background: "transparent", color: C.mut, fontSize: 9, cursor: "pointer" }}>
+                                ✕
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <div style={{ fontSize: 13, fontFamily: "monospace", fontWeight: 700, flex: 1 }}>
+                                <span style={{ color: C.blu }}>{s.reps}</span>
+                                <span style={{ color: C.mut }}> × </span>
+                                <span style={{ color: C.gld }}>{s.weight === 0 ? "BW" : s.weight}</span>
+                                {s.weight > 0 && <span style={{ color: C.mut, fontSize: 9 }}> lb</span>}
+                                {s.notes && s.notes.startsWith('band:') && (
+                                  <span style={{ fontSize: 9, color: BAND_COLORS[s.notes.replace('band:','')] || C.mut, marginLeft: 4, fontWeight: 600 }}>
+                                    {s.notes.replace('band:','')}
+                                  </span>
+                                )}
+                              </div>
+                              <button onClick={() => { setEditingSetId(s.id); setEditSetFields({ reps: s.reps.toString(), weight: s.weight.toString() }); }}
+                                style={{ padding: "2px 6px", borderRadius: 4, border: `1px solid ${C.bdr}`, background: C.c2, color: C.mut, fontSize: 9, cursor: "pointer" }}>
+                                Edit
+                              </button>
+                              <button onClick={async () => {
+                                  await db.deleteSetById(s.id);
+                                  setSessions(prev => prev.map(sess => sess.id === session.id
+                                    ? { ...sess, sets: sess.sets.filter(x => x.id !== s.id) }
+                                    : sess));
+                                }}
+                                style={{ padding: "2px 6px", borderRadius: 4, border: `1px solid ${C.red}33`, background: C.red + "11", color: C.red, fontSize: 9, cursor: "pointer" }}>
+                                ✕
+                              </button>
+                            </>
                           )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ))}
                 {totalVolume > 0 && (
