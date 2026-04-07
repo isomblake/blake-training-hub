@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 
 // === SOUND SYSTEM ===
 // iPhone: AudioContext is the ONLY way to play sounds without killing Spotify.
@@ -588,7 +588,7 @@ const fmtTimer = s => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`
 
 const BAND_COLORS = { Green: "#22c55e", Purple: "#a78bfa", Black: "#888", Red: "#ff5c5c", None: "#00e5a0" };
 
-function SetRow({ setNum, targetReps, targetWt, lastWeight, isBW, bands, onLog, onDelete, logged }) {
+const SetRow = React.memo(function SetRow({ setNum, targetReps, targetWt, lastWeight, isBW, bands, onLog, onDelete, logged }) {
   // Local state ONLY used when actively editing or entering new data
   const initWt = lastWeight != null ? lastWeight.toString() : (targetWt?.toString() || (isBW ? "0" : ""));
   const [editReps, setEditReps] = useState(targetReps || "");
@@ -707,7 +707,18 @@ function SetRow({ setNum, targetReps, targetWt, lastWeight, isBW, bands, onLog, 
       )}
     </div>
   );
-}
+}, (prev, next) => {
+  // Only re-render if these specific values actually changed
+  return prev.setNum === next.setNum
+    && prev.targetWt === next.targetWt
+    && prev.targetReps === next.targetReps
+    && prev.isBW === next.isBW
+    && prev.logged?.reps === next.logged?.reps
+    && prev.logged?.wt === next.logged?.wt
+    && prev.logged?.band === next.logged?.band
+    && prev.lastWeight === next.lastWeight
+    && (prev.logged == null) === (next.logged == null);
+});
 
 function RestTimer({ seconds, exName, setNum, totalSets, onDone }) {
   const [elapsed, setElapsed] = useState(0);
