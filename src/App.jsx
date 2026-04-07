@@ -576,7 +576,7 @@ const DELOAD_WEEKS = [
 // All mesocycles
 // Sculpted Strength W9 deload uses Meso 1 exercises at 50% weight, 2 sets
 const SCULPTED_DELOAD_WEEKS = [
-  { rir: "4+ RIR", note: "W9 DELOAD · 2 sets · 50% weight · learn Meso 1 moves", smith: 0, cable: 0, iso: 0, deload: true },
+  { rir: "4+ RIR", note: "W9 DELOAD · 2 sets · 50% weight · learn Meso 1 moves", smith: 0, cable: 0, iso: 0, deload: true, preDeloaded: true },
 ];
 
 const MESOCYCLES = [
@@ -900,7 +900,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
   const minStep = exCat === "smith" ? 5 : 2.5; // rounding step
   const baseTarget = ex.wt
     ? wkData.deload
-      ? Math.round(ex.wt * 0.5 / minStep) * minStep
+      ? (wkData.preDeloaded ? ex.wt : Math.round(ex.wt * 0.5 / minStep) * minStep)
       : Math.round((ex.wt + weeklyAdd) / minStep) * minStep
     : null;
 
