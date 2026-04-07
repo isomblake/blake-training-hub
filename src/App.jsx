@@ -1,20 +1,19 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 
 // === SOUND SYSTEM ===
-// iPhone: AudioContext is the ONLY way to play sounds without killing Spotify.
-// HTML Audio elements take over the iOS audio session and stop other apps.
-// AudioContext oscillators mix with Spotify because they use the "ambient" category.
-//
-// Flow: user taps "Enable Sound" -> we resume AudioContext (requires gesture) ->
-// then oscillator-based sounds play alongside Spotify for the rest of the session.
+// iOS issue: AudioContext gets suspended when screen locks or app backgrounds.
+// `resume()` only works inside a user gesture, so timer callbacks can't unsuspend.
+// Solution: when sound is enabled, run a silent oscillator continuously to keep
+// the context alive. This is the standard web audio trick for mobile.
+// AudioContext oscillators mix with Spotify (don't take over the audio session).
 
 let _ctx = null;
 let _soundEnabled = false;
+let _silentNode = null;
+let _silentGain = null;
 
 function _ensureCtx() {
-  // Reuse existing context, or create new one
   if (_ctx && _ctx.state !== 'closed') {
-    // If suspended (iOS background), resume it
     if (_ctx.state === 'suspended') _ctx.resume().catch(() => {});
     return _ctx;
   }
@@ -22,10 +21,38 @@ function _ensureCtx() {
   return _ctx;
 }
 
+// Start a silent oscillator to keep AudioContext alive (prevents iOS suspension)
+function _startKeepAlive() {
+  try {
+    if (_silentNode) return;
+    const ctx = _ensureCtx();
+    _silentNode = ctx.createOscillator();
+    _silentGain = ctx.createGain();
+    _silentGain.gain.value = 0.0001; // effectively silent but not zero
+    _silentNode.frequency.value = 1;
+    _silentNode.connect(_silentGain);
+    _silentGain.connect(ctx.destination);
+    _silentNode.start();
+  } catch(e) {}
+}
+
+function _stopKeepAlive() {
+  try {
+    if (_silentNode) {
+      _silentNode.stop();
+      _silentNode.disconnect();
+      _silentGain.disconnect();
+      _silentNode = null;
+      _silentGain = null;
+    }
+  } catch(e) {}
+}
+
 function enableSound() {
   try {
     const ctx = _ensureCtx();
     ctx.resume().then(() => {
+      _startKeepAlive();
       // Play confirmation tone
       _playOsc(660, 0.15, 0.4);
       setTimeout(() => _playOsc(880, 0.15, 0.4), 160);
@@ -37,12 +64,14 @@ function enableSound() {
 
 function disableSound() {
   _soundEnabled = false;
+  _stopKeepAlive();
   return false;
 }
 
 function _playOsc(freq, dur, vol) {
   try {
     const ctx = _ensureCtx();
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
     const t = ctx.currentTime;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -59,23 +88,19 @@ function _playOsc(freq, dur, vol) {
 
 function playWarningSound() {
   if (_soundEnabled) {
-    // Re-resume context in case iOS suspended it in background
-    if (_ctx && _ctx.state === 'suspended') _ctx.resume().catch(() => {});
     // Double high ding — louder and repeated so it cuts through
-    setTimeout(() => { _playOsc(880, 0.35, 0.9); }, 50);
-    setTimeout(() => { _playOsc(880, 0.35, 0.9); }, 400);
+    _playOsc(880, 0.35, 0.9);
+    setTimeout(() => { _playOsc(880, 0.35, 0.9); }, 350);
   }
   if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
 }
 
 function playRestBeep() {
   if (_soundEnabled) {
-    // Re-resume context in case iOS suspended it in background
-    if (_ctx && _ctx.state === 'suspended') _ctx.resume().catch(() => {});
     // Ascending three-note chime: C5, E5, G5
-    setTimeout(() => { _playOsc(523, 0.3, 0.7); }, 50);
-    setTimeout(() => { _playOsc(659, 0.3, 0.7); }, 250);
-    setTimeout(() => { _playOsc(784, 0.35, 0.8); }, 450);
+    _playOsc(523, 0.3, 0.7);
+    setTimeout(() => { _playOsc(659, 0.3, 0.7); }, 200);
+    setTimeout(() => { _playOsc(784, 0.35, 0.8); }, 400);
   }
   if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 300]);
 }
