@@ -1017,7 +1017,7 @@ function HistoryView() {
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
   const [editingId, setEditingId] = useState(null);
-  const [editDuration, setEditDuration] = useState("");
+  const [editFields, setEditFields] = useState({});
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   useEffect(() => {
@@ -1036,12 +1036,15 @@ function HistoryView() {
     const byExercise = {};
     (sets || []).forEach(s => {
       const name = s.exercises?.name || 'Unknown';
-      if (!byExercise[name]) byExercise[name] = { name, muscles: s.exercises?.muscles || '', sets: [] };
+      if (!byExercise[name]) byExercise[name] = { name, muscles: s.exercises?.muscles || '', sets: [], firstTime: s.created_at };
       byExercise[name].sets.push(s);
+      // Track earliest timestamp for ordering
+      if (s.created_at < byExercise[name].firstTime) byExercise[name].firstTime = s.created_at;
     });
     // Sort sets within each exercise by set_number
     Object.values(byExercise).forEach(ex => ex.sets.sort((a, b) => a.set_number - b.set_number));
-    return Object.values(byExercise);
+    // Sort exercises by the order they were performed (first set timestamp)
+    return Object.values(byExercise).sort((a, b) => (a.firstTime || '').localeCompare(b.firstTime || ''));
   };
 
   // Parse routine into { name, detail } for display
@@ -1140,36 +1143,84 @@ function HistoryView() {
                   </div>
                 )}
 
-                {/* Edit duration */}
+                {/* Edit session / Delete */}
                 {editingId === session.id ? (
-                  <div style={{ marginTop: 10, display: "flex", gap: 6, alignItems: "center" }}>
-                    <span style={{ fontSize: 10, color: C.mut }}>Duration:</span>
-                    <input type="number" inputMode="numeric" value={editDuration} onChange={e => setEditDuration(e.target.value)}
-                      onFocus={e => e.target.select()}
-                      style={{ width: 50, padding: "4px", borderRadius: 5, border: `1px solid ${C.bdr}`, background: C.c2, color: C.txt, fontSize: 12, textAlign: "center" }} />
-                    <span style={{ fontSize: 10, color: C.mut }}>min</span>
-                    <button onClick={async () => {
-                        await db.updateSession(session.id, { duration_minutes: parseInt(editDuration) || null });
-                        setSessions(prev => prev.map(s => s.id === session.id ? { ...s, duration_minutes: parseInt(editDuration) || null } : s));
-                        setEditingId(null);
-                      }}
-                      style={{ padding: "4px 10px", borderRadius: 5, border: "none", background: C.grn, color: C.bg, fontSize: 10, fontWeight: 700, cursor: "pointer" }}>
-                      Save
-                    </button>
-                    <button onClick={() => setEditingId(null)}
-                      style={{ padding: "4px 8px", borderRadius: 5, border: `1px solid ${C.bdr}`, background: "transparent", color: C.mut, fontSize: 10, cursor: "pointer" }}>
-                      Cancel
-                    </button>
+                  <div style={{ marginTop: 10, background: C.c2, borderRadius: 8, padding: 10 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.txt, marginBottom: 8 }}>Edit Session</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 10, color: C.mut, width: 55 }}>Date:</span>
+                        <input type="date" value={editFields.date || ''} onChange={e => setEditFields(f => ({...f, date: e.target.value}))}
+                          style={{ flex: 1, padding: "4px", borderRadius: 5, border: `1px solid ${C.bdr}`, background: C.card, color: C.txt, fontSize: 11 }} />
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 10, color: C.mut, width: 55 }}>Duration:</span>
+                        <input type="number" inputMode="numeric" value={editFields.duration || ''} onChange={e => setEditFields(f => ({...f, duration: e.target.value}))}
+                          onFocus={e => e.target.select()}
+                          style={{ width: 50, padding: "4px", borderRadius: 5, border: `1px solid ${C.bdr}`, background: C.card, color: C.txt, fontSize: 11, textAlign: "center" }} />
+                        <span style={{ fontSize: 10, color: C.mut }}>min</span>
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 10, color: C.mut, width: 55 }}>Week:</span>
+                        <input type="number" inputMode="numeric" value={editFields.week || ''} onChange={e => setEditFields(f => ({...f, week: e.target.value}))}
+                          onFocus={e => e.target.select()}
+                          style={{ width: 40, padding: "4px", borderRadius: 5, border: `1px solid ${C.bdr}`, background: C.card, color: C.txt, fontSize: 11, textAlign: "center" }} />
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 10, color: C.mut, width: 55 }}>RIR:</span>
+                        <input type="text" value={editFields.rir || ''} onChange={e => setEditFields(f => ({...f, rir: e.target.value}))}
+                          style={{ flex: 1, padding: "4px", borderRadius: 5, border: `1px solid ${C.bdr}`, background: C.card, color: C.txt, fontSize: 11 }} />
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 10, color: C.mut, width: 55 }}>Status:</span>
+                        <select value={editFields.status || 'completed'} onChange={e => setEditFields(f => ({...f, status: e.target.value}))}
+                          style={{ flex: 1, padding: "4px", borderRadius: 5, border: `1px solid ${C.bdr}`, background: C.card, color: C.txt, fontSize: 11 }}>
+                          <option value="completed">Completed</option>
+                          <option value="in_progress">In Progress</option>
+                          <option value="partial">Partial</option>
+                          <option value="skipped">Skipped</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                      <button onClick={async () => {
+                          const updates = {};
+                          if (editFields.date) updates.date = editFields.date;
+                          if (editFields.duration) updates.duration_minutes = parseInt(editFields.duration);
+                          if (editFields.week) updates.week_number = parseInt(editFields.week);
+                          if (editFields.rir) updates.rir = editFields.rir;
+                          if (editFields.status) updates.status = editFields.status;
+                          await db.updateSession(session.id, updates);
+                          setSessions(prev => prev.map(s => s.id === session.id ? { ...s, ...updates } : s));
+                          setEditingId(null);
+                        }}
+                        style={{ padding: "5px 14px", borderRadius: 6, border: "none", background: C.grn, color: C.bg, fontSize: 10, fontWeight: 700, cursor: "pointer" }}>
+                        Save
+                      </button>
+                      <button onClick={() => setEditingId(null)}
+                        style={{ padding: "5px 10px", borderRadius: 6, border: `1px solid ${C.bdr}`, background: "transparent", color: C.mut, fontSize: 10, cursor: "pointer" }}>
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div style={{ marginTop: 10, display: "flex", gap: 6 }}>
-                    <button onClick={() => { setEditingId(session.id); setEditDuration(session.duration_minutes?.toString() || ""); }}
+                    <button onClick={() => {
+                        setEditingId(session.id);
+                        setEditFields({
+                          date: session.date || '',
+                          duration: session.duration_minutes?.toString() || '',
+                          week: session.week_number?.toString() || '',
+                          rir: session.rir || '',
+                          status: session.status || 'completed',
+                        });
+                      }}
                       style={{ padding: "5px 12px", borderRadius: 6, border: `1px solid ${C.bdr}`, background: C.c2, color: C.mut, fontSize: 10, cursor: "pointer" }}>
-                      Edit Duration
+                      Edit Session
                     </button>
                     {confirmDeleteId === session.id ? (
                       <>
-                        <span style={{ fontSize: 10, color: C.red, alignSelf: "center" }}>Delete this session?</span>
+                        <span style={{ fontSize: 10, color: C.red, alignSelf: "center" }}>Delete?</span>
                         <button onClick={async () => {
                             await db.deleteSession(session.id);
                             setSessions(prev => prev.filter(s => s.id !== session.id));
@@ -1177,7 +1228,7 @@ function HistoryView() {
                             setExpandedId(null);
                           }}
                           style={{ padding: "5px 12px", borderRadius: 6, border: "none", background: C.red, color: "#fff", fontSize: 10, fontWeight: 700, cursor: "pointer" }}>
-                          Yes, Delete
+                          Yes
                         </button>
                         <button onClick={() => setConfirmDeleteId(null)}
                           style={{ padding: "5px 8px", borderRadius: 6, border: `1px solid ${C.bdr}`, background: "transparent", color: C.mut, fontSize: 10, cursor: "pointer" }}>
@@ -1187,7 +1238,7 @@ function HistoryView() {
                     ) : (
                       <button onClick={() => setConfirmDeleteId(session.id)}
                         style={{ padding: "5px 12px", borderRadius: 6, border: `1px solid ${C.red}33`, background: C.red + "11", color: C.red, fontSize: 10, cursor: "pointer" }}>
-                        Delete Session
+                        Delete
                       </button>
                     )}
                   </div>
