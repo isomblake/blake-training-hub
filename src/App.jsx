@@ -59,19 +59,23 @@ function _playOsc(freq, dur, vol) {
 
 function playWarningSound() {
   if (_soundEnabled) {
+    // Re-resume context in case iOS suspended it in background
+    if (_ctx && _ctx.state === 'suspended') _ctx.resume().catch(() => {});
     // Double high ding — louder and repeated so it cuts through
-    _playOsc(880, 0.35, 0.9);
-    setTimeout(() => _playOsc(880, 0.35, 0.9), 350);
+    setTimeout(() => { _playOsc(880, 0.35, 0.9); }, 50);
+    setTimeout(() => { _playOsc(880, 0.35, 0.9); }, 400);
   }
   if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
 }
 
 function playRestBeep() {
   if (_soundEnabled) {
+    // Re-resume context in case iOS suspended it in background
+    if (_ctx && _ctx.state === 'suspended') _ctx.resume().catch(() => {});
     // Ascending three-note chime: C5, E5, G5
-    _playOsc(523, 0.3, 0.7);
-    setTimeout(() => _playOsc(659, 0.3, 0.7), 200);
-    setTimeout(() => _playOsc(784, 0.35, 0.8), 400);
+    setTimeout(() => { _playOsc(523, 0.3, 0.7); }, 50);
+    setTimeout(() => { _playOsc(659, 0.3, 0.7); }, 250);
+    setTimeout(() => { _playOsc(784, 0.35, 0.8); }, 450);
   }
   if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 300]);
 }
@@ -393,6 +397,7 @@ const MESO1_ROUTINES = {
       ]},
       { name: "Back", exercises: [
         { name: "Chin-Ups (Wide Overhand)", muscles: "Lats · Upper Back", sets: 3, reps: "6-10", rest: 150, wt: null,
+          bands: ["Green", "Purple", "Black", "Red", "None"],
           vid: "https://www.muscleandstrength.com/exercises/wide-grip-pull-up.html", src: "M&S" },
         { name: "Seated Cable Row (Neutral)", muscles: "Upper Back · Lats", sets: 3, reps: "10-12", rest: 120, wt: 140,
           vid: "https://www.muscleandstrength.com/exercises/seated-row.html", src: "M&S" },
@@ -556,23 +561,43 @@ const ROUTINE_KEYS = Object.keys(MESO1_ROUTINES);
 const fmtRest = s => s >= 60 ? `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}` : `${s}s`;
 const fmtTimer = s => `${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`;
 
-function SetRow({ setNum, targetReps, targetWt, isBW, onLog, onDelete, logged }) {
+const BAND_COLORS = { Green: "#22c55e", Purple: "#a78bfa", Black: "#888", Red: "#ff5c5c", None: "#00e5a0" };
+
+function SetRow({ setNum, targetReps, targetWt, lastWeight, isBW, bands, onLog, onDelete, logged }) {
+  // For weight: use logged value > last weight from previous set > programmed target
+  const defaultWt = logged?.wt?.toString() || (lastWeight != null ? lastWeight.toString() : (targetWt?.toString() || (isBW ? "0" : "")));
   const [reps, setReps] = useState(logged?.reps?.toString() || targetReps || "");
-  const [wt, setWt] = useState(logged?.wt?.toString() || (targetWt?.toString() || (isBW ? "0" : "")));
+  const [wt, setWt] = useState(defaultWt);
+  const [band, setBand] = useState(logged?.band || (bands ? bands[0] : null));
   const [editing, setEditing] = useState(false);
   const isDone = logged != null && !editing;
+  const prevLoggedRef = useRef(logged);
 
   useEffect(() => {
-    if (logged && !editing) {
+    // Only reset if the actual logged data changed (not just re-render)
+    const prev = prevLoggedRef.current;
+    const changed = logged && (!prev || prev.reps !== logged.reps || prev.wt !== logged.wt);
+    if (changed && !editing) {
       setReps(logged.reps.toString());
       setWt(logged.wt.toString());
+      if (logged.band) setBand(logged.band);
     }
-  }, [logged, editing]);
+    prevLoggedRef.current = logged;
+  }, [logged?.reps, logged?.wt, logged?.band, editing]);
+
+  // When a previous set logs a new weight, update this unlogged set's weight to match
+  useEffect(() => {
+    if (!logged && !editing && lastWeight != null && !isBW) {
+      setWt(lastWeight.toString());
+    }
+  }, [lastWeight, logged, editing, isBW]);
 
   const handleLog = () => {
     const weight = isBW ? 0 : parseFloat(wt);
     if (reps && (isBW || wt)) {
-      onLog(setNum, { reps: parseInt(reps), wt: weight });
+      const data = { reps: parseInt(reps), wt: weight };
+      if (band) data.band = band;
+      onLog(setNum, data);
       setEditing(false);
     }
   };
@@ -613,6 +638,7 @@ function SetRow({ setNum, targetReps, targetWt, isBW, onLog, onDelete, logged })
             <span style={{ color: C.mut }}> × </span>
             <span style={{ color: C.gld }}>{isBW ? "BW" : logged.wt}</span>
             {!isBW && <span style={{ color: C.mut, fontSize: 9 }}> lb</span>}
+            {logged.band && <span style={{ fontSize: 9, color: BAND_COLORS[logged.band] || C.mut, marginLeft: 4, fontWeight: 600 }}>{logged.band} band</span>}
           </div>
           <button onClick={handleEdit} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${C.bdr}`, background: C.c2, color: C.mut, fontSize: 10, cursor: "pointer" }}>Edit</button>
           <button onClick={handleDelete} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${C.red}22`, background: C.red + "11", color: C.red, fontSize: 10, cursor: "pointer" }}>✕</button>
@@ -624,9 +650,14 @@ function SetRow({ setNum, targetReps, targetWt, isBW, onLog, onDelete, logged })
             style={{ width: 48, padding: "5px 4px", borderRadius: 6, border: `1px solid ${C.bdr}`, background: C.c2, color: C.txt, fontSize: 13, textAlign: "center" }}
           />
           <span style={{ fontSize: 9, color: C.mut }}>reps</span>
-          {isBW ? (
-            <span style={{ fontSize: 12, color: C.teal, fontWeight: 600, marginLeft: 4 }}>BW</span>
-          ) : (
+          {isBW && <span style={{ fontSize: 12, color: C.teal, fontWeight: 600, marginLeft: 4 }}>BW</span>}
+          {bands && (
+            <select value={band || bands[0]} onChange={e => setBand(e.target.value)}
+              style={{ padding: "4px 2px", borderRadius: 5, border: `1px solid ${BAND_COLORS[band] || C.bdr}44`, background: C.c2, color: BAND_COLORS[band] || C.txt, fontSize: 10, fontWeight: 600 }}>
+              {bands.map(b => <option key={b} value={b}>{b === "None" ? "No band" : b}</option>)}
+            </select>
+          )}
+          {!isBW && (
             <>
               <span style={{ fontSize: 12, color: C.mut }}>×</span>
               <input type="number" inputMode="decimal" placeholder={targetWt || "wt"} value={wt} onChange={e => setWt(e.target.value)}
@@ -653,20 +684,25 @@ function SetRow({ setNum, targetReps, targetWt, isBW, onLog, onDelete, logged })
 function RestTimer({ seconds, exName, setNum, totalSets, onDone }) {
   const [elapsed, setElapsed] = useState(0);
   const [expanded, setExpanded] = useState(true);
+  const startTimeRef = useRef(Date.now());
   const ref = useRef(null);
   const warnedRef = useRef(false);
   const alertedRef = useRef(false);
   const touchStartY = useRef(null);
 
   useEffect(() => {
-    ref.current = setInterval(() => setElapsed(e => e + 1), 1000);
+    // Use real timestamps so backgrounding doesn't break the timer
+    ref.current = setInterval(() => {
+      const realElapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+      setElapsed(realElapsed);
+    }, 500); // Check every 500ms for faster catch-up after background
     return () => clearInterval(ref.current);
   }, []);
 
   // 10-second warning ding
   useEffect(() => {
     const remaining = seconds - elapsed;
-    if (remaining === 10 && !warnedRef.current) {
+    if (remaining <= 10 && remaining > 0 && !warnedRef.current) {
       warnedRef.current = true;
       playWarningSound();
     }
@@ -782,6 +818,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
   const [expanded, setExpanded] = useState(false);
   const [smartTarget, setSmartTarget] = useState(null);
   const [progressNote, setProgressNote] = useState(null);
+  const lastWeightRef = useRef(null);
   const exKey = `${sessionKey}|${ex.name}`;
   const logged = allSets[exKey] || {};
   const numDone = Object.keys(logged).length;
@@ -850,15 +887,21 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
   const logSet = (setNum, data) => {
     setAllSets(prev => {
       const prevEx = prev[exKey] || {};
-      const updated = { ...prev, [exKey]: { ...prevEx, [setNum]: data } };
-      return updated;
+      const updatedEx = { ...prevEx, [setNum]: data };
+      // Cascade weight change to remaining UNLOGGED sets
+      for (let s = setNum + 1; s <= totalSets; s++) {
+        if (!prevEx[s]) {
+          // Not logged yet — it'll pick up the new weight from the input default
+          // Nothing to do in state, but we signal via a ref below
+        }
+      }
+      return { ...prev, [exKey]: updatedEx };
     });
+    // Store the latest weight so unlogged SetRows can pick it up
+    if (data.wt !== undefined) lastWeightRef.current = data.wt;
     onSync(ex.name, setNum, data.reps, data.wt);
-    // Always start rest timer (even on edits) — only skip if it's the very last set and all sets are done
-    const currentDone = Object.keys(logged).length + 1;
-    if (!(currentDone >= totalSets && setNum >= totalSets)) {
-      onStartRest(ex.rest, ex.name, setNum, totalSets);
-    }
+    // Always start rest timer after every set — you need rest before the next exercise too
+    onStartRest(ex.rest, ex.name, setNum, totalSets);
   };
 
   const deleteSet = (setNum) => {
@@ -919,7 +962,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
           )}
 
           {Array.from({ length: totalSets }, (_, i) => (
-            <SetRow key={i} setNum={i + 1} targetReps={ex.reps.split("-")[0]} targetWt={targetWt} isBW={!ex.wt && ex.wt !== 0} logged={logged[i + 1]} onLog={logSet} onDelete={deleteSet} />
+            <SetRow key={i} setNum={i + 1} targetReps={ex.reps.split("-")[0]} targetWt={targetWt} lastWeight={lastWeightRef.current} isBW={!ex.wt && ex.wt !== 0} bands={ex.bands} logged={logged[i + 1]} onLog={logSet} onDelete={deleteSet} />
           ))}
         </div>
       )}
@@ -1062,7 +1105,13 @@ function HistoryView() {
 }
 
 export default function App() {
-  const [routine, setRoutine] = useState(0);
+  const [routine, setRoutine] = useState(() => {
+    try {
+      const saved = localStorage.getItem('training-hub-next-routine');
+      if (saved != null) return parseInt(saved) || 0;
+    } catch(e) {}
+    return 0;
+  });
   const [week, setWeek] = useState(0);
   const [allSets, setAllSets] = useState({});
   const [showExport, setShowExport] = useState(false);
@@ -1384,9 +1433,15 @@ export default function App() {
                   if (!currentSession) return;
                   const mins = Math.round((Date.now() - sessionStartTime) / 60000);
                   await db.finishSession(currentSession.id, mins);
-                  setSyncStatus("session saved ✓");
+                  // Advance to next routine in cycle
+                  const nextRoutine = (routine + 1) % activeRoutineKeys.length;
+                  try { localStorage.setItem('training-hub-next-routine', nextRoutine.toString()); } catch(e) {}
+                  setRoutine(nextRoutine);
+                  setAllSets({});
+                  setCurrentSession(null);
+                  setSyncStatus("session saved ✓ — next up: " + activeRoutineKeys[nextRoutine]);
                   setShowFinishReview(false);
-                  setTimeout(() => setSyncStatus(""), 3000);
+                  setTimeout(() => setSyncStatus(""), 5000);
                 }}
                 style={{ flex: 1, padding: "12px", borderRadius: 8, border: "none", background: C.grn, color: C.bg, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
                 ✓ Confirm & Save
