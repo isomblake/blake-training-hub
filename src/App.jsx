@@ -959,26 +959,25 @@ function HistoryView() {
     return Object.values(byExercise);
   };
 
-  // Parse routine name from notes
-  const getRoutineName = (notes) => {
-    if (!notes) return 'Workout';
+  // Parse routine into { name, detail } for display
+  const getRoutineInfo = (notes) => {
+    if (!notes) return { name: 'Workout', detail: '' };
     // Meso 1 sessions: "W1-Upper A", "W2-Lower B"
-    if (notes.includes('Upper A')) return 'Upper A (Mon)';
-    if (notes.includes('Upper B')) return 'Upper B (Thu)';
-    if (notes.includes('Lower A')) return 'Lower A (Tue)';
-    if (notes.includes('Lower B')) return 'Lower B (Sat)';
+    if (notes.includes('Upper A')) return { name: 'Upper A (Mon)', detail: '' };
+    if (notes.includes('Upper B')) return { name: 'Upper B (Thu)', detail: '' };
+    if (notes.includes('Lower A')) return { name: 'Lower A (Tue)', detail: '' };
+    if (notes.includes('Lower B')) return { name: 'Lower B (Sat)', detail: '' };
     // Sculpted Strength: "SC-W3D2 | Sculpted Strength | W3D2"
     const scMatch = notes.match(/SC-W(\d+)D(\d)/);
-    if (scMatch) {
-      const dayNames = { '1': 'Upper', '2': 'Lower', '3': 'Upper', '4': 'Lower' };
-      return `Sculpted · ${dayNames[scMatch[2]] || 'Day ' + scMatch[2]}`;
-    }
+    if (scMatch) return { name: 'Sculpted Strength', detail: `W${scMatch[1]} / D${scMatch[2]}` };
     // Starting Strength: "SS-W1D1 | Starting Strength | W1D1"
     const ssMatch = notes.match(/SS-W(\d+)D(\d)/);
-    if (ssMatch) return `Starting Strength · Day ${ssMatch[2]}`;
-    // Natural Strength
-    if (notes.includes('Natural')) return 'Natural Strength';
-    return notes.split('|')[0]?.trim() || 'Workout';
+    if (ssMatch) return { name: 'Starting Strength', detail: `W${ssMatch[1]} / D${ssMatch[2]}` };
+    // Natural Strength: "NS-W1D1"
+    const nsMatch = notes.match(/NS-W(\d+)D(\d)/);
+    if (nsMatch) return { name: 'Natural Strength', detail: `W${nsMatch[1]} / D${nsMatch[2]}` };
+    if (notes.includes('Natural')) return { name: 'Natural Strength', detail: '' };
+    return { name: notes.split('|')[0]?.trim() || 'Workout', detail: '' };
   };
 
   const fmtDate = (d) => {
@@ -994,7 +993,7 @@ function HistoryView() {
         const isExpanded = expandedId === session.id;
         const exercises = groupSets(session.sets);
         const totalSets = session.sets?.length || 0;
-        const routineName = getRoutineName(session.notes);
+        const { name: routineName, detail: routineDetail } = getRoutineInfo(session.notes);
         const totalVolume = (session.sets || []).reduce((a, s) => a + (s.reps * s.weight), 0);
 
         return (
@@ -1008,7 +1007,7 @@ function HistoryView() {
                 </div>
                 <div style={{ fontSize: 10, color: C.mut, marginTop: 2, marginLeft: 16 }}>
                   {fmtDate(session.date)}
-                  {session.week_number && <span> · W{session.week_number}</span>}
+                  {routineDetail && <span> · {routineDetail}</span>}
                   {session.duration_minutes && <span> · {session.duration_minutes} min</span>}
                   {session.rir && <span> · {session.rir}</span>}
                 </div>
