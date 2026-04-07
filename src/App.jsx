@@ -417,7 +417,7 @@ const MESO1_ROUTINES = {
       { name: "Chest", exercises: [
         { name: "Smith Flat Bench Press", muscles: "Chest", sets: 3, reps: "8-10", rest: 150, wt: 120,
           vid: "https://www.muscleandstrength.com/exercises/smith-machine-bench-press.html", src: "M&S" },
-        { name: "Smith Incline Press (30°)", muscles: "Upper Chest", sets: 3, reps: "10-12", rest: 120, wt: 75,
+        { name: "Smith Incline Press", muscles: "Upper Chest", sets: 3, reps: "10-12", rest: 120, wt: 75,
           vid: "https://www.muscleandstrength.com/exercises/incline-smith-machine-bench-press.html", src: "M&S" },
       ]},
       { name: "Back", exercises: [
@@ -521,7 +521,7 @@ const MESO1_ROUTINES = {
 
 // Deload weights from master brief (50% of Meso 1 W1, rounded)
 const DELOAD_WEIGHTS = {
-  "Smith Flat Bench Press": 60, "Smith Incline Press (30°)": 40,
+  "Smith Flat Bench Press": 60, "Smith Incline Press": 40,
   "Chin-Ups (Wide Overhand)": null, "Seated Cable Row (Neutral)": 70,
   "Cable Lateral Raise": 10, "Cable Face Pull (Rope)": 35,
   "Cable EZ Bar Curl": 35, "Cable OH Tricep Extension": 30,
@@ -1233,6 +1233,11 @@ export default function App() {
   const today = new Date().toISOString().slice(0, 10);
   const sessionKey = today + "-" + rKey.replace(/\s+/g, "") + "-W" + (week + 1);
 
+  // One-time: rename exercise with degree symbol so DB matches app
+  useEffect(() => {
+    supabase.from('exercises').update({ name: 'Smith Incline Press' }).eq('name', 'Smith Incline Press (30°)').then(() => {});
+  }, []);
+
   // Load session from Supabase on mount or when routine/week changes
   useEffect(() => {
     let cancelled = false;
@@ -1383,7 +1388,7 @@ export default function App() {
       </div>
 
       {/* Mesocycle selector */}
-      {view === "workout" && MESOCYCLES.length > 1 && (
+      {MESOCYCLES.length > 1 && view === "workout" && (
         <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
           {MESOCYCLES.map((m, i) => {
             const isActive = i === mesoIdx;
@@ -1401,10 +1406,12 @@ export default function App() {
       )}
 
       {/* HISTORY VIEW */}
-      {view === "history" && <HistoryView />}
+      <div style={{ display: view === "history" ? "block" : "none" }}>
+        <HistoryView />
+      </div>
 
-      {/* WORKOUT VIEW */}
-      {view === "workout" && <>
+      {/* WORKOUT VIEW — use display:none instead of unmounting to preserve typed data */}
+      <div style={{ display: view === "workout" ? "block" : "none" }}>
       {!loaded && (
         <div style={{ textAlign: "center", padding: 40, color: C.mut, fontSize: 12 }}>Loading session data...</div>
       )}
@@ -1561,7 +1568,7 @@ export default function App() {
           RP Hypertrophy · ForceUSA G3 · {activeMeso.name} · {today} · {dbConnected ? "☁ synced" : "offline"}
         </div>
       </>)}
-      </>}
+      </div>
     </div>
   );
 }
