@@ -821,8 +821,10 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone }) {
     if (remaining <= 10 && remaining > 0 && !warnedRef.current) {
       warnedRef.current = true;
       playWarningSound();
+      // Issue #3: Auto-expand so Next Set button is tappable
+      if (!expanded) setExpanded(true);
     }
-  }, [elapsed, seconds]);
+  }, [elapsed, seconds, expanded]);
 
   // Time's up chime
   useEffect(() => {
