@@ -804,6 +804,7 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone }) {
   const ref = useRef(null);
   const warnedRef = useRef(false);
   const alertedRef = useRef(false);
+  const autoAdvancedRef = useRef(false);
   const touchStartY = useRef(null);
 
   useEffect(() => {
@@ -831,6 +832,12 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone }) {
     if (elapsed >= seconds && !alertedRef.current) {
       alertedRef.current = true;
       playRestBeep();
+    }
+    // Issue #6: Auto-advance 2s after timer hits zero
+    if (elapsed >= seconds + 2 && !autoAdvancedRef.current) {
+      autoAdvancedRef.current = true;
+      clearInterval(ref.current);
+      onDone();
     }
   }, [elapsed, seconds]);
 
