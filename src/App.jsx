@@ -1017,7 +1017,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
     if (data.wt !== undefined) lastWeightRef.current = data.wt;
     onSync(ex.name, setNum, data.reps, data.wt, data.band);
     // Always start rest timer after every set — you need rest before the next exercise too
-    onStartRest(ex.rest, ex.name, setNum, totalSets);
+    onStartRest(wkData.deload ? Math.min(ex.rest, 75) : ex.rest, ex.name, setNum, totalSets);
   };
 
   const deleteSet = (setNum) => {
@@ -1068,7 +1068,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
           
           <div style={{ display: "flex", gap: 12, marginBottom: 4, fontSize: 10 }}>
             <span style={{ color: C.mut }}>Target: <span style={{ color: C.grn, fontWeight: 600 }}>{totalSets}×{ex.reps}</span></span>
-            <span style={{ color: C.mut }}>Rest: <span style={{ color: C.pur, fontWeight: 600 }}>{fmtRest(ex.rest)}</span></span>
+            <span style={{ color: C.mut }}>Rest: <span style={{ color: C.pur, fontWeight: 600 }}>{fmtRest(wkData.deload ? Math.min(ex.rest, 75) : ex.rest)}</span></span>
             {targetWt && <span style={{ color: C.mut }}>Wt: <span style={{ color: smartTarget ? C.org : C.gld, fontWeight: 600 }}>{targetWt} lb{smartTarget ? " *" : ""}</span></span>}
           </div>
           {progressNote && (
