@@ -484,7 +484,7 @@ function makeDeloadRoutines(baseRoutines, deloadWeights) {
 // Base Meso 1 routines (used for both Meso 1 and pre-Meso deload)
 const MESO1_ROUTINES = {
   "Upper A": {
-    day: "Mon", cardio: "20-min incline walk", sections: [
+    day: "D1", sections: [
       { name: "Chest", exercises: [
         { name: "Smith Flat Bench Press", muscles: "Chest", sets: 3, reps: "8-10", rest: 150, wt: 120,
           vid: "https://www.muscleandstrength.com/exercises/smith-machine-bench-press.html", src: "M&S" },
@@ -513,7 +513,7 @@ const MESO1_ROUTINES = {
     ]
   },
   "Lower A": {
-    day: "Tue", cardio: "10-min incline walk", sections: [
+    day: "D2", sections: [
       { name: "Quads", exercises: [
         { name: "Smith Front Squat", muscles: "Quads · Glutes", sets: 3, reps: "8-10", rest: 150, wt: 105,
           vid: "https://www.muscleandstrength.com/exercises/smith-machine-front-squat.html", src: "M&S" },
@@ -537,7 +537,7 @@ const MESO1_ROUTINES = {
     ]
   },
   "Upper B": {
-    day: "Thu", cardio: "20-min incline walk", sections: [
+    day: "D3", sections: [
       { name: "Chest", exercises: [
         { name: "Smith Close-Grip Bench", muscles: "Chest · Triceps", sets: 3, reps: "8-10", rest: 150, wt: 75,
           vid: "https://www.muscleandstrength.com/exercises/smith-machine-close-grip-bench-press.html", src: "M&S" },
@@ -565,7 +565,7 @@ const MESO1_ROUTINES = {
     ]
   },
   "Lower B": {
-    day: "Sat", cardio: "10-min incline walk", sections: [
+    day: "D4", sections: [
       { name: "Quads", exercises: [
         { name: "Smith Hack Squat (Feet Fwd)", muscles: "Quads", sets: 3, reps: "10-12", rest: 120, wt: 95,
           vid: "https://www.muscleandstrength.com/exercises/feet-forward-smith-machine-squat.html", src: "M&S" },
