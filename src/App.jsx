@@ -123,10 +123,10 @@ const db = {
     const yestStr = `${yest.getFullYear()}-${String(yest.getMonth()+1).padStart(2,'0')}-${String(yest.getDate()).padStart(2,'0')}`;
 
     // Find ALL matching sessions across today + yesterday for this routine + week
+    // Search both new format (Meso 0-W1D1-Upper A) and legacy (W1-Upper A)
     const { data: candidates } = await supabase
       .from('sessions')
       .select('*, sets(id)')
-      .in('date', [date, yestStr])
       .eq('week_number', weekNum)
       .ilike('notes', `%${routineSuffix}%`);
 
