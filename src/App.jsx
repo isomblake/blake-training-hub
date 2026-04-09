@@ -375,7 +375,7 @@ const db = {
   },
 
   // Get last session's data for an exercise (for auto-progression)
-  async getLastSessionForExercise(exerciseName, beforeDate) {
+  async getLastSessionForExercise(exerciseName, beforeDate, mesoPrefix) {
     const { data: ex } = await supabase
       .from('exercises')
       .select('id')
@@ -384,12 +384,14 @@ const db = {
     if (!ex) return null;
 
     // Get recent sessions that have this exercise, before today
-    const { data: sessions } = await supabase
+    // Issue #7: Filter by meso so old program data doesn't bleed in
+    let { data: sessions } = await supabase
       .from('sessions')
       .select('id, date, week_number, notes')
       .lt('date', beforeDate || '9999-12-31')
       .order('date', { ascending: false })
       .limit(10);
+    if (mesoPrefix) { const filtered = (sessions||[]).filter(s => s.notes && s.notes.startsWith(mesoPrefix)); if (filtered.length > 0) sessions = filtered; }
 
     if (!sessions || sessions.length === 0) return null;
 
@@ -939,7 +941,7 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone }) {
   );
 }
 
-function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, onStartRest, onSave, onSync, onDeleteFromDb }) {
+function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, onStartRest, onSave, onSync, onDeleteFromDb, mesoPrefix }) {
   const [expanded, setExpanded] = useState(false);
   const [smartTarget, setSmartTarget] = useState(null);
   const [progressNote, setProgressNote] = useState(null);
@@ -967,7 +969,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
     setProgressNote(null);
     // Use tomorrow's date so we include today's earlier sessions too
     const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-    db.getLastSessionForExercise(ex.name, tomorrow).then(last => {
+    db.getLastSessionForExercise(ex.name, tomorrow, mesoPrefix).then(last => {
       if (!last || !last.sets || last.sets.length === 0) return;
       const repRange = ex.reps.split("-").map(Number);
       const minReps = repRange[0];
@@ -1663,7 +1665,7 @@ export default function App() {
           <div key={si}>
             <div style={{ fontSize: 11, fontWeight: 700, color: C.mut, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4, marginTop: si > 0 ? 12 : 0 }}>{sec.name}</div>
             {sec.exercises.map((ex, ei) => (
-              <ExerciseCard key={ei} ex={ex} week={week} weeksConfig={activeWeeks} sessionKey={sessionKey} allSets={allSets} setAllSets={setAllSets} onStartRest={startRest} onSave={saveToStorage} onSync={syncToDb} onDeleteFromDb={deleteFromDb} />
+              <ExerciseCard key={ei} ex={ex} week={week} weeksConfig={activeWeeks} sessionKey={sessionKey} allSets={allSets} setAllSets={setAllSets} onStartRest={startRest} onSave={saveToStorage} onSync={syncToDb} onDeleteFromDb={deleteFromDb} mesoPrefix={activeMeso.shortName} />
             ))}
           </div>
         ))}
