@@ -131,10 +131,8 @@ const db = {
       .ilike('notes', `%${routineSuffix}%`);
 
     if (candidates && candidates.length > 0) {
-      // Prefer today over yesterday (Issue #5: timezone drift fix)
-      const todayCandidates = candidates.filter(c => c.date === date);
-      const pool = todayCandidates.length > 0 ? todayCandidates : candidates;
-      const sorted = [...pool].sort((a, b) => {
+      // Sort: most sets first, then most recent
+      const sorted = [...candidates].sort((a, b) => {
         const aCount = a.sets?.length || 0;
         const bCount = b.sets?.length || 0;
         if (bCount !== aCount) return bCount - aCount;
