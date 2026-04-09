@@ -1522,8 +1522,11 @@ export default function App() {
   const totalSetsLogged = Object.values(allSets).reduce((s, ex) => s + Object.keys(ex).length, 0);
 
   const startRest = useCallback((seconds, exName, setNum, totalSets) => {
-    setTimer({ seconds, exName, setNum, totalSets });
-  }, []);
+    // Issue #2: Cap rest at 75s during deload weeks
+    const isDeload = activeWeeks[week]?.deload;
+    const deloadRest = isDeload ? Math.min(seconds, 75) : seconds;
+    setTimer({ seconds: deloadRest, exName, setNum, totalSets });
+  }, [activeWeeks, week]);
 
   const W = { background: C.bg, minHeight: "100vh", color: C.txt, fontFamily: "'SF Pro Display',system-ui,sans-serif", padding: "12px 10px", paddingTop: timer ? 64 : 12, maxWidth: 480, margin: "0 auto" };
 
