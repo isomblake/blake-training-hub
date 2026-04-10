@@ -58,6 +58,7 @@ function enableSound() {
       setTimeout(() => _playOsc(880, 0.15, 0.4), 160);
     }).catch(() => {});
   } catch(e) {}
+  requestNotifPermission();
   _soundEnabled = true;
   return true;
 }
@@ -66,6 +67,36 @@ function disableSound() {
   _soundEnabled = false;
   _stopKeepAlive();
   return false;
+}
+
+// === NOTIFICATION SYSTEM (Issue #1: background timer alert) ===
+let _notifPermission = false;
+
+async function requestNotifPermission() {
+  if (!("Notification" in window)) return false;
+  if (Notification.permission === "granted") { _notifPermission = true; return true; }
+  if (Notification.permission === "denied") return false;
+  const result = await Notification.requestPermission();
+  _notifPermission = result === "granted";
+  return _notifPermission;
+}
+
+function scheduleTimerNotification(seconds, exName) {
+  if (!_notifPermission || !("Notification" in window)) return null;
+  const timeoutId = setTimeout(() => {
+    try {
+      new Notification("Rest Complete", {
+        body: exName + " — time for next set",
+        tag: "rest-timer",
+        requireInteraction: true,
+      });
+    } catch(e) {}
+  }, seconds * 1000);
+  return timeoutId;
+}
+
+function cancelTimerNotification(timeoutId) {
+  if (timeoutId) clearTimeout(timeoutId);
 }
 
 function _playOsc(freq, dur, vol) {
@@ -808,6 +839,14 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone }) {
   const alertedRef = useRef(false);
   const autoAdvancedRef = useRef(false);
   const touchStartY = useRef(null);
+
+
+  // Issue #1: Schedule notification for background alert
+  const notifRef = useRef(null);
+  useEffect(() => {
+    notifRef.current = scheduleTimerNotification(seconds, exName);
+    return () => cancelTimerNotification(notifRef.current);
+  }, []);
 
   useEffect(() => {
     // Use real timestamps so backgrounding doesn't break the timer
