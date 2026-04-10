@@ -162,10 +162,16 @@ const db = {
       .ilike('notes', `%${routineSuffix}%`);
 
     if (candidates && candidates.length > 0) {
-      // Prefer today over yesterday (Issue #5: timezone drift fix)
-      const todayCandidates = candidates.filter(c => c.date === date);
-      const pool = todayCandidates.length > 0 ? todayCandidates : candidates;
-      console.log('SESSION LOOKUP:', { date, routineSuffix, weekNum, candidateCount: candidates.length, todayCount: todayCandidates.length, poolCount: pool.length, poolDates: pool.map(c => c.date + ':' + c.notes) });
+      // Pick session with most data, prefer today only as tiebreaker
+      const sorted = [...candidates].sort((a, b) => {
+        const aCount = a.sets?.length || 0;
+        const bCount = b.sets?.length || 0;
+        if (bCount !== aCount) return bCount - aCount;
+        // Tiebreaker: prefer today
+        if (a.date === date && b.date !== date) return -1;
+        if (b.date === date && a.date !== date) return 1;
+        return new Date(b.created_at) - new Date(a.created_at);
+      });
       const sorted = [...pool].sort((a, b) => {
         const aCount = a.sets?.length || 0;
         const bCount = b.sets?.length || 0;
