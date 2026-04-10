@@ -1480,6 +1480,24 @@ export default function App() {
   const today = localDate();
   const sessionKey = today + "-" + rKey.replace(/\s+/g, "") + "-W" + (week + 1);
 
+  // Auto-detect next routine based on last completed session
+  useEffect(() => {
+    db.getRecentSessions(5).then(sessions => {
+      const completed = sessions.filter(s => s.status === "completed" && s.notes);
+      if (completed.length === 0) return;
+      const last = completed[0];
+      const routineOrder = ["Upper A", "Lower A", "Upper B", "Lower B"];
+      const lastMatch = last.notes.match(/(Upper [AB]|Lower [AB])/);
+      if (!lastMatch) return;
+      const lastIdx = routineOrder.indexOf(lastMatch[1]);
+      if (lastIdx === -1) return;
+      const nextIdx = (lastIdx + 1) % routineOrder.length;
+      const nextKey = routineOrder[nextIdx];
+      const appIdx = activeRoutineKeys.indexOf(nextKey);
+      if (appIdx !== -1 && appIdx !== routine) setRoutine(appIdx);
+    }).catch(() => {});
+  }, []);
+
   // One-time: rename exercise with degree symbol so DB matches app
   useEffect(() => {
     supabase.from('exercises').update({ name: 'Smith Incline Press' }).eq('name', 'Smith Incline Press (30°)').then(() => {});
