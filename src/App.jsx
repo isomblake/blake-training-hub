@@ -172,12 +172,6 @@ const db = {
         if (b.date === date && a.date !== date) return 1;
         return new Date(b.created_at) - new Date(a.created_at);
       });
-      const sorted = [...pool].sort((a, b) => {
-        const aCount = a.sets?.length || 0;
-        const bCount = b.sets?.length || 0;
-        if (bCount !== aCount) return bCount - aCount;
-        return new Date(b.created_at) - new Date(a.created_at);
-      });
       const best = sorted[0];
       // Upgrade legacy notes to new format
       if (!best.notes.includes('Meso')) {
