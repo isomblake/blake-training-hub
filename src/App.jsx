@@ -1369,6 +1369,11 @@ function HistoryView() {
                           <option value="skipped">Skipped</option>
                         </select>
                       </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: 10, color: C.mut, width: 55 }}>Notes:</span>
+                        <input type="text" value={editFields.notes || ''} onChange={e => setEditFields(f => ({...f, notes: e.target.value}))}
+                          style={{ flex: 1, padding: "4px", borderRadius: 5, border: `1px solid ${C.bdr}`, background: C.card, color: C.txt, fontSize: 11 }} />
+                      </div>
                     </div>
                     <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
                       <button onClick={async () => {
@@ -1378,6 +1383,7 @@ function HistoryView() {
                           if (editFields.week) updates.week_number = parseInt(editFields.week);
                           if (editFields.rir) updates.rir = editFields.rir;
                           if (editFields.status) updates.status = editFields.status;
+                          if (editFields.notes !== undefined) updates.notes = editFields.notes;
                           await db.updateSession(session.id, updates);
                           setSessions(prev => prev.map(s => s.id === session.id ? { ...s, ...updates } : s));
                           setEditingId(null);
@@ -1401,6 +1407,7 @@ function HistoryView() {
                           week: session.week_number?.toString() || '',
                           rir: session.rir || '',
                           status: session.status || 'completed',
+                          notes: session.notes || '',
                         });
                       }}
                       style={{ padding: "5px 12px", borderRadius: 6, border: `1px solid ${C.bdr}`, background: C.c2, color: C.mut, fontSize: 10, cursor: "pointer" }}>
