@@ -189,12 +189,12 @@ const db = {
         await supabase.from('sessions').update({ notes: routineKey }).eq('id', best.id);
       }
       if (best.date !== date) {
-        await supabase.from('sessions').update({ date }).eq('id', best.id);
-        best.date = date;
-      }
-      if (best.date !== date) {
-        await supabase.from('sessions').update({ date }).eq('id', best.id);
-        best.date = date;
+        delete best.sets;
+        const { data: newSess } = await supabase
+          .from('sessions')
+          .insert({ date, week_number: weekNum, rir, status: 'in_progress', notes: routineKey })
+          .select().single();
+        return newSess;
       }
       // Strip the sets array we joined for the count
       delete best.sets;
@@ -1497,12 +1497,12 @@ export default function App() {
   // Auto-detect next routine based on last completed session (current meso only)
   useEffect(() => {
     db.getRecentSessions(20).then(sessions => {
+      const routineOrder = ["Upper A", "Lower A", "Upper B", "Lower B"];
       const completed = sessions.filter(s =>
-        s.status === "completed" && s.notes && s.notes.startsWith(activeMeso.shortName)
+        s.status === "completed" && s.notes && routineOrder.some(r => s.notes.includes(r))
       );
       if (completed.length === 0) return;
       const last = completed[0];
-      const routineOrder = ["Upper A", "Lower A", "Upper B", "Lower B"];
       const lastMatch = last.notes.match(/(Upper [AB]|Lower [AB])/);
       if (!lastMatch) return;
       const lastIdx = routineOrder.indexOf(lastMatch[1]);
