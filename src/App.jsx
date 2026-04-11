@@ -318,7 +318,7 @@ const db = {
     const { data } = await supabase
       .from('sessions')
       .select('*, sets(*, exercises(name, muscles, muscle_group))')
-      .order('date', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(limit);
     return data || [];
   },
