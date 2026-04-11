@@ -166,11 +166,14 @@ const db = {
 
     // Find ALL matching sessions across today + yesterday for this routine + week
     // Search both new format (Meso 0-W1D1-Upper A) and legacy (W1-Upper A)
-    const { data: candidates } = await supabase
+    const mesoTag = routineKey.match(/^(Meso \d+)/)?.[1];
+    let candidateQuery = supabase
       .from('sessions')
       .select('*, sets(id)')
       .eq('week_number', weekNum)
       .ilike('notes', `%${routineSuffix}%`);
+    if (mesoTag) candidateQuery = candidateQuery.ilike('notes', `${mesoTag}%`);
+    const { data: candidates } = await candidateQuery;
 
     if (candidates && candidates.length > 0) {
       // Pick session with most data, prefer today only as tiebreaker
@@ -187,14 +190,6 @@ const db = {
       // Upgrade legacy notes to new format
       if (!best.notes.includes('Meso')) {
         await supabase.from('sessions').update({ notes: routineKey }).eq('id', best.id);
-      }
-      if (best.date !== date) {
-        delete best.sets;
-        const { data: newSess } = await supabase
-          .from('sessions')
-          .insert({ date, week_number: weekNum, rir, status: 'in_progress', notes: routineKey })
-          .select().single();
-        return newSess;
       }
       // Strip the sets array we joined for the count
       delete best.sets;
