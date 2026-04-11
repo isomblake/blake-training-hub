@@ -44,6 +44,14 @@ if (typeof document !== 'undefined') {
   });
 }
 
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && _ctx && _soundEnabled) {
+      _ctx.resume().catch(() => {});
+    }
+  });
+}
+
 function _stopKeepAlive() {
   try {
     if (_silentNode) {
@@ -179,6 +187,10 @@ const db = {
       // Upgrade legacy notes to new format
       if (!best.notes.includes('Meso')) {
         await supabase.from('sessions').update({ notes: routineKey }).eq('id', best.id);
+      }
+      if (best.date !== date) {
+        await supabase.from('sessions').update({ date }).eq('id', best.id);
+        best.date = date;
       }
       if (best.date !== date) {
         await supabase.from('sessions').update({ date }).eq('id', best.id);
@@ -622,7 +634,7 @@ const MESO1_ROUTINES = {
       { name: "Calves + Core + Delts", exercises: [
         { name: "Smith Deficit Calf Raise", muscles: "Calves", sets: 3, reps: "12-15", rest: 60, wt: 115,
           vid: "https://www.muscleandstrength.com/exercises/smith-machine-calf-raise.html", src: "M&S" },
-        { name: "Hanging Knee Raise", muscles: "Abs", sets: 3, reps: "12-15", rest: 60, wt: null, bodyweight: true,
+        { name: "Hanging Knee Raise", muscles: "Abs", sets: 3, reps: "12-15", rest: 60, wt: null, bodyweight: true, bodyweight: true,
           vid: "https://www.muscleandstrength.com/exercises/hanging-knee-raise.html", src: "M&S" },
         { name: "Cable Upright Row", muscles: "Side Delts", sets: 2, reps: "12-15", rest: 60, wt: 40,
           vid: "https://www.muscleandstrength.com/exercises/cable-upright-row.html", src: "M&S" },
