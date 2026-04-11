@@ -1494,10 +1494,12 @@ export default function App() {
   const today = localDate();
   const sessionKey = today + "-" + rKey.replace(/\s+/g, "") + "-W" + (week + 1);
 
-  // Auto-detect next routine based on last completed session
+  // Auto-detect next routine based on last completed session (current meso only)
   useEffect(() => {
-    db.getRecentSessions(5).then(sessions => {
-      const completed = sessions.filter(s => s.status === "completed" && s.notes);
+    db.getRecentSessions(20).then(sessions => {
+      const completed = sessions.filter(s =>
+        s.status === "completed" && s.notes && s.notes.startsWith(activeMeso.shortName)
+      );
       if (completed.length === 0) return;
       const last = completed[0];
       const routineOrder = ["Upper A", "Lower A", "Upper B", "Lower B"];
