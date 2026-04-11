@@ -1313,7 +1313,7 @@ function HistoryView() {
                               <div style={{ fontSize: 13, fontFamily: "monospace", fontWeight: 700, flex: 1 }}>
                                 <span style={{ color: C.blu }}>{s.reps}</span>
                                 <span style={{ color: C.mut }}> × </span>
-                                <span style={{ color: C.gld }}>{s.weight === 0 ? "BW" : s.weight}</span>
+                                <span style={{ color: C.gld }}>{s.weight === 0 && ["Chin-Ups (Wide Overhand)","Hanging Knee Raise"].includes(s.exercises?.name) ? "BW" : s.weight}</span>
                                 {s.weight > 0 && <span style={{ color: C.mut, fontSize: 9 }}> lb</span>}
                                 {s.notes && s.notes.startsWith('band:') && (
                                   <span style={{ fontSize: 9, color: BAND_COLORS[s.notes.replace('band:','')] || C.mut, marginLeft: 4, fontWeight: 600 }}>
@@ -1321,7 +1321,7 @@ function HistoryView() {
                                   </span>
                                 )}
                               </div>
-                              <button onClick={() => { setEditingSetId(s.id); setEditSetFields({ reps: s.reps.toString(), weight: s.weight.toString() }); }}
+                              <button onClick={() => { setEditingSetId(s.id); setEditSetFields({ reps: s.reps.toString(), weight: (s.weight === 0 && !["Chin-Ups (Wide Overhand)","Hanging Knee Raise"].includes(s.exercises?.name)) ? '' : s.weight.toString() }); }}
                                 style={{ padding: "2px 6px", borderRadius: 4, border: `1px solid ${C.bdr}`, background: C.c2, color: C.mut, fontSize: 9, cursor: "pointer" }}>
                                 Edit
                               </button>
