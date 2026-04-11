@@ -36,6 +36,14 @@ function _startKeepAlive() {
   } catch(e) {}
 }
 
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && _ctx && _soundEnabled) {
+      _ctx.resume().catch(() => {});
+    }
+  });
+}
+
 function _stopKeepAlive() {
   try {
     if (_silentNode) {
@@ -81,23 +89,18 @@ async function requestNotifPermission() {
   return _notifPermission;
 }
 
+function _sendNotif(title, body) {
+  if (!_notifPermission || !("Notification" in window)) return;
+  if (document.visibilityState !== 'hidden') return;
+  try { new Notification(title, { body, tag: "rest-timer", requireInteraction: true }); } catch(e) {}
+}
 function scheduleTimerNotification(seconds, exName) {
-  if (!_notifPermission || !("Notification" in window)) return null;
-  const timeoutId = setTimeout(() => {
-    try {
-      new Notification("Rest Complete", {
-        body: exName + " — time for next set",
-        tag: "rest-timer",
-        requireInteraction: true,
-      });
-    } catch(e) {}
-  }, seconds * 1000);
-  return timeoutId;
+  const ids = [];
+  if (seconds > 10) ids.push(setTimeout(() => _sendNotif("⏱ 10 seconds left", exName + " — get ready"), (seconds - 10) * 1000));
+  ids.push(setTimeout(() => _sendNotif("✅ Rest Complete", exName + " — time for next set"), seconds * 1000));
+  return ids;
 }
-
-function cancelTimerNotification(timeoutId) {
-  if (timeoutId) clearTimeout(timeoutId);
-}
+function cancelTimerNotification(ids) { (ids || []).forEach(id => clearTimeout(id)); }
 
 function _playOsc(freq, dur, vol) {
   try {
@@ -176,6 +179,10 @@ const db = {
       // Upgrade legacy notes to new format
       if (!best.notes.includes('Meso')) {
         await supabase.from('sessions').update({ notes: routineKey }).eq('id', best.id);
+      }
+      if (best.date !== date) {
+        await supabase.from('sessions').update({ date }).eq('id', best.id);
+        best.date = date;
       }
       // Strip the sets array we joined for the count
       delete best.sets;
@@ -423,7 +430,7 @@ const db = {
       .lt('date', beforeDate || '9999-12-31')
       .order('date', { ascending: false })
       .limit(10);
-    if (mesoPrefix) { const filtered = (sessions||[]).filter(s => s.notes && s.notes.startsWith(mesoPrefix)); if (filtered.length > 0) sessions = filtered; }
+    if (mesoPrefix) { sessions = (sessions||[]).filter(s => s.notes && s.notes.startsWith(mesoPrefix)); }
 
     if (!sessions || sessions.length === 0) return null;
 
@@ -526,7 +533,7 @@ const MESO1_ROUTINES = {
           vid: "https://www.muscleandstrength.com/exercises/incline-smith-machine-bench-press.html", src: "M&S" },
       ]},
       { name: "Back", exercises: [
-        { name: "Chin-Ups (Wide Overhand)", muscles: "Lats · Upper Back", sets: 3, reps: "6-10", rest: 150, wt: null,
+        { name: "Chin-Ups (Wide Overhand)", muscles: "Lats · Upper Back", sets: 3, reps: "6-10", rest: 150, wt: null, bodyweight: true,
           bands: ["Green", "Purple", "Black", "Red", "None"],
           vid: "https://www.muscleandstrength.com/exercises/wide-grip-pull-up.html", src: "M&S" },
         { name: "Seated Cable Row (Neutral)", muscles: "Upper Back · Lats", sets: 3, reps: "10-12", rest: 120, wt: 140,
@@ -615,7 +622,7 @@ const MESO1_ROUTINES = {
       { name: "Calves + Core + Delts", exercises: [
         { name: "Smith Deficit Calf Raise", muscles: "Calves", sets: 3, reps: "12-15", rest: 60, wt: 115,
           vid: "https://www.muscleandstrength.com/exercises/smith-machine-calf-raise.html", src: "M&S" },
-        { name: "Hanging Knee Raise", muscles: "Abs", sets: 3, reps: "12-15", rest: 60, wt: null,
+        { name: "Hanging Knee Raise", muscles: "Abs", sets: 3, reps: "12-15", rest: 60, wt: null, bodyweight: true,
           vid: "https://www.muscleandstrength.com/exercises/hanging-knee-raise.html", src: "M&S" },
         { name: "Cable Upright Row", muscles: "Side Delts", sets: 2, reps: "12-15", rest: 60, wt: 40,
           vid: "https://www.muscleandstrength.com/exercises/cable-upright-row.html", src: "M&S" },
@@ -981,7 +988,7 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone }) {
   );
 }
 
-function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, onStartRest, onSave, onSync, onDeleteFromDb, mesoPrefix }) {
+function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, onStartRest, onSave, onSync, onDeleteFromDb, mesoPrefix, isLastExercise }) {
   const [expanded, setExpanded] = useState(false);
   const [smartTarget, setSmartTarget] = useState(null);
   const [progressNote, setProgressNote] = useState(null);
@@ -1067,8 +1074,10 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
     // Store the latest weight so unlogged SetRows can pick it up
     if (data.wt !== undefined) lastWeightRef.current = data.wt;
     onSync(ex.name, setNum, data.reps, data.wt, data.band);
-    // Always start rest timer after every set — you need rest before the next exercise too
-    onStartRest(wkData.deload ? Math.min(ex.rest, 75) : ex.rest, ex.name, setNum, totalSets);
+    const isLastSet = setNum >= totalSets;
+    if (!(isLastExercise && isLastSet)) {
+      onStartRest(wkData.deload ? Math.min(ex.rest, 75) : ex.rest, ex.name, setNum, totalSets);
+    }
   };
 
   const deleteSet = (setNum) => {
@@ -1129,7 +1138,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
           )}
 
           {Array.from({ length: totalSets }, (_, i) => (
-            <SetRow key={i} setNum={i + 1} targetReps={ex.reps.split("-")[0]} targetWt={targetWt} lastWeight={lastWeightRef.current} isBW={!ex.wt && ex.wt !== 0} bands={ex.bands} logged={logged[i + 1]} onLog={logSet} onDelete={deleteSet} />
+            <SetRow key={i} setNum={i + 1} targetReps={ex.reps.split("-")[0]} targetWt={targetWt} lastWeight={lastWeightRef.current} isBW={!!ex.bodyweight} bands={ex.bands} logged={logged[i + 1]} onLog={logSet} onDelete={deleteSet} />
           ))}
         </div>
       )}
@@ -1722,9 +1731,11 @@ export default function App() {
         {r.sections.map((sec, si) => (
           <div key={si}>
             <div style={{ fontSize: 11, fontWeight: 700, color: C.mut, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4, marginTop: si > 0 ? 12 : 0 }}>{sec.name}</div>
-            {sec.exercises.map((ex, ei) => (
-              <ExerciseCard key={ei} ex={ex} week={week} weeksConfig={activeWeeks} sessionKey={sessionKey} allSets={allSets} setAllSets={setAllSets} onStartRest={startRest} onSave={saveToStorage} onSync={syncToDb} onDeleteFromDb={deleteFromDb} mesoPrefix={activeMeso.shortName} />
-            ))}
+            {sec.exercises.map((ex, ei) => {
+              const isLastSec = si === r.sections.length - 1;
+              const isLastEx = isLastSec && ei === sec.exercises.length - 1;
+              return <ExerciseCard key={ei} ex={ex} week={week} weeksConfig={activeWeeks} sessionKey={sessionKey} allSets={allSets} setAllSets={setAllSets} onStartRest={startRest} onSave={saveToStorage} onSync={syncToDb} onDeleteFromDb={deleteFromDb} mesoPrefix={activeMeso.shortName} isLastExercise={isLastEx} />;
+            })}
           </div>
         ))}
 
