@@ -1474,7 +1474,7 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState("");
   const [dbConnected, setDbConnected] = useState(false);
   const [view, setView] = useState("workout"); // "workout" or "history"
-  const [(sessionStartRef.current || Date.now())] = useState(Date.now());
+  const sessionStartRef = useRef(null);
   const [showFinishReview, setShowFinishReview] = useState(false);
   const [mesoIdx, setMesoIdx] = useState(() => getActiveMeso(localDate()));
   const activeMeso = MESOCYCLES[mesoIdx];
