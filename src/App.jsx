@@ -176,14 +176,13 @@ const db = {
     const { data: candidates } = await candidateQuery;
 
     if (candidates && candidates.length > 0) {
-      // Pick session with most data, prefer today only as tiebreaker
-      const sorted = [...candidates].sort((a, b) => {
+      // Prefer today's session; only reuse older session if today has none
+      const todaySessions = candidates.filter(c => c.date === date);
+      const pool = todaySessions.length > 0 ? todaySessions : candidates;
+      const sorted = [...pool].sort((a, b) => {
         const aCount = a.sets?.length || 0;
         const bCount = b.sets?.length || 0;
         if (bCount !== aCount) return bCount - aCount;
-        // Tiebreaker: prefer today
-        if (a.date === date && b.date !== date) return -1;
-        if (b.date === date && a.date !== date) return 1;
         return new Date(b.created_at) - new Date(a.created_at);
       });
       const best = sorted[0];
