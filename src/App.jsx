@@ -1748,7 +1748,14 @@ export default function App() {
         ))}
 
         {/* Finish Session + Export */}
-        {!showFinishReview ? (
+        {!sessionStarted ? (
+          <div style={{ marginTop: 16 }}>
+            <button onClick={() => { sessionStartRef.current = Date.now(); setSessionStarted(true); }}
+              style={{ width: "100%", padding: "14px", borderRadius: 10, border: `1px solid ${C.blu}44`, background: C.blu + "11", color: C.blu, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
+              ▶ Start Session
+            </button>
+          </div>
+        ) : !showFinishReview ? (
           <div style={{ marginTop: 16, display: "flex", gap: 6 }}>
             <button onClick={() => setShowFinishReview(true)}
               style={{ flex: 1, padding: "14px", borderRadius: 10, border: `1px solid ${C.grn}44`, background: C.grn + "11", color: C.grn, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
