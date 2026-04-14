@@ -1474,7 +1474,7 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState("");
   const [dbConnected, setDbConnected] = useState(false);
   const [view, setView] = useState("workout"); // "workout" or "history"
-  const [sessionStartTime] = useState(Date.now());
+  const [(sessionStartRef.current || Date.now())] = useState(Date.now());
   const [showFinishReview, setShowFinishReview] = useState(false);
   const [mesoIdx, setMesoIdx] = useState(() => getActiveMeso(localDate()));
   const activeMeso = MESOCYCLES[mesoIdx];
@@ -1770,7 +1770,7 @@ export default function App() {
           <div style={{ marginTop: 16, background: C.card, borderRadius: 12, border: `1px solid ${C.grn}33`, padding: 14 }}>
             <div style={{ fontSize: 14, fontWeight: 800, color: C.grn, marginBottom: 10 }}>Session Review</div>
             <div style={{ fontSize: 11, color: C.mut, marginBottom: 8 }}>
-              {rKey} · {activeWeeks[week].rir} · {Math.round((Date.now() - sessionStartTime) / 60000)} min
+              {rKey} · {activeWeeks[week].rir} · {Math.round((Date.now() - (sessionStartRef.current || Date.now())) / 60000)} min
             </div>
 
             {/* Review each exercise */}
@@ -1825,7 +1825,7 @@ export default function App() {
               </button>
               <button onClick={async () => {
                   if (!currentSession) return;
-                  const mins = Math.round((Date.now() - sessionStartTime) / 60000);
+                  const mins = Math.round((Date.now() - (sessionStartRef.current || Date.now())) / 60000);
                   await db.finishSession(currentSession.id, mins);
                   // Advance to next routine in cycle
                   const nextRoutine = (routine + 1) % activeRoutineKeys.length;
