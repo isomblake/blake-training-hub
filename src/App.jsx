@@ -36,18 +36,18 @@ function _startKeepAlive() {
   } catch(e) {}
 }
 
+// Track background state to prevent stale sound playback
+let _appBackgrounded = false;
+let _soundSuppressUntil = 0;
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && _ctx && _soundEnabled) {
-      _ctx.resume().catch(() => {});
-    }
-  });
-}
-
-if (typeof document !== 'undefined') {
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && _ctx && _soundEnabled) {
-      _ctx.resume().catch(() => {});
+    if (document.visibilityState === 'hidden') {
+      _appBackgrounded = true;
+    } else {
+      // Suppress sounds for 500ms after returning to prevent queued playback
+      _soundSuppressUntil = Date.now() + 500;
+      _appBackgrounded = false;
+      if (_ctx && _soundEnabled) _ctx.resume().catch(() => {});
     }
   });
 }
@@ -111,6 +111,7 @@ function scheduleTimerNotification(seconds, exName) {
 function cancelTimerNotification(ids) { (ids || []).forEach(id => clearTimeout(id)); }
 
 function _playOsc(freq, dur, vol) {
+  if (_appBackgrounded) return; // Don't queue sounds while backgrounded
   try {
     const ctx = _ensureCtx();
     if (ctx.state === 'suspended') ctx.resume().catch(() => {});
@@ -129,6 +130,7 @@ function _playOsc(freq, dur, vol) {
 }
 
 function playWarningSound() {
+  if (Date.now() < _soundSuppressUntil) return;
   if (_soundEnabled) {
     // Double high ding — louder and repeated so it cuts through
     _playOsc(880, 0.35, 0.9);
@@ -138,6 +140,7 @@ function playWarningSound() {
 }
 
 function playRestBeep() {
+  if (Date.now() < _soundSuppressUntil) return;
   if (_soundEnabled) {
     // Ascending three-note chime: C5, E5, G5
     _playOsc(523, 0.3, 0.7);
@@ -844,7 +847,7 @@ const SetRow = React.memo(function SetRow({ setNum, targetReps, targetWt, lastWe
     && (prev.logged == null) === (next.logged == null);
 });
 
-function RestTimer({ seconds, exName, setNum, totalSets, onDone }) {
+function RestTimer({ seconds, exName, setNum, totalSets, onDone, nextSetInfo, onLogFromTimer }) {
   const [elapsed, setElapsed] = useState(0);
   const [expanded, setExpanded] = useState(true);
   const startTimeRef = useRef(Date.now());
@@ -852,6 +855,7 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone }) {
   const warnedRef = useRef(false);
   const alertedRef = useRef(false);
   const autoAdvancedRef = useRef(false);
+  const [showNextSet, setShowNextSet] = useState(false);
   const touchStartY = useRef(null);
 
 
@@ -888,11 +892,15 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone }) {
       alertedRef.current = true;
       playRestBeep();
     }
-    // Issue #6: Auto-advance 2s after timer hits zero
-    if (elapsed >= seconds + 2 && !autoAdvancedRef.current) {
+    // Show next set card after timer completes
+    if (elapsed >= seconds && !autoAdvancedRef.current) {
       autoAdvancedRef.current = true;
       clearInterval(ref.current);
-      onDone();
+      if (nextSetInfo && onLogFromTimer) {
+        setShowNextSet(true);
+      } else {
+        onDone();
+      }
     }
   }, [elapsed, seconds]);
 
@@ -911,6 +919,57 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone }) {
     if (diff < -50) setExpanded(false);  // swipe up = collapse
     touchStartY.current = null;
   };
+
+  // NEXT SET CARD — shown after rest timer completes
+  if (showNextSet && nextSetInfo) {
+    const nsi = nextSetInfo;
+    const [logReps, setLogReps] = useState(nsi.targetReps || "");
+    const [logWt, setLogWt] = useState(nsi.targetWt?.toString() || "");
+    return (
+      <div style={{ position: "fixed", inset: 0, background: C.bg, zIndex: 1000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
+        <div style={{ fontSize: 12, color: C.grn, marginBottom: 4, textTransform: "uppercase", letterSpacing: 1, fontWeight: 700 }}>Next Set</div>
+        <div style={{ fontSize: 20, color: C.txt, fontWeight: 800, marginBottom: 6 }}>{nsi.exName}</div>
+        <div style={{ fontSize: 12, color: C.mut, marginBottom: 20 }}>{nsi.muscles}</div>
+
+        <div style={{ fontSize: 14, color: C.pur, marginBottom: 20, fontWeight: 600 }}>
+          Set {nsi.nextSetNum} of {nsi.totalSets}
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
+          <div>
+            <div style={{ fontSize: 10, color: C.mut, textAlign: "center", marginBottom: 4 }}>REPS</div>
+            <input type="number" inputMode="numeric" value={logReps} onChange={e => setLogReps(e.target.value)}
+              onFocus={e => e.target.select()}
+              style={{ width: 64, padding: "10px", borderRadius: 10, border: `1px solid ${C.bdr}`, background: C.c2, color: C.txt, fontSize: 20, textAlign: "center", fontWeight: 700 }} />
+          </div>
+          <div style={{ fontSize: 20, color: C.mut, marginTop: 16 }}>×</div>
+          {nsi.isBW ? (
+            <div style={{ fontSize: 20, color: C.teal, fontWeight: 700, marginTop: 16 }}>BW</div>
+          ) : (
+            <div>
+              <div style={{ fontSize: 10, color: C.mut, textAlign: "center", marginBottom: 4 }}>WEIGHT</div>
+              <input type="number" inputMode="decimal" value={logWt} onChange={e => setLogWt(e.target.value)}
+                onFocus={e => e.target.select()}
+                style={{ width: 80, padding: "10px", borderRadius: 10, border: `1px solid ${C.bdr}`, background: C.c2, color: C.txt, fontSize: 20, textAlign: "center", fontWeight: 700 }} />
+              <div style={{ fontSize: 10, color: C.mut, textAlign: "center", marginTop: 2 }}>lb</div>
+            </div>
+          )}
+        </div>
+
+        <button onClick={() => {
+            const r = parseInt(logReps); const w = nsi.isBW ? 0 : parseFloat(logWt);
+            if (r && (nsi.isBW || w >= 0)) { onLogFromTimer(nsi.exName, nsi.nextSetNum, { reps: r, wt: w }); onDone(); }
+          }}
+          style={{ padding: "16px 60px", borderRadius: 14, border: "none", background: C.grn, color: C.bg, fontSize: 16, fontWeight: 800, cursor: "pointer", marginBottom: 12 }}>
+          Log Set {nsi.nextSetNum} ✓
+        </button>
+        <button onClick={() => onDone()}
+          style={{ padding: "8px 20px", borderRadius: 8, border: `1px solid ${C.bdr}`, background: "transparent", color: C.mut, fontSize: 11, cursor: "pointer" }}>
+          Skip — log manually
+        </button>
+      </div>
+    );
+  }
 
   if (expanded) {
     // FULL SCREEN MODE
@@ -1615,6 +1674,40 @@ export default function App() {
     setTimer({ seconds: deloadRest, exName, setNum, totalSets });
   }, [activeWeeks, week]);
 
+  // Build next set info for the RestTimer's NextSetCard
+  const getNextSetInfo = useCallback(() => {
+    if (!timer) return null;
+    // Find the exercise in the current routine
+    for (const sec of r.sections) {
+      for (const ex of sec.exercises) {
+        if (ex.name === timer.exName) {
+          const exKey = `${sessionKey}|${ex.name}`;
+          const logged = allSets[exKey] || {};
+          const nextSetNum = timer.setNum + 1;
+          if (nextSetNum > ex.sets) return null; // exercise done
+          const wkData = activeWeeks[week];
+          const exCat = getExCategory(ex.name, ex.rest);
+          const minStep = exCat === "smith" ? 5 : 2.5;
+          const weeklyAdd = wkData[exCat];
+          const baseTarget = ex.wt ? (wkData.deload ? (wkData.preDeloaded ? ex.wt : Math.round(ex.wt * 0.5 / minStep) * minStep) : Math.round((ex.wt + weeklyAdd) / minStep) * minStep) : null;
+          // Use last logged weight if available
+          const lastLogged = logged[timer.setNum];
+          const targetWt = lastLogged ? lastLogged.wt : baseTarget;
+          const targetReps = ex.reps.split("-")[0];
+          return { exName: ex.name, muscles: ex.muscles, nextSetNum, totalSets: ex.sets, targetReps, targetWt, isBW: !ex.wt && ex.wt !== 0 };
+        }
+      }
+    }
+    return null;
+  }, [timer, r, sessionKey, allSets, activeWeeks, week]);
+
+  // Handle logging a set from the timer's NextSetCard
+  const logFromTimer = useCallback((exName, setNum, data) => {
+    const exKey = `${sessionKey}|${exName}`;
+    setAllSets(prev => ({ ...prev, [exKey]: { ...(prev[exKey] || {}), [setNum]: data } }));
+    syncToDb(exName, setNum, data.reps, data.wt, data.band);
+  }, [sessionKey, syncToDb]);
+
   const W = { background: C.bg, minHeight: "100vh", color: C.txt, fontFamily: "'SF Pro Display',system-ui,sans-serif", padding: "12px 10px", paddingTop: timer ? 64 : 12, maxWidth: 480, margin: "0 auto" };
 
   return (
@@ -1627,6 +1720,8 @@ export default function App() {
           setNum={timer.setNum}
           totalSets={timer.totalSets}
           onDone={() => setTimer(null)}
+          nextSetInfo={getNextSetInfo()}
+          onLogFromTimer={logFromTimer}
         />
       )}
 
@@ -1828,8 +1923,17 @@ export default function App() {
                   if (!currentSession) return;
                   const mins = Math.round((Date.now() - (sessionStartRef.current || Date.now())) / 60000);
                   await db.finishSession(currentSession.id, mins);
+                  // Fix date: update session date to actual completion date
+                  const actualDate = localDate();
+                  if (currentSession.date !== actualDate) {
+                    await db.updateSession(currentSession.id, { date: actualDate });
+                  }
                   // Advance to next routine in cycle
                   const nextRoutine = (routine + 1) % activeRoutineKeys.length;
+                  // If wrapping back to D1, advance to next week
+                  if (nextRoutine === 0 && week < activeWeeks.length - 1) {
+                    setWeek(week + 1);
+                  }
                   try { localStorage.setItem('training-hub-next-routine', nextRoutine.toString()); } catch(e) {}
                   setRoutine(nextRoutine);
                   setAllSets({});
