@@ -1552,8 +1552,10 @@ export default function App() {
   useEffect(() => {
     db.getRecentSessions(20).then(sessions => {
       const routineOrder = ["Upper A", "Lower A", "Upper B", "Lower B"];
+      // Filter to current meso's completed sessions
       const completed = sessions.filter(s =>
         s.status === "completed" && s.notes && routineOrder.some(r => s.notes.includes(r))
+        && s.notes.includes(activeMeso.shortName)
       );
       if (completed.length === 0) return;
       const last = completed[0];
@@ -1565,6 +1567,18 @@ export default function App() {
       const nextKey = routineOrder[nextIdx];
       const appIdx = activeRoutineKeys.indexOf(nextKey);
       if (appIdx !== -1 && appIdx !== routine) setRoutine(appIdx);
+
+      // Extract week from last session notes (e.g. "Meso 1-W2D4-Lower B" → week 2)
+      const weekMatch = last.notes.match(/W(\d+)D/);
+      if (weekMatch) {
+        const lastWeek = parseInt(weekMatch[1]);
+        // If D4 was last (wrapping to D1), advance to next week
+        const targetWeek = nextIdx === 0 ? lastWeek + 1 : lastWeek;
+        const weekIdx = targetWeek - 1; // 0-indexed
+        if (weekIdx >= 0 && weekIdx < activeWeeks.length && weekIdx !== week) {
+          setWeek(weekIdx);
+        }
+      }
     }).catch(() => {});
   }, []);
 
