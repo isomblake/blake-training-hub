@@ -856,6 +856,8 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone, nextSetInfo, on
   const alertedRef = useRef(false);
   const autoAdvancedRef = useRef(false);
   const [showNextSet, setShowNextSet] = useState(false);
+  const [logReps, setLogReps] = useState("");
+  const [logWt, setLogWt] = useState("");
   const touchStartY = useRef(null);
 
 
@@ -897,6 +899,8 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone, nextSetInfo, on
       autoAdvancedRef.current = true;
       clearInterval(ref.current);
       if (nextSetInfo && onLogFromTimer) {
+        setLogReps(nextSetInfo.targetReps || "");
+        setLogWt(nextSetInfo.targetWt?.toString() || "");
         setShowNextSet(true);
       } else {
         onDone();
@@ -923,8 +927,6 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone, nextSetInfo, on
   // NEXT SET CARD — shown after rest timer completes
   if (showNextSet && nextSetInfo) {
     const nsi = nextSetInfo;
-    const [logReps, setLogReps] = useState(nsi.targetReps || "");
-    const [logWt, setLogWt] = useState(nsi.targetWt?.toString() || "");
     return (
       <div style={{ position: "fixed", inset: 0, background: C.bg, zIndex: 1000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
         <div style={{ fontSize: 12, color: C.grn, marginBottom: 4, textTransform: "uppercase", letterSpacing: 1, fontWeight: 700 }}>Next Set</div>
