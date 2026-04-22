@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { supabase } from "./supabaseClient";
 
 // === SOUND SYSTEM ===
 // iOS issue: AudioContext gets suspended when screen locks or app backgrounds.
@@ -85,30 +86,99 @@ function disableSound() {
   return false;
 }
 
-// === NOTIFICATION SYSTEM (Issue #1: background timer alert) ===
+// === PUSH NOTIFICATION SYSTEM ===
+// Uses service worker + Supabase Edge Function for true background notifications
+const VAPID_PUBLIC_KEY = "BJWYcIo0sRyX_IJ-ydcbh1_mq-U0STuQvqWUvQFE45c_y0Jxg--291FakMSA28oyP_nGsglvZu_2pODypQo-uxU";
+let _pushSubscription = null;
 let _notifPermission = false;
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+}
+
+async function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return null;
+  try {
+    const reg = await navigator.serviceWorker.register("/sw.js");
+    await navigator.serviceWorker.ready;
+    return reg;
+  } catch (e) {
+    console.error("SW registration failed:", e);
+    return null;
+  }
+}
+
+async function subscribeToPush(reg) {
+  if (!reg) return null;
+  try {
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+    }
+    _pushSubscription = sub.toJSON();
+    // Save subscription to Supabase
+    await supabase.from("push_subscriptions").upsert({
+      endpoint: _pushSubscription.endpoint,
+      p256dh: _pushSubscription.keys.p256dh,
+      auth: _pushSubscription.keys.auth,
+    }, { onConflict: "endpoint" });
+    return _pushSubscription;
+  } catch (e) {
+    console.error("Push subscribe failed:", e);
+    return null;
+  }
+}
 
 async function requestNotifPermission() {
   if (!("Notification" in window)) return false;
-  if (Notification.permission === "granted") { _notifPermission = true; return true; }
+  if (Notification.permission === "granted") {
+    _notifPermission = true;
+    const reg = await registerServiceWorker();
+    await subscribeToPush(reg);
+    return true;
+  }
   if (Notification.permission === "denied") return false;
   const result = await Notification.requestPermission();
   _notifPermission = result === "granted";
+  if (_notifPermission) {
+    const reg = await registerServiceWorker();
+    await subscribeToPush(reg);
+  }
   return _notifPermission;
 }
 
-function _sendNotif(title, body) {
-  if (!_notifPermission || !("Notification" in window)) return;
-  if (document.visibilityState !== 'hidden') return;
-  try { new Notification(title, { body, tag: "rest-timer", requireInteraction: true }); } catch(e) {}
+// Send push via Supabase Edge Function (server-side delay, works in background)
+async function sendPushViaServer(delaySec, title, body, tag) {
+  if (!_pushSubscription) return;
+  try {
+    const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+    const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+    fetch(`${supabaseUrl}/functions/v1/send-push`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${supabaseKey}` },
+      body: JSON.stringify({ subscription: _pushSubscription, title, body, delay_seconds: delaySec, tag }),
+    }).catch(() => {});
+  } catch (e) { console.error("Push schedule error:", e); }
 }
+
+// Schedule both 10s-warning and completion notifications via server
 function scheduleTimerNotification(seconds, exName) {
-  const ids = [];
-  if (seconds > 10) ids.push(setTimeout(() => _sendNotif("⏱ 10 seconds left", exName + " — get ready"), (seconds - 10) * 1000));
-  ids.push(setTimeout(() => _sendNotif("✅ Rest Complete", exName + " — time for next set"), seconds * 1000));
-  return ids;
+  if (!_pushSubscription) return [];
+  // 10-second warning (only if rest > 15s)
+  if (seconds > 15) {
+    sendPushViaServer(seconds - 10, "⏱ 10 seconds left", exName + " — get ready", "rest-warning");
+  }
+  // Completion notification
+  sendPushViaServer(seconds, "✅ Rest Complete", exName + " — time for next set", "rest-done");
+  return []; // No client-side timeouts needed
 }
-function cancelTimerNotification(ids) { (ids || []).forEach(id => clearTimeout(id)); }
+function cancelTimerNotification(ids) { /* Server-side — can't cancel, but notifications are tagged so they replace each other */ }
 
 function _playOsc(freq, dur, vol) {
   if (_appBackgrounded) return; // Don't queue sounds while backgrounded
@@ -149,7 +219,7 @@ function playRestBeep() {
   }
   if (navigator.vibrate) navigator.vibrate([200, 100, 200, 100, 300]);
 }
-import { supabase } from "./supabaseClient";
+
 
 // ============================================================
 // DATABASE HELPERS
