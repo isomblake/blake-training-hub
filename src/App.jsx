@@ -960,7 +960,7 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone, nextSetInfo, on
 
         <button onClick={() => {
             const r = parseInt(logReps); const w = nsi.isBW ? 0 : parseFloat(logWt);
-            if (r && (nsi.isBW || w >= 0)) { onLogFromTimer(nsi.exName, nsi.nextSetNum, { reps: r, wt: w }); onDone(); }
+            if (r && (nsi.isBW || w >= 0)) { onLogFromTimer(nsi.exName, nsi.nextSetNum, { reps: r, wt: w }, nsi); onDone(); }
           }}
           style={{ padding: "16px 60px", borderRadius: 14, border: "none", background: C.grn, color: C.bg, fontSize: 16, fontWeight: 800, cursor: "pointer", marginBottom: 12 }}>
           Log Set {nsi.nextSetNum} ✓
@@ -1691,38 +1691,69 @@ export default function App() {
   }, [activeWeeks, week]);
 
   // Build next set info for the RestTimer's NextSetCard
+  // Handles: next set of same exercise, OR first set of next exercise
+  // Returns null only for the very last set of the very last exercise
   const getNextSetInfo = useCallback(() => {
     if (!timer) return null;
-    // Find the exercise in the current routine
-    for (const sec of r.sections) {
-      for (const ex of sec.exercises) {
-        if (ex.name === timer.exName) {
-          const exKey = `${sessionKey}|${ex.name}`;
-          const logged = allSets[exKey] || {};
-          const nextSetNum = timer.setNum + 1;
-          if (nextSetNum > ex.sets) return null; // exercise done
-          const wkData = activeWeeks[week];
-          const exCat = getExCategory(ex.name, ex.rest);
-          const minStep = exCat === "smith" ? 5 : 2.5;
-          const weeklyAdd = wkData[exCat];
-          const baseTarget = ex.wt ? (wkData.deload ? (wkData.preDeloaded ? ex.wt : Math.round(ex.wt * 0.5 / minStep) * minStep) : Math.round((ex.wt + weeklyAdd) / minStep) * minStep) : null;
-          // Use last logged weight if available
-          const lastLogged = logged[timer.setNum];
-          const targetWt = lastLogged ? lastLogged.wt : baseTarget;
-          const targetReps = ex.reps.split("-")[0];
-          return { exName: ex.name, muscles: ex.muscles, nextSetNum, totalSets: ex.sets, targetReps, targetWt, isBW: !ex.wt && ex.wt !== 0 };
-        }
-      }
+    const wkData = activeWeeks[week];
+    // Flatten all exercises in order
+    const allExercises = r.sections.flatMap(sec => sec.exercises);
+    const currentIdx = allExercises.findIndex(ex => ex.name === timer.exName);
+    if (currentIdx === -1) return null;
+    const currentEx = allExercises[currentIdx];
+    const exKey = `${sessionKey}|${currentEx.name}`;
+    const logged = allSets[exKey] || {};
+    const nextSetNum = timer.setNum + 1;
+
+    if (nextSetNum <= currentEx.sets) {
+      // Next set of SAME exercise
+      const exCat = getExCategory(currentEx.name, currentEx.rest);
+      const minStep = exCat === "smith" ? 5 : 2.5;
+      const weeklyAdd = wkData[exCat];
+      const baseTarget = currentEx.wt ? (wkData.deload ? (wkData.preDeloaded ? currentEx.wt : Math.round(currentEx.wt * 0.5 / minStep) * minStep) : Math.round((currentEx.wt + weeklyAdd) / minStep) * minStep) : null;
+      const lastLogged = logged[timer.setNum];
+      const targetWt = lastLogged ? lastLogged.wt : baseTarget;
+      const targetReps = currentEx.reps.split("-")[0];
+      return { exName: currentEx.name, muscles: currentEx.muscles, nextSetNum, totalSets: currentEx.sets, targetReps, targetWt, isBW: !currentEx.wt && currentEx.wt !== 0, restSeconds: currentEx.rest, isLastExInSession: false };
     }
-    return null;
+
+    // Current exercise is done — find next exercise
+    const nextEx = allExercises[currentIdx + 1];
+    if (!nextEx) return null; // Last exercise in session — no next set card
+
+    // First set of next exercise
+    const exCat = getExCategory(nextEx.name, nextEx.rest);
+    const minStep = exCat === "smith" ? 5 : 2.5;
+    const weeklyAdd = wkData[exCat];
+    const baseTarget = nextEx.wt ? (wkData.deload ? (wkData.preDeloaded ? nextEx.wt : Math.round(nextEx.wt * 0.5 / minStep) * minStep) : Math.round((nextEx.wt + weeklyAdd) / minStep) * minStep) : null;
+    const targetReps = nextEx.reps.split("-")[0];
+    const isLastEx = currentIdx + 1 === allExercises.length - 1;
+    return { exName: nextEx.name, muscles: nextEx.muscles, nextSetNum: 1, totalSets: nextEx.sets, targetReps, targetWt: baseTarget, isBW: !nextEx.wt && nextEx.wt !== 0, restSeconds: nextEx.rest, isLastExInSession: isLastEx, isNewExercise: true };
   }, [timer, r, sessionKey, allSets, activeWeeks, week]);
 
   // Handle logging a set from the timer's NextSetCard
-  const logFromTimer = useCallback((exName, setNum, data) => {
+  const logFromTimer = useCallback((exName, setNum, data, nextSetInfo) => {
     const exKey = `${sessionKey}|${exName}`;
     setAllSets(prev => ({ ...prev, [exKey]: { ...(prev[exKey] || {}), [setNum]: data } }));
     syncToDb(exName, setNum, data.reps, data.wt, data.band);
-  }, [sessionKey, syncToDb]);
+
+    // Start rest timer for next set — unless this is the final set of the session
+    if (nextSetInfo) {
+      const allExercises = r.sections.flatMap(sec => sec.exercises);
+      const isLastExercise = allExercises[allExercises.length - 1]?.name === exName;
+      const currentEx = allExercises.find(ex => ex.name === exName);
+      const isLastSet = currentEx && setNum >= currentEx.sets;
+      const isFinalSetOfSession = isLastExercise && isLastSet;
+
+      if (!isFinalSetOfSession) {
+        const restEx = allExercises.find(ex => ex.name === exName);
+        const restSeconds = restEx ? restEx.rest : 90;
+        const isDeload = activeWeeks[week]?.deload;
+        const cappedRest = isDeload ? Math.min(restSeconds, 75) : restSeconds;
+        setTimer({ seconds: cappedRest, exName, setNum, totalSets: currentEx?.sets || nextSetInfo.totalSets });
+      }
+    }
+  }, [sessionKey, syncToDb, r, activeWeeks, week]);
 
   const W = { background: C.bg, minHeight: "100vh", color: C.txt, fontFamily: "'SF Pro Display',system-ui,sans-serif", padding: "12px 10px", paddingTop: timer ? 64 : 12, maxWidth: 480, margin: "0 auto" };
 
