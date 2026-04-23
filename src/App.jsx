@@ -873,15 +873,6 @@ const SetRow = React.memo(function SetRow({ setNum, targetReps, targetWt, lastWe
             {logged.band && <span style={{ fontSize: 9, color: BAND_COLORS[logged.band] || C.mut, marginLeft: 4, fontWeight: 600 }}>{logged.band} band</span>}
           </div>
           <button onClick={handleEdit} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${C.bdr}`, background: C.c2, color: C.mut, fontSize: 10, cursor: "pointer" }}>Edit</button>
-        <button
-          onClick={() => setView('analytics')}
-          style={{
-            flex: 1, padding: '12px 0', background: 'none', border: 'none',
-            borderBottom: view === 'analytics' ? `2px solid ${C.accent}` : '2px solid transparent',
-            color: view === 'analytics' ? C.accent : C.textMuted,
-            fontSize: 14, fontWeight: view === 'analytics' ? 700 : 400, cursor: 'pointer',
-          }}
-        >Analytics</button>
           <button onClick={handleDelete} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${C.red}22`, background: C.red + "11", color: C.red, fontSize: 10, cursor: "pointer" }}>â</button>
         </>
       ) : (
@@ -1894,6 +1885,15 @@ export default function App() {
             style={{ flex: 1, padding: "6px", borderRadius: 8, border: `1px solid ${view === "history" ? C.gld : C.bdr}`, background: view === "history" ? C.gld + "22" : "transparent", color: view === "history" ? C.gld : C.mut, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
             History
           </button>
+        <button
+          onClick={() => setView("analytics")}
+          style={{
+            flex: 1, padding: "12px 0", background: "none", border: "none",
+            borderBottom: view === "analytics" ? `2px solid ${C.accent}` : "2px solid transparent",
+            color: view === "analytics" ? C.accent : C.textMuted,
+            fontSize: 14, fontWeight: view === "analytics" ? 700 : 400, cursor: "pointer",
+          }}
+        >Analytics</button>
         </div>
       </div>
 
@@ -1919,7 +1919,7 @@ export default function App() {
       <div style={{ display: view === "history" ? "block" : "none" }}>
         <HistoryView />
       </div>
-          <div style={{ display: view === 'analytics' ? 'block' : 'none' }}>
+          <div style={{ display: view === "analytics" ? "block" : "none" }}>
             <AnalyticsView />
           </div>
 
@@ -2113,36 +2113,25 @@ const xS=i=>PAD.left+(i/(valid.length-1))*cW;const yS=v=>PAD.top+cH-((v-min)/ran
 const pathD=valid.map((d,i)=>`${i===0?"M":"L"}${xS(i).toFixed(1)},${yS(d[dataKey]).toFixed(1)}`).join(' ');
 const ticks=[min,(min+max)/2,max];
 return(<div><svg width="100%" viewBox={`0 0 ${W} ${H}`} style={{display:'block',overflow:'visible'}}>
-{ticks.map((t,i)=>(<g key={i}>
-<line x1={PAD.left} x2={W-PAD.right} y1={yS(t)} y2={yS(t)} stroke={C.border} strokeWidth="0.5" strokeDasharray="3,3"/>
-<text x={PAD.left-4} y={yS(t)+4} textAnchor="end" fill={C.textMuted} fontSize="9">{t%1===0?t.toFixed(0):t.toFixed(1)}{unit}</text></g>))}
+{ticks.map((t,i)=>(<g key={i}><line x1={PAD.left} x2={W-PAD.right} y1={yS(t)} y2={yS(t)} stroke={C.border} strokeWidth="0.5" strokeDasharray="3,3"/><text x={PAD.left-4} y={yS(t)+4} textAnchor="end" fill={C.textMuted} fontSize="9">{t%1===0?t.toFixed(0):t.toFixed(1)}{unit}</text></g>))}
 <path d={pathD} fill="none" stroke={color} strokeWidth="2"/>
 {valid.map((d,i)=>{const sel=d.date===selectedDate;return(<circle key={i} cx={xS(i)} cy={yS(d[dataKey])} r={sel?5:3} fill={sel?color:C.cardBg} stroke={color} strokeWidth={sel?2:1.5} style={{cursor:'pointer'}} onClick={()=>onPointClick&&onPointClick(d)}/>);})}
-{(()=>{const m1='2026-04-14';const idx=valid.findIndex(d=>d.date>=m1);if(idx<0)return null;const x=xS(idx);return(<g><line x1={x} x2={x} y1={PAD.top} y2={H-PAD.bottom} stroke={C.accent} strokeWidth="1" strokeDasharray="3,2" strokeOpacity="0.6"/><text x={x+2} y={PAD.top+8} fill={C.accent} fontSize="8" opacity="0.8">M1</text></g>);})()}
 <text x={PAD.left} y={H-2} fill={C.textMuted} fontSize="8">{valid[0].date.slice(5)}</text>
 <text x={W-PAD.right} y={H-2} textAnchor="end" fill={C.textMuted} fontSize="8">{valid[valid.length-1].date.slice(5)}</text>
 </svg></div>);}
-function ReadingDetailView({reading,allReadings,onBack}){
-const C=window.__C__;
+function ReadingDetailView({reading,allReadings,onBack}){const C=window.__C__;
 const idx=allReadings.findIndex(r=>r.date===reading.date);
 const prev=idx>0?allReadings[idx-1]:null;const next=idx<allReadings.length-1?allReadings[idx+1]:null;
 const delta=(a,b)=>{if(a==null||b==null)return null;const d=a-b;return(d>=0?'+':'')+d.toFixed(1);};
 const Row=({label,value,dlt,unit=''})=>(<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:`1px solid ${C.border}`}}><span style={{color:C.textMuted,fontSize:14}}>{label}</span><div style={{textAlign:'right'}}><span style={{color:C.text,fontSize:16,fontWeight:600}}>{value!=null?`${value}${unit}`:'—'}</span>{dlt!=null&&<span style={{fontSize:12,color:parseFloat(dlt)<0?C.green:C.red,marginLeft:8}}>{dlt}{unit}</span>}</div></div>);
-return(<div style={{padding:'0 16px 24px'}}>
-<div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20}}>
-<button onClick={onBack} style={{background:'none',border:'none',color:C.accent,fontSize:22,cursor:'pointer',padding:0}}>‹</button>
-<div><div style={{color:C.text,fontSize:18,fontWeight:700}}>{reading.date}</div><div style={{color:C.textMuted,fontSize:12}}>Body Comp Reading</div></div></div>
+return(<div style={{padding:'0 16px 24px'}}><div style={{display:'flex',alignItems:'center',gap:12,marginBottom:20}}><button onClick={onBack} style={{background:'none',border:'none',color:C.accent,fontSize:22,cursor:'pointer',padding:0}}>‹</button><div><div style={{color:C.text,fontSize:18,fontWeight:700}}>{reading.date}</div><div style={{color:C.textMuted,fontSize:12}}>Body Comp Reading</div></div></div>
 <Row label="Weight" value={reading.weight_lbs} unit=" lbs" dlt={prev?delta(reading.weight_lbs,prev.weight_lbs):null}/>
 <Row label="Body Fat" value={reading.body_fat_pct} unit="%" dlt={prev?delta(reading.body_fat_pct,prev.body_fat_pct):null}/>
 <Row label="Lean Mass" value={reading.lean_mass_lbs} unit=" lbs" dlt={prev?delta(reading.lean_mass_lbs,prev.lean_mass_lbs):null}/>
 <Row label="Fat Mass" value={reading.fat_mass_lbs} unit=" lbs" dlt={prev?delta(reading.fat_mass_lbs,prev.fat_mass_lbs):null}/>
-<div style={{display:'flex',gap:12,marginTop:24}}>
-{prev&&<button onClick={()=>onBack(prev)} style={{flex:1,padding:'10px 0',background:C.cardBg,border:`1px solid ${C.border}`,borderRadius:8,color:C.textMuted,fontSize:13,cursor:'pointer'}}>‹ {prev.date}</button>}
-{next&&<button onClick={()=>onBack(next)} style={{flex:1,padding:'10px 0',background:C.cardBg,border:`1px solid ${C.border}`,borderRadius:8,color:C.textMuted,fontSize:13,cursor:'pointer'}}>{next.date} ›</button>}
-</div></div>);}
-function BodyCompView({readings}){
-const C=window.__C__;
-const[selR,setSelR]=React.useState(null);const[detR,setDetR]=React.useState(null);
+<div style={{display:'flex',gap:12,marginTop:24}}>{prev&&<button onClick={()=>onBack(prev)} style={{flex:1,padding:'10px 0',background:C.cardBg,border:`1px solid ${C.border}`,borderRadius:8,color:C.textMuted,fontSize:13,cursor:'pointer'}}>‹ {prev.date}</button>}{next&&<button onClick={()=>onBack(next)} style={{flex:1,padding:'10px 0',background:C.cardBg,border:`1px solid ${C.border}`,borderRadius:8,color:C.textMuted,fontSize:13,cursor:'pointer'}}>{next.date} ›</button>}</div></div>);}
+function BodyCompView({readings}){const C=window.__C__;
+const[detR,setDetR]=React.useState(null);
 const sorted=[...readings].sort((a,b)=>a.date.localeCompare(b.date));
 const withBF=sorted.filter(r=>r.body_fat_pct!=null);
 const latest=sorted[sorted.length-1];
@@ -2150,59 +2139,17 @@ const prev7=sorted.filter(r=>r.date<latest?.date).slice(-7)[0];
 const prev28=sorted.filter(r=>r.date<latest?.date).slice(-28)[0];
 const peak=sorted.reduce((p,r)=>(r.weight_lbs>(p?.weight_lbs||0)?r:p),null);
 const m1st=sorted.find(r=>r.date>='2026-04-14');
-const cards=[
-prev7&&latest?{label:'7d',val:(latest.weight_lbs-prev7.weight_lbs).toFixed(1),good:latest.weight_lbs<prev7.weight_lbs}:null,
-prev28&&latest?{label:'28d',val:(latest.weight_lbs-prev28.weight_lbs).toFixed(1),good:latest.weight_lbs<prev28.weight_lbs}:null,
-peak&&latest?{label:'from peak',val:(latest.weight_lbs-peak.weight_lbs).toFixed(1),good:true}:null,
-m1st&&latest?{label:'since M1',val:((latest.weight_lbs-m1st.weight_lbs)>=0?'+':'')+(latest.weight_lbs-m1st.weight_lbs).toFixed(1),good:latest.weight_lbs<m1st.weight_lbs}:null
-].filter(Boolean);
+const cards=[prev7&&latest?{label:'7d',val:(latest.weight_lbs-prev7.weight_lbs).toFixed(1),good:latest.weight_lbs<prev7.weight_lbs}:null,prev28&&latest?{label:'28d',val:(latest.weight_lbs-prev28.weight_lbs).toFixed(1),good:latest.weight_lbs<prev28.weight_lbs}:null,peak&&latest?{label:'from peak',val:(latest.weight_lbs-peak.weight_lbs).toFixed(1),good:true}:null,m1st&&latest?{label:'since M1',val:((latest.weight_lbs-m1st.weight_lbs)>=0?'+':'')+(latest.weight_lbs-m1st.weight_lbs).toFixed(1),good:latest.weight_lbs<m1st.weight_lbs}:null].filter(Boolean);
 if(detR)return(<ReadingDetailView reading={detR} allReadings={sorted} onBack={r=>{if(r&&r.date)setDetR(r);else setDetR(null);}}/>);
 return(<div style={{padding:'0 0 80px'}}>
-{latest&&<div style={{padding:'16px 16px 0',cursor:'pointer'}} onClick={()=>setDetR(latest)}>
-<div style={{background:C.cardBg,borderRadius:12,padding:16,border:`1px solid ${C.border}`}}>
-<div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}>
-<div><div style={{color:C.textMuted,fontSize:11,textTransform:'uppercase',letterSpacing:1}}>Latest · {latest.date}</div>
-<div style={{color:C.text,fontSize:36,fontWeight:700,lineHeight:1.1,marginTop:4}}>{latest.weight_lbs}</div>
-<div style={{color:C.textMuted,fontSize:13}}>lbs</div></div>
-<div style={{textAlign:'right'}}>
-{latest.body_fat_pct&&<div style={{color:C.text,fontSize:22,fontWeight:600}}>{latest.body_fat_pct}%</div>}
-{latest.lean_mass_lbs&&<div style={{color:C.textMuted,fontSize:13}}>{latest.lean_mass_lbs} lean</div>}
-{latest.fat_mass_lbs&&<div style={{color:C.textMuted,fontSize:13}}>{latest.fat_mass_lbs} fat</div>}
-</div></div></div></div>}
-{cards.length>0&&<div style={{padding:'12px 16px 0'}}><div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8}}>
-{cards.map((c,i)=>(<div key={i} style={{background:C.cardBg,borderRadius:10,padding:'10px 12px',border:`1px solid ${C.border}`}}>
-<div style={{color:C.textMuted,fontSize:11,textTransform:'uppercase',letterSpacing:0.8}}>{c.label}</div>
-<div style={{color:c.good?C.green:(parseFloat(c.val)>0?C.red:C.green),fontSize:22,fontWeight:700,marginTop:2}}>
-{(parseFloat(c.val)>=0?'+':'')+c.val} <span style={{fontSize:12,color:C.textMuted}}>lbs</span></div>
-</div>))}</div></div>}
-{[{key:'weight_lbs',label:'Weight',color:'#64B5F6',unit:''},{key:'body_fat_pct',label:'Body Fat %',color:'#EF5350',unit:'%'},{key:'lean_mass_lbs',label:'Lean Mass',color:'#66BB6A',unit:''},{key:'fat_mass_lbs',label:'Fat Mass',color:'#FFA726',unit:''}].map(({key,label,color,unit})=>{
-const cd=(key==='body_fat_pct'||key==='lean_mass_lbs'||key==='fat_mass_lbs')?withBF:sorted;
-if(cd.length<2)return null;
-return(<div key={key} style={{padding:'16px 16px 0'}}><div style={{background:C.cardBg,borderRadius:12,padding:'12px 8px 8px',border:`1px solid ${C.border}`}}>
-<div style={{paddingLeft:8,marginBottom:4,color:C.textMuted,fontSize:12,fontWeight:600,textTransform:'uppercase',letterSpacing:0.8}}>{label}</div>
-<BodyCompChart data={cd} dataKey={key} label={label} color={color} unit={unit} height={120} onPointClick={d=>setDetR(d)} selectedDate={selR?.date}/>
-</div></div>);})}
-<div style={{padding:'16px 16px 0'}}><div style={{color:C.textMuted,fontSize:12,fontWeight:600,textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>All Readings</div>
-{[...sorted].reverse().map(r=>(<div key={r.date} onClick={()=>setDetR(r)} style={{background:C.cardBg,borderRadius:10,padding:'12px 14px',marginBottom:8,border:`1px solid ${C.border}`,cursor:'pointer',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-<div><div style={{color:C.text,fontSize:14,fontWeight:600}}>{r.date}</div>{r.body_fat_pct&&<div style={{color:C.textMuted,fontSize:12}}>{r.body_fat_pct}% BF</div>}</div>
-<div style={{textAlign:'right'}}><div style={{color:C.text,fontSize:18,fontWeight:700}}>{r.weight_lbs}</div><div style={{color:C.textMuted,fontSize:11}}>lbs</div></div>
-</div>))}</div></div>);}
-function TrainingView(){const C=window.__C__;return(<div style={{padding:'40px 16px',textAlign:'center',color:C.textMuted}}><div style={{fontSize:32,marginBottom:12}}>📊</div><div style={{fontSize:16,fontWeight:600,color:C.text}}>Training Analytics</div><div style={{fontSize:13,marginTop:8}}>Coming next session — strength curves, volume vs MEV/MAV/MRV, adherence & RIR tracking</div></div>);}
-function CompareView(){const C=window.__C__;return(<div style={{padding:'40px 16px',textAlign:'center',color:C.textMuted}}><div style={{fontSize:32,marginBottom:12}}>🔄</div><div style={{fontSize:16,fontWeight:600,color:C.text}}>Meso Comparison</div><div style={{fontSize:13,marginTop:8}}>Coming after Meso 1 completes — side-by-side meso performance, body comp deltas, volume progression</div></div>);}
-function AnalyticsView(){
-const C=window.__C__;
-const[sub,setSub]=React.useState('bodycomp');
-const[readings,setReadings]=React.useState([]);
-const[loading,setLoading]=React.useState(true);
+{latest&&<div style={{padding:'16px 16px 0',cursor:'pointer'}} onClick={()=>setDetR(latest)}><div style={{background:C.cardBg,borderRadius:12,padding:16,border:`1px solid ${C.border}`}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}><div><div style={{color:C.textMuted,fontSize:11,textTransform:'uppercase',letterSpacing:1}}>Latest · {latest.date}</div><div style={{color:C.text,fontSize:36,fontWeight:700,lineHeight:1.1,marginTop:4}}>{latest.weight_lbs}</div><div style={{color:C.textMuted,fontSize:13}}>lbs</div></div><div style={{textAlign:'right'}}>{latest.body_fat_pct&&<div style={{color:C.text,fontSize:22,fontWeight:600}}>{latest.body_fat_pct}%</div>}{latest.lean_mass_lbs&&<div style={{color:C.textMuted,fontSize:13}}>{latest.lean_mass_lbs} lean</div>}{latest.fat_mass_lbs&&<div style={{color:C.textMuted,fontSize:13}}>{latest.fat_mass_lbs} fat</div>}</div></div></div></div>}
+{cards.length>0&&<div style={{padding:'12px 16px 0'}}><div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8}}>{cards.map((c,i)=>(<div key={i} style={{background:C.cardBg,borderRadius:10,padding:'10px 12px',border:`1px solid ${C.border}`}}><div style={{color:C.textMuted,fontSize:11,textTransform:'uppercase',letterSpacing:0.8}}>{c.label}</div><div style={{color:c.good?C.green:(parseFloat(c.val)>0?C.red:C.green),fontSize:22,fontWeight:700,marginTop:2}}>{(parseFloat(c.val)>=0?'+':'')+c.val} <span style={{fontSize:12,color:C.textMuted}}>lbs</span></div></div>))}</div></div>}
+{[{key:'weight_lbs',label:'Weight',color:'#64B5F6',unit:''},{key:'body_fat_pct',label:'Body Fat %',color:'#EF5350',unit:'%'},{key:'lean_mass_lbs',label:'Lean Mass',color:'#66BB6A',unit:''},{key:'fat_mass_lbs',label:'Fat Mass',color:'#FFA726',unit:''}].map(({key,label,color,unit})=>{const cd=(key==='body_fat_pct'||key==='lean_mass_lbs'||key==='fat_mass_lbs')?withBF:sorted;if(cd.length<2)return null;return(<div key={key} style={{padding:'16px 16px 0'}}><div style={{background:C.cardBg,borderRadius:12,padding:'12px 8px 8px',border:`1px solid ${C.border}`}}><div style={{paddingLeft:8,marginBottom:4,color:C.textMuted,fontSize:12,fontWeight:600,textTransform:'uppercase',letterSpacing:0.8}}>{label}</div><BodyCompChart data={cd} dataKey={key} label={label} color={color} unit={unit} height={120} onPointClick={d=>setDetR(d)} selectedDate={undefined}/></div></div>);})}
+<div style={{padding:'16px 16px 0'}}><div style={{color:C.textMuted,fontSize:12,fontWeight:600,textTransform:'uppercase',letterSpacing:1,marginBottom:8}}>All Readings</div>{[...sorted].reverse().map(r=>(<div key={r.date} onClick={()=>setDetR(r)} style={{background:C.cardBg,borderRadius:10,padding:'12px 14px',marginBottom:8,border:`1px solid ${C.border}`,cursor:'pointer',display:'flex',justifyContent:'space-between',alignItems:'center'}}><div><div style={{color:C.text,fontSize:14,fontWeight:600}}>{r.date}</div>{r.body_fat_pct&&<div style={{color:C.textMuted,fontSize:12}}>{r.body_fat_pct}% BF</div>}</div><div style={{textAlign:'right'}}><div style={{color:C.text,fontSize:18,fontWeight:700}}>{r.weight_lbs}</div><div style={{color:C.textMuted,fontSize:11}}>lbs</div></div></div>))}</div></div>);}
+function TrainingView(){const C=window.__C__;return(<div style={{padding:'40px 16px',textAlign:'center',color:C.textMuted}}><div style={{fontSize:32,marginBottom:12}}>📊</div><div style={{fontSize:16,fontWeight:600,color:C.text}}>Training Analytics</div><div style={{fontSize:13,marginTop:8}}>Coming next session</div></div>);}
+function CompareView(){const C=window.__C__;return(<div style={{padding:'40px 16px',textAlign:'center',color:C.textMuted}}><div style={{fontSize:32,marginBottom:12}}>🔄</div><div style={{fontSize:16,fontWeight:600,color:C.text}}>Meso Comparison</div><div style={{fontSize:13,marginTop:8}}>Coming after Meso 1</div></div>);}
+function AnalyticsView(){const C=window.__C__;const[sub,setSub]=React.useState('bodycomp');const[readings,setReadings]=React.useState([]);const[loading,setLoading]=React.useState(true);
 React.useEffect(()=>{db.getBodyCompHistory(200).then(d=>{setReadings(d||[]);setLoading(false);}).catch(()=>setLoading(false));},[]);
-return(<div>
-<div style={{display:'flex',borderBottom:`1px solid ${C.border}`,background:C.bg,position:'sticky',top:56,zIndex:10}}>
-{[{id:'bodycomp',label:'Body Comp'},{id:'training',label:'Training'},{id:'compare',label:'Compare'}].map(t=>(
-<button key={t.id} onClick={()=>setSub(t.id)} style={{flex:1,padding:'10px 0',background:'none',border:'none',borderBottom:sub===t.id?`2px solid ${C.accent}`:'2px solid transparent',color:sub===t.id?C.accent:C.textMuted,fontSize:13,fontWeight:sub===t.id?700:400,cursor:'pointer'}}>{t.label}</button>
-))}</div>
-{loading&&<div style={{padding:40,textAlign:'center',color:C.textMuted}}>Loading...</div>}
-{!loading&&sub==='bodycomp'&&<BodyCompView readings={readings}/>}
-{!loading&&sub==='training'&&<TrainingView/>}
-{!loading&&sub==='compare'&&<CompareView/>}
-</div>);}
+return(<div><div style={{display:'flex',borderBottom:`1px solid ${C.border}`,background:C.bg,position:'sticky',top:56,zIndex:10}}>{[{id:'bodycomp',label:'Body Comp'},{id:'training',label:'Training'},{id:'compare',label:'Compare'}].map(t=>(<button key={t.id} onClick={()=>setSub(t.id)} style={{flex:1,padding:'10px 0',background:'none',border:'none',borderBottom:sub===t.id?`2px solid ${C.accent}`:'2px solid transparent',color:sub===t.id?C.accent:C.textMuted,fontSize:13,fontWeight:sub===t.id?700:400,cursor:'pointer'}}>{t.label}</button>))}</div>
+{loading&&<div style={{padding:40,textAlign:'center',color:C.textMuted}}>Loading...</div>}{!loading&&sub==='bodycomp'&&<BodyCompView readings={readings}/>}{!loading&&sub==='training'&&<TrainingView/>}{!loading&&sub==='compare'&&<CompareView/>}</div>);}
 
