@@ -172,13 +172,13 @@ function scheduleTimerNotification(seconds, exName) {
   if (!_pushSubscription) return [];
   // 10-second warning (only if rest > 15s)
   if (seconds > 15) {
-    sendPushViaServer(seconds - 10, "â± 10 seconds left", exName + " â get ready", "rest-warning");
+    sendPushViaServer(seconds - 10, "⏱ 10 seconds left", exName + " — get ready", "rest-warning");
   }
   // Completion notification
-  sendPushViaServer(seconds, "â Rest Complete", exName + " â time for next set", "rest-done");
+  sendPushViaServer(seconds, "✅ Rest Complete", exName + " — time for next set", "rest-done");
   return []; // No client-side timeouts needed
 }
-function cancelTimerNotification(ids) { /* Server-side â can't cancel, but notifications are tagged so they replace each other */ }
+function cancelTimerNotification(ids) { /* Server-side — can't cancel, but notifications are tagged so they replace each other */ }
 
 function _playOsc(freq, dur, vol) {
   if (_appBackgrounded) return; // Don't queue sounds while backgrounded
@@ -202,7 +202,7 @@ function _playOsc(freq, dur, vol) {
 function playWarningSound() {
   if (Date.now() < _soundSuppressUntil) return;
   if (_soundEnabled) {
-    // Double high ding â louder and repeated so it cuts through
+    // Double high ding — louder and repeated so it cuts through
     _playOsc(880, 0.35, 0.9);
     setTimeout(() => { _playOsc(880, 0.35, 0.9); }, 350);
   }
@@ -390,7 +390,7 @@ const db = {
     return data || [];
   },
 
-  // Finish a session â mark as completed with duration
+  // Finish a session — mark as completed with duration
   async finishSession(sessionId, durationMinutes) {
     const { data, error } = await supabase
       .from('sessions')
@@ -559,12 +559,12 @@ const C = {
 // Cable compound (stack, 2.5 lb pin): +0, +2.5, +5, +7.5, +10
 // Cable isolation (stack, slower): +0, +0, +2.5, +2.5, +5
 const WEEKS = [
-  { rir: "4 RIR", note: "Technique focus Â· moderate effort", smith: 0, cable: 0, iso: 0, deload: false },
-  { rir: "3 RIR", note: "Effort up Â· weight up where possible", smith: 5, cable: 2.5, iso: 0, deload: false },
-  { rir: "2 RIR", note: "Getting harder Â· hold reps stable", smith: 5, cable: 5, iso: 2.5, deload: false },
-  { rir: "2 RIR", note: "Sustained effort Â· stay consistent", smith: 10, cable: 7.5, iso: 2.5, deload: false },
-  { rir: "0-1 RIR", note: "PEAK Â· push near failure Â· max volume", smith: 10, cable: 10, iso: 5, deload: false },
-  { rir: "4 RIR", note: "DELOAD Â· 50% weight Â· 50% sets Â· recover", smith: 0, cable: 0, iso: 0, deload: true },
+  { rir: "4 RIR", note: "Technique focus · moderate effort", smith: 0, cable: 0, iso: 0, deload: false },
+  { rir: "3 RIR", note: "Effort up · weight up where possible", smith: 5, cable: 2.5, iso: 0, deload: false },
+  { rir: "2 RIR", note: "Getting harder · hold reps stable", smith: 5, cable: 5, iso: 2.5, deload: false },
+  { rir: "2 RIR", note: "Sustained effort · stay consistent", smith: 10, cable: 7.5, iso: 2.5, deload: false },
+  { rir: "0-1 RIR", note: "PEAK · push near failure · max volume", smith: 10, cable: 10, iso: 5, deload: false },
+  { rir: "4 RIR", note: "DELOAD · 50% weight · 50% sets · recover", smith: 0, cable: 0, iso: 0, deload: true },
 ];
 
 // Determine exercise category from name for weight progression
@@ -612,10 +612,10 @@ const MESO1_ROUTINES = {
           vid: "https://www.muscleandstrength.com/exercises/incline-smith-machine-bench-press.html", src: "M&S" },
       ]},
       { name: "Back", exercises: [
-        { name: "Chin-Ups (Wide Overhand)", muscles: "Lats Â· Upper Back", sets: 3, reps: "6-10", rest: 150, wt: null, bodyweight: true,
+        { name: "Chin-Ups (Wide Overhand)", muscles: "Lats · Upper Back", sets: 3, reps: "6-10", rest: 150, wt: null, bodyweight: true,
           bands: ["Green", "Purple", "Black", "Red", "None"],
           vid: "https://www.muscleandstrength.com/exercises/wide-grip-pull-up.html", src: "M&S" },
-        { name: "Seated Cable Row (Neutral)", muscles: "Upper Back Â· Lats", sets: 3, reps: "10-12", rest: 120, wt: 140,
+        { name: "Seated Cable Row (Neutral)", muscles: "Upper Back · Lats", sets: 3, reps: "10-12", rest: 120, wt: 140,
           vid: "https://www.muscleandstrength.com/exercises/seated-row.html", src: "M&S" },
       ]},
       { name: "Shoulders", exercises: [
@@ -635,15 +635,15 @@ const MESO1_ROUTINES = {
   "Lower A": {
     day: "D2", sections: [
       { name: "Quads", exercises: [
-        { name: "Smith Front Squat", muscles: "Quads Â· Glutes", sets: 3, reps: "8-10", rest: 150, wt: 105,
+        { name: "Smith Front Squat", muscles: "Quads · Glutes", sets: 3, reps: "8-10", rest: 150, wt: 105,
           vid: "https://www.muscleandstrength.com/exercises/smith-machine-front-squat.html", src: "M&S" },
       ]},
       { name: "Hamstrings", exercises: [
-        { name: "Smith Stiff-Leg Deadlift", muscles: "Hams Â· Glutes", sets: 3, reps: "8-10", rest: 150, wt: 115,
+        { name: "Smith Stiff-Leg Deadlift", muscles: "Hams · Glutes", sets: 3, reps: "8-10", rest: 150, wt: 115,
           vid: "https://www.muscleandstrength.com/exercises/smith-machine-stiff-leg-deadlift.html", src: "M&S" },
       ]},
       { name: "Quads (Volume)", exercises: [
-        { name: "Landmine Goblet Squat", muscles: "Quads Â· Glutes", sets: 3, reps: "12-15", rest: 90, wt: 30,
+        { name: "Landmine Goblet Squat", muscles: "Quads · Glutes", sets: 3, reps: "12-15", rest: 90, wt: 30,
           vid: "https://www.muscleandstrength.com/exercises/landmine-goblet-squat", src: "M&S" },
       ]},
       { name: "Calves + Core + Delts", exercises: [
@@ -659,7 +659,7 @@ const MESO1_ROUTINES = {
   "Upper B": {
     day: "D3", sections: [
       { name: "Chest", exercises: [
-        { name: "Smith Close-Grip Bench", muscles: "Chest Â· Triceps", sets: 3, reps: "8-10", rest: 150, wt: 75,
+        { name: "Smith Close-Grip Bench", muscles: "Chest · Triceps", sets: 3, reps: "8-10", rest: 150, wt: 75,
           vid: "https://www.muscleandstrength.com/exercises/smith-machine-close-grip-bench-press.html", src: "M&S" },
         { name: "Cable Fly (Low-to-High)", muscles: "Chest", sets: 2, reps: "12-15", rest: 90, wt: 15,
           vid: "https://www.muscleandstrength.com/exercises/cable-lower-chest-raise.html", src: "M&S" },
@@ -667,7 +667,7 @@ const MESO1_ROUTINES = {
       { name: "Back", exercises: [
         { name: "Cable Lat Pulldown (Close)", muscles: "Lats", sets: 3, reps: "10-12", rest: 120, wt: 180,
           vid: "https://www.muscleandstrength.com/exercises/close-grip-pull-down.html", src: "M&S" },
-        { name: "Landmine Row (Per Arm)", muscles: "Upper Back Â· Lats", sets: 3, reps: "10-12", rest: 90, wt: 20,
+        { name: "Landmine Row (Per Arm)", muscles: "Upper Back · Lats", sets: 3, reps: "10-12", rest: 90, wt: 20,
           vid: "https://www.muscleandstrength.com/exercises/one-arm-bent-over-row.html", src: "M&S" },
       ]},
       { name: "Shoulders", exercises: [
@@ -691,11 +691,11 @@ const MESO1_ROUTINES = {
           vid: "https://www.muscleandstrength.com/exercises/feet-forward-smith-machine-squat.html", src: "M&S" },
       ]},
       { name: "Hamstrings", exercises: [
-        { name: "Smith Good Morning", muscles: "Hams Â· Glutes", sets: 3, reps: "10-12", rest: 120, wt: 75,
+        { name: "Smith Good Morning", muscles: "Hams · Glutes", sets: 3, reps: "10-12", rest: 120, wt: 75,
           vid: "https://www.tiktok.com/@drmikeisraetel/video/7340302191909031211", src: "Dr. Mike" },
       ]},
       { name: "Glutes", exercises: [
-        { name: "Smith Lunge (Front Elevated)", muscles: "Glutes Â· Quads", sets: 2, reps: "12-15", rest: 90, wt: 40,
+        { name: "Smith Lunge (Front Elevated)", muscles: "Glutes · Quads", sets: 2, reps: "12-15", rest: 90, wt: 40,
           vid: "https://www.muscleandstrength.com/exercises/front-foot-elevated-smith-machine-split-squat", src: "M&S" },
       ]},
       { name: "Calves + Core + Delts", exercises: [
@@ -729,15 +729,15 @@ const DELOAD_WEIGHTS = {
 
 const DELOAD_ROUTINES = makeDeloadRoutines(MESO1_ROUTINES, DELOAD_WEIGHTS);
 
-// Deload only has 1 "week" â no progression
+// Deload only has 1 "week" — no progression
 const DELOAD_WEEKS = [
-  { rir: "4+ RIR", note: "DELOAD Â· 2 sets Â· 50% weight Â· learn Meso 1 moves Â· prep for Apr 13", smith: 0, cable: 0, iso: 0, deload: true },
+  { rir: "4+ RIR", note: "DELOAD · 2 sets · 50% weight · learn Meso 1 moves · prep for Apr 13", smith: 0, cable: 0, iso: 0, deload: true },
 ];
 
 // All mesocycles
 // Sculpted Strength W9 deload uses Meso 1 exercises at 50% weight, 2 sets
 const SCULPTED_DELOAD_WEEKS = [
-  { rir: "4+ RIR", note: "W9 DELOAD Â· 2 sets Â· 50% weight Â· learn Meso 1 moves", smith: 0, cable: 0, iso: 0, deload: true, preDeloaded: true },
+  { rir: "4+ RIR", note: "W9 DELOAD · 2 sets · 50% weight · learn Meso 1 moves", smith: 0, cable: 0, iso: 0, deload: true, preDeloaded: true },
 ];
 
 const MESOCYCLES = [
@@ -749,7 +749,7 @@ const MESOCYCLES = [
     endDate: "2026-04-12",
     weeks: SCULPTED_DELOAD_WEEKS, // Only W9 deload is active in app (W1-W8 data is in history)
     routines: DELOAD_ROUTINES,
-    note: "8 weeks completed (Feb 9 â Apr 4) Â· W9 Deload (Apr 6â12)",
+    note: "8 weeks completed (Feb 9 – Apr 4) · W9 Deload (Apr 6–12)",
   },
   {
     id: "rp-meso-1",
@@ -770,7 +770,7 @@ function getActiveMeso(dateStr) {
   return 0;
 }
 
-// Legacy compat â these get overridden in App based on active meso
+// Legacy compat — these get overridden in App based on active meso
 let ROUTINES = MESO1_ROUTINES;
 const ROUTINE_KEYS = Object.keys(MESO1_ROUTINES);
 
@@ -854,19 +854,19 @@ const SetRow = React.memo(function SetRow({ setNum, targetReps, targetWt, lastWe
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
       <div onClick={handleQuickLog} style={{ width: 28, height: 28, borderRadius: "50%", background: isDone ? C.grn : C.c2, border: `1px solid ${isDone ? C.grn : C.bdr}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: isDone ? C.bg : C.mut, cursor: "pointer", flexShrink: 0 }}>
-        {isDone ? "â" : setNum}
+        {isDone ? "✓" : setNum}
       </div>
       {isDone ? (
         <>
           <div style={{ fontSize: 14, fontFamily: "monospace", fontWeight: 700, color: C.txt, flex: 1 }}>
             <span style={{ color: C.blu }}>{logged.reps}</span>
-            <span style={{ color: C.mut }}> Ã </span>
+            <span style={{ color: C.mut }}> × </span>
             <span style={{ color: C.gld }}>{isBW ? "BW" : logged.wt}</span>
             {!isBW && <span style={{ color: C.mut, fontSize: 9 }}> lb</span>}
             {logged.band && <span style={{ fontSize: 9, color: BAND_COLORS[logged.band] || C.mut, marginLeft: 4, fontWeight: 600 }}>{logged.band} band</span>}
           </div>
           <button onClick={handleEdit} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${C.bdr}`, background: C.c2, color: C.mut, fontSize: 10, cursor: "pointer" }}>Edit</button>
-          <button onClick={handleDelete} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${C.red}22`, background: C.red + "11", color: C.red, fontSize: 10, cursor: "pointer" }}>â</button>
+          <button onClick={handleDelete} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${C.red}22`, background: C.red + "11", color: C.red, fontSize: 10, cursor: "pointer" }}>✕</button>
         </>
       ) : (
         <>
@@ -884,7 +884,7 @@ const SetRow = React.memo(function SetRow({ setNum, targetReps, targetWt, lastWe
           )}
           {!isBW && (
             <>
-              <span style={{ fontSize: 12, color: C.mut }}>Ã</span>
+              <span style={{ fontSize: 12, color: C.mut }}>×</span>
               <input type="number" inputMode="decimal" placeholder={targetWt || "wt"} value={editWt} onChange={e => setEditWt(e.target.value)}
                 onFocus={e => e.target.select()}
                 style={{ width: 56, padding: "5px 4px", borderRadius: 6, border: `1px solid ${C.bdr}`, background: C.c2, color: C.txt, fontSize: 13, textAlign: "center" }}
@@ -994,7 +994,7 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone, nextSetInfo, on
     touchStartY.current = null;
   };
 
-  // NEXT SET CARD â shown after rest timer completes
+  // NEXT SET CARD — shown after rest timer completes
   if (showNextSet && nextSetInfo) {
     const nsi = nextSetInfo;
     return (
@@ -1014,7 +1014,7 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone, nextSetInfo, on
               onFocus={e => e.target.select()}
               style={{ width: 64, padding: "10px", borderRadius: 10, border: `1px solid ${C.bdr}`, background: C.c2, color: C.txt, fontSize: 20, textAlign: "center", fontWeight: 700 }} />
           </div>
-          <div style={{ fontSize: 20, color: C.mut, marginTop: 16 }}>Ã</div>
+          <div style={{ fontSize: 20, color: C.mut, marginTop: 16 }}>×</div>
           {nsi.isBW ? (
             <div style={{ fontSize: 20, color: C.teal, fontWeight: 700, marginTop: 16 }}>BW</div>
           ) : (
@@ -1033,11 +1033,11 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone, nextSetInfo, on
             if (r && (nsi.isBW || w >= 0)) { onLogFromTimer(nsi.exName, nsi.nextSetNum, { reps: r, wt: w }, nsi); onDone(); }
           }}
           style={{ padding: "16px 60px", borderRadius: 14, border: "none", background: C.grn, color: C.bg, fontSize: 16, fontWeight: 800, cursor: "pointer", marginBottom: 12 }}>
-          Log Set {nsi.nextSetNum} â
+          Log Set {nsi.nextSetNum} ✓
         </button>
         <button onClick={() => onDone()}
           style={{ padding: "8px 20px", borderRadius: 8, border: `1px solid ${C.bdr}`, background: "transparent", color: C.mut, fontSize: 11, cursor: "pointer" }}>
-          Skip â log manually
+          Skip — log manually
         </button>
       </div>
     );
@@ -1067,20 +1067,20 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone, nextSetInfo, on
               {isOver ? "+" + fmtTimer(overBy) : fmtTimer(remaining)}
             </div>
             <div style={{ fontSize: 12, color: isOver ? C.grn : C.mut, fontWeight: 600, marginTop: 4 }}>
-              {isOver ? "GO â you're rested" : `${fmtTimer(elapsed)} / ${fmtRest(seconds)}`}
+              {isOver ? "GO — you're rested" : `${fmtTimer(elapsed)} / ${fmtRest(seconds)}`}
             </div>
           </div>
         </div>
 
         <div style={{ fontSize: 12, color: C.mut, marginBottom: 24 }}>
           Set {setNum} of {totalSets} complete
-          {setNum < totalSets && <span style={{ color: C.blu }}> â Set {setNum + 1} next</span>}
-          {setNum >= totalSets && <span style={{ color: C.grn }}> â Exercise done!</span>}
+          {setNum < totalSets && <span style={{ color: C.blu }}> — Set {setNum + 1} next</span>}
+          {setNum >= totalSets && <span style={{ color: C.grn }}> — Exercise done!</span>}
         </div>
 
         <button onClick={() => { clearInterval(ref.current); onDone(); }}
           style={{ padding: "16px 60px", borderRadius: 14, border: "none", background: accent, color: C.bg, fontSize: 16, fontWeight: 800, cursor: "pointer" }}>
-          {setNum < totalSets ? "Next Set â" : "Done â"}
+          {setNum < totalSets ? "Next Set →" : "Done ✓"}
         </button>
         <button onClick={() => setExpanded(false)}
           style={{ marginTop: 12, padding: "8px 20px", borderRadius: 8, border: `1px solid ${C.bdr}`, background: "transparent", color: C.mut, fontSize: 11, cursor: "pointer" }}>
@@ -1103,10 +1103,10 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone, nextSetInfo, on
         </div>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: 11, color: isOver ? C.grn : C.txt, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {isOver ? "GO â you're rested" : exName}
+            {isOver ? "GO — you're rested" : exName}
           </div>
           <div style={{ fontSize: 9, color: C.mut }}>
-            Set {setNum}/{totalSets} Â· {isOver ? "rest complete" : `${fmtTimer(elapsed)} / ${fmtRest(seconds)}`}
+            Set {setNum}/{totalSets} · {isOver ? "rest complete" : `${fmtTimer(elapsed)} / ${fmtRest(seconds)}`}
           </div>
         </div>
       </div>
@@ -1118,7 +1118,7 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone, nextSetInfo, on
         </svg>
         <button onClick={() => { clearInterval(ref.current); onDone(); }}
           style={{ padding: "5px 14px", borderRadius: 6, border: "none", background: accent, color: C.bg, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
-          {isOver ? "Done â" : "Skip"}
+          {isOver ? "Done ✓" : "Skip"}
         </button>
       </div>
     </div>
@@ -1170,19 +1170,19 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
       if (lastWk >= (week + 1)) return;
 
       if (avgReps >= maxReps && avgWt >= (baseTarget || 0)) {
-        // Exceeded rep range at or above target â extra bump
+        // Exceeded rep range at or above target — extra bump
         adjusted = Math.round((avgWt + increment) / minStep) * minStep;
-        note = `â Bumped â hit ${Math.round(avgReps)} reps @ ${avgWt} lb last session (exceeded range)`;
+        note = `↑ Bumped — hit ${Math.round(avgReps)} reps @ ${avgWt} lb last session (exceeded range)`;
       } else if (avgReps < minReps) {
-        // Couldn't hit min reps â hold weight, don't progress
+        // Couldn't hit min reps — hold weight, don't progress
         adjusted = Math.round(avgWt / minStep) * minStep;
-        note = `â¸ Holding @ ${avgWt} lb â only ${Math.round(avgReps)} reps last session (below ${minReps} min)`;
+        note = `⏸ Holding @ ${avgWt} lb — only ${Math.round(avgReps)} reps last session (below ${minReps} min)`;
       } else if (avgWt > (baseTarget || 0)) {
-        // Went heavier than programmed â adjust up from actual
+        // Went heavier than programmed — adjust up from actual
         adjusted = Math.round((avgWt + increment) / minStep) * minStep;
-        note = `â Adjusted â you lifted ${avgWt} lb last session (above programmed ${baseTarget})`;
+        note = `↑ Adjusted — you lifted ${avgWt} lb last session (above programmed ${baseTarget})`;
       } else {
-        // Normal progression â reps in range, weight on target
+        // Normal progression — reps in range, weight on target
         return;
       }
 
@@ -1202,7 +1202,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
       // Cascade weight change to remaining UNLOGGED sets
       for (let s = setNum + 1; s <= totalSets; s++) {
         if (!prevEx[s]) {
-          // Not logged yet â it'll pick up the new weight from the input default
+          // Not logged yet — it'll pick up the new weight from the input default
           // Nothing to do in state, but we signal via a ref below
         }
       }
@@ -1233,7 +1233,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: allDone ? C.grn : C.txt }}>
-              {expanded ? "â¾" : "â¸"} {ex.name} {allDone && <span style={{ fontSize: 10, color: C.grn }}>â</span>}
+              {expanded ? "▾" : "▸"} {ex.name} {allDone && <span style={{ fontSize: 10, color: C.grn }}>✓</span>}
             </div>
           </div>
           <div style={{ fontSize: 10, color: C.mut, marginTop: 1, marginLeft: 16 }}>{ex.muscles}</div>
@@ -1243,7 +1243,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
             <div style={{ textAlign: "right" }}>
               <div style={{ fontSize: 12, fontFamily: "monospace", fontWeight: 700 }}>
                 <span style={{ color: C.grn }}>{totalSets}</span>
-                <span style={{ color: C.mut }}>Ã</span>
+                <span style={{ color: C.mut }}>×</span>
                 <span style={{ color: C.blu }}>{ex.reps}</span>
                 {targetWt && <span style={{ color: C.gld, marginLeft: 4 }}>@{targetWt}</span>}
               </div>
@@ -1252,7 +1252,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
           )}
           <a href={ex.vid} target="_blank" rel="noopener" onClick={e => e.stopPropagation()}
             style={{ display: "inline-flex", alignItems: "center", gap: 3, background: C.teal + "15", border: `1px solid ${C.teal}33`, borderRadius: 6, padding: "3px 7px", fontSize: 9, color: C.teal, textDecoration: "none", fontWeight: 600 }}>
-            â¶ {ex.src}
+            ▶ {ex.src}
           </a>
         </div>
       </div>
@@ -1260,11 +1260,11 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
       {expanded && (
         <div onClick={e => e.stopPropagation()}>
           <div style={{ fontSize: 11, color: C.pur, padding: "5px 7px", background: C.pur + "11", borderRadius: 6, marginTop: 8, marginBottom: 8 }}>
-            {wkData.rir} Â· {wkData.note}
+            {wkData.rir} · {wkData.note}
           </div>
           
           <div style={{ display: "flex", gap: 12, marginBottom: 4, fontSize: 10 }}>
-            <span style={{ color: C.mut }}>Target: <span style={{ color: C.grn, fontWeight: 600 }}>{totalSets}Ã{ex.reps}</span></span>
+            <span style={{ color: C.mut }}>Target: <span style={{ color: C.grn, fontWeight: 600 }}>{totalSets}×{ex.reps}</span></span>
             <span style={{ color: C.mut }}>Rest: <span style={{ color: C.pur, fontWeight: 600 }}>{fmtRest(wkData.deload ? Math.min(ex.rest, 75) : ex.rest)}</span></span>
             {targetWt && <span style={{ color: C.mut }}>Wt: <span style={{ color: smartTarget ? C.org : C.gld, fontWeight: 600 }}>{targetWt} lb{smartTarget ? " *" : ""}</span></span>}
           </div>
@@ -1324,34 +1324,34 @@ function HistoryView() {
   };
 
   // Parse routine into { name, detail } for display
-  // Format: main line = program name, second line = Day Mon DD Â· W# / D#
+  // Format: main line = program name, second line = Day Mon DD · W# / D#
   const getRoutineInfo = (notes, date) => {
     if (!notes) return { name: 'Workout', detail: '' };
     const dateStr = date ? fmtDate(date) : '';
 
     // New format: "Meso 0-W1D1-Upper A" or "Meso 1-W2D3-Upper B"
     const mesoMatch = notes.match(/^(Meso \d+)-W(\d+)D(\d)/);
-    if (mesoMatch) return { name: mesoMatch[1], detail: `${dateStr} Â· W${mesoMatch[2]} / D${mesoMatch[3]}` };
+    if (mesoMatch) return { name: mesoMatch[1], detail: `${dateStr} · W${mesoMatch[2]} / D${mesoMatch[3]}` };
 
     // Legacy: "W1-Upper A" (old format before meso tag)
     const legacyW = notes.match(/^W(\d+)-(Upper|Lower)\s+([AB])/);
     if (legacyW) {
       const dayMap = { "Upper A": 1, "Lower A": 2, "Upper B": 3, "Lower B": 4 };
       const d = dayMap[`${legacyW[2]} ${legacyW[3]}`] || 1;
-      return { name: 'Meso 0', detail: `${dateStr} Â· W${legacyW[1]} / D${d}` };
+      return { name: 'Meso 0', detail: `${dateStr} · W${legacyW[1]} / D${d}` };
     }
 
     // Sculpted Strength: "SC-W3D2 | Sculpted Strength | W3D2"
     const scMatch = notes.match(/SC-W(\d+)D(\d)/);
-    if (scMatch) return { name: 'Sculpted Strength', detail: `${dateStr} Â· W${scMatch[1]} / D${scMatch[2]}` };
+    if (scMatch) return { name: 'Sculpted Strength', detail: `${dateStr} · W${scMatch[1]} / D${scMatch[2]}` };
 
     // Starting Strength: "SS-W1D1 | Starting Strength | W1D1"
     const ssMatch = notes.match(/SS-W(\d+)D(\d)/);
-    if (ssMatch) return { name: 'Starting Strength', detail: `${dateStr} Â· W${ssMatch[1]} / D${ssMatch[2]}` };
+    if (ssMatch) return { name: 'Starting Strength', detail: `${dateStr} · W${ssMatch[1]} / D${ssMatch[2]}` };
 
     // Natural Strength: "NS-W1D1"
     const nsMatch = notes.match(/NS-W(\d+)D(\d)/);
-    if (nsMatch) return { name: 'Natural Strength', detail: `${dateStr} Â· W${nsMatch[1]} / D${nsMatch[2]}` };
+    if (nsMatch) return { name: 'Natural Strength', detail: `${dateStr} · W${nsMatch[1]} / D${nsMatch[2]}` };
 
     if (notes.includes('Natural')) return { name: 'Natural Strength', detail: dateStr };
     return { name: notes.split('|')[0]?.trim() || 'Workout', detail: dateStr };
@@ -1375,17 +1375,17 @@ function HistoryView() {
 
         return (
           <div key={session.id} style={{ background: C.card, borderRadius: 10, marginBottom: 6, border: `1px solid ${C.bdr}`, overflow: "hidden" }}>
-            {/* Session header â tap to expand */}
+            {/* Session header — tap to expand */}
             <div onClick={() => setExpandedId(isExpanded ? null : session.id)}
               style={{ padding: "10px 12px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: C.txt }}>
-                  {isExpanded ? "â¾" : "â¸"} {routineName}
+                  {isExpanded ? "▾" : "▸"} {routineName}
                 </div>
                 <div style={{ fontSize: 10, color: C.mut, marginTop: 2, marginLeft: 16 }}>
                   {routineDetail || fmtDate(session.date)}
-                  {session.duration_minutes ? <span> Â· {session.duration_minutes} min</span> : null}
-                  {session.rir ? <span> Â· {session.rir}</span> : null}
+                  {session.duration_minutes ? <span> · {session.duration_minutes} min</span> : null}
+                  {session.rir ? <span> · {session.rir}</span> : null}
                 </div>
               </div>
               <div style={{ textAlign: "right", flexShrink: 0 }}>
@@ -1398,7 +1398,7 @@ function HistoryView() {
             {isExpanded && (
               <div style={{ padding: "0 12px 12px", borderTop: `1px solid ${C.bdr}` }}>
                 {session.status === 'completed' && (
-                  <div style={{ fontSize: 9, color: C.grn, padding: "6px 0 4px", fontWeight: 600 }}>â Completed</div>
+                  <div style={{ fontSize: 9, color: C.grn, padding: "6px 0 4px", fontWeight: 600 }}>✓ Completed</div>
                 )}
                 {exercises.map((ex, i) => (
                   <div key={i} style={{ marginTop: 8 }}>
@@ -1417,7 +1417,7 @@ function HistoryView() {
                                 onChange={e => setEditSetFields(f => ({...f, reps: e.target.value}))}
                                 onFocus={e => e.target.select()}
                                 style={{ width: 36, padding: "3px", borderRadius: 4, border: `1px solid ${C.bdr}`, background: C.c2, color: C.txt, fontSize: 11, textAlign: "center" }} />
-                              <span style={{ color: C.mut, fontSize: 11 }}>Ã</span>
+                              <span style={{ color: C.mut, fontSize: 11 }}>×</span>
                               <input type="number" inputMode="decimal" value={editSetFields.weight}
                                 onChange={e => setEditSetFields(f => ({...f, weight: e.target.value}))}
                                 onFocus={e => e.target.select()}
@@ -1431,18 +1431,18 @@ function HistoryView() {
                                   setEditingSetId(null);
                                 }}
                                 style={{ padding: "2px 8px", borderRadius: 4, border: "none", background: C.grn, color: C.bg, fontSize: 9, fontWeight: 700, cursor: "pointer" }}>
-                                â
+                                ✓
                               </button>
                               <button onClick={() => setEditingSetId(null)}
                                 style={{ padding: "2px 6px", borderRadius: 4, border: `1px solid ${C.bdr}`, background: "transparent", color: C.mut, fontSize: 9, cursor: "pointer" }}>
-                                â
+                                ✕
                               </button>
                             </>
                           ) : (
                             <>
                               <div style={{ fontSize: 13, fontFamily: "monospace", fontWeight: 700, flex: 1 }}>
                                 <span style={{ color: C.blu }}>{s.reps}</span>
-                                <span style={{ color: C.mut }}> Ã </span>
+                                <span style={{ color: C.mut }}> × </span>
                                 <span style={{ color: C.gld }}>{s.weight === 0 && ["Chin-Ups (Wide Overhand)","Hanging Knee Raise"].includes(s.exercises?.name) ? "BW" : s.weight}</span>
                                 {s.weight > 0 && <span style={{ color: C.mut, fontSize: 9 }}> lb</span>}
                                 {s.notes && s.notes.startsWith('band:') && (
@@ -1462,7 +1462,7 @@ function HistoryView() {
                                     : sess));
                                 }}
                                 style={{ padding: "2px 6px", borderRadius: 4, border: `1px solid ${C.red}33`, background: C.red + "11", color: C.red, fontSize: 9, cursor: "pointer" }}>
-                                â
+                                ✕
                               </button>
                             </>
                           )}
@@ -1587,144 +1587,7 @@ function HistoryView() {
   );
 }
 
-export default 
-function BodyCompChart({data,dataKey,color,unit,height,onPointClick}){
-  height=height||120;unit=unit||'';
-  var valid=data.filter(function(d){return d[dataKey]!=null;});
-  if(valid.length<2)return React.createElement('div',{style:{height:height,display:'flex',alignItems:'center',justifyContent:'center',color:C.mut,fontSize:12}},'No data');
-  var vals=valid.map(function(d){return d[dataKey];});
-  var mn=Math.min.apply(null,vals),mx=Math.max.apply(null,vals),rng=mx-mn||1;
-  var W=320,H=height,pl=36,pr=8,pt=8,pb=20,cW=W-pl-pr,cH=H-pt-pb;
-  var xS=function(i){return pl+(i/(valid.length-1))*cW;};
-  var yS=function(v){return pt+cH-((v-mn)/rng)*cH;};
-  var path=valid.map(function(d,i){return (i===0?'M':'L')+xS(i).toFixed(1)+','+yS(d[dataKey]).toFixed(1);}).join(' ');
-  var tks=[mn,(mn+mx)/2,mx];
-  return React.createElement('svg',{width:'100%',viewBox:'0 0 '+W+' '+H,style:{display:'block',overflow:'visible'}},
-    tks.map(function(t,i){return [
-      React.createElement('line',{key:'l'+i,x1:pl,x2:W-pr,y1:yS(t),y2:yS(t),stroke:C.bdr,strokeWidth:'0.5',strokeDasharray:'3,3'}),
-      React.createElement('text',{key:'t'+i,x:pl-3,y:yS(t)+4,textAnchor:'end',fill:C.mut,fontSize:'9'},(t%1===0?t.toFixed(0):t.toFixed(1))+unit)
-    ];}),
-    React.createElement('path',{key:'p',d:path,fill:'none',stroke:color,strokeWidth:'2'}),
-    valid.map(function(d,i){return React.createElement('circle',{key:'c'+i,cx:xS(i),cy:yS(d[dataKey]),r:3,fill:C.card,stroke:color,strokeWidth:'1.5',style:{cursor:'pointer'},onClick:function(){onPointClick&&onPointClick(d);}});}),
-    React.createElement('text',{key:'x0',x:pl,y:H-2,fill:C.mut,fontSize:'8'},valid[0].date.slice(5)),
-    React.createElement('text',{key:'x1',x:W-pr,y:H-2,textAnchor:'end',fill:C.mut,fontSize:'8'},valid[valid.length-1].date.slice(5))
-  );
-}
-
-function ReadingDetailView({reading,allReadings,onBack}){
-  var idx=allReadings.findIndex(function(r){return r.date===reading.date;});
-  var prev=idx>0?allReadings[idx-1]:null;
-  var nxt=idx<allReadings.length-1?allReadings[idx+1]:null;
-  var dl=function(a,b){if(a==null||b==null)return null;var d=a-b;return(d>=0?'+':'')+d.toFixed(1);};
-  return React.createElement('div',{style:{padding:'0 16px 24px'}},
-    React.createElement('div',{style:{display:'flex',alignItems:'center',gap:12,marginBottom:20}},
-      React.createElement('button',{onClick:onBack,style:{background:'none',border:'none',color:C.blu,fontSize:22,cursor:'pointer',padding:0}},'back'),
-      React.createElement('div',null,
-        React.createElement('div',{style:{color:C.txt,fontSize:18,fontWeight:700}},reading.date),
-        React.createElement('div',{style:{color:C.mut,fontSize:12}},'Body Comp')
-      )
-    ),
-    [['Weight',reading.weight_lbs,' lbs',prev?dl(reading.weight_lbs,prev.weight_lbs):null],
-     ['Body Fat',reading.body_fat_pct,'%',prev?dl(reading.body_fat_pct,prev.body_fat_pct):null],
-     ['Lean',reading.lean_mass_lbs,' lbs',prev?dl(reading.lean_mass_lbs,prev.lean_mass_lbs):null],
-     ['Fat',reading.fat_mass_lbs,' lbs',prev?dl(reading.fat_mass_lbs,prev.fat_mass_lbs):null]
-    ].map(function(row,i){return React.createElement('div',{key:i,style:{display:'flex',justifyContent:'space-between',padding:'10px 0',borderBottom:'1px solid '+C.bdr}},
-      React.createElement('span',{style:{color:C.mut,fontSize:14}},row[0]),
-      React.createElement('span',{style:{color:C.txt,fontSize:15,fontWeight:600}},(row[1]!=null?row[1]+row[2]:'—')+(row[3]?' ('+row[3]+row[2]+')':''))
-    );}),
-    React.createElement('div',{style:{display:'flex',gap:12,marginTop:24}},
-      prev&&React.createElement('button',{onClick:function(){onBack(prev);},style:{flex:1,padding:'10px 0',background:C.card,border:'1px solid '+C.bdr,borderRadius:8,color:C.mut,fontSize:13,cursor:'pointer'}},'prev'),
-      nxt&&React.createElement('button',{onClick:function(){onBack(nxt);},style:{flex:1,padding:'10px 0',background:C.card,border:'1px solid '+C.bdr,borderRadius:8,color:C.mut,fontSize:13,cursor:'pointer'}},'next')
-    )
-  );
-}
-
-function BodyCompView({readings}){
-  var s=React.useState(null);var detR=s[0];var setDetR=s[1];
-  var sorted=[].concat(readings).sort(function(a,b){return a.date<b.date?-1:1;});
-  var withBF=sorted.filter(function(r){return r.body_fat_pct!=null;});
-  var latest=sorted[sorted.length-1];
-  var prev7=sorted.filter(function(r){return latest&&r.date<latest.date;}).slice(-7)[0];
-  var prev28=sorted.filter(function(r){return latest&&r.date<latest.date;}).slice(-28)[0];
-  var peak=sorted.reduce(function(p,r){return(!p||r.weight_lbs>p.weight_lbs)?r:p;},null);
-  var m1=sorted.find(function(r){return r.date>='2026-04-14';});
-  if(detR)return React.createElement(ReadingDetailView,{reading:detR,allReadings:sorted,onBack:function(r){setDetR(r&&r.date?r:null);}});
-  var cards=[
-    prev7&&latest?{l:'7d',v:(latest.weight_lbs-prev7.weight_lbs),g:latest.weight_lbs<prev7.weight_lbs}:null,
-    prev28&&latest?{l:'28d',v:(latest.weight_lbs-prev28.weight_lbs),g:latest.weight_lbs<prev28.weight_lbs}:null,
-    peak&&latest?{l:'peak',v:(latest.weight_lbs-peak.weight_lbs),g:true}:null,
-    m1&&latest?{l:'M1',v:(latest.weight_lbs-m1.weight_lbs),g:latest.weight_lbs<m1.weight_lbs}:null,
-  ].filter(Boolean);
-  return React.createElement('div',{style:{paddingBottom:80}},
-    latest&&React.createElement('div',{style:{padding:'16px 16px 0',cursor:'pointer'},onClick:function(){setDetR(latest);}},
-      React.createElement('div',{style:{background:C.card,borderRadius:12,padding:16,border:'1px solid '+C.bdr}},
-        React.createElement('div',{style:{display:'flex',justifyContent:'space-between'}},
-          React.createElement('div',null,
-            React.createElement('div',{style:{color:C.mut,fontSize:11,textTransform:'uppercase',letterSpacing:1}},'Latest - '+latest.date),
-            React.createElement('div',{style:{color:C.txt,fontSize:36,fontWeight:700}},latest.weight_lbs),
-            React.createElement('div',{style:{color:C.mut,fontSize:13}},'lbs')
-          ),
-          React.createElement('div',{style:{textAlign:'right'}},
-            latest.body_fat_pct&&React.createElement('div',{style:{color:C.txt,fontSize:22,fontWeight:600}},latest.body_fat_pct+'%'),
-            latest.lean_mass_lbs&&React.createElement('div',{style:{color:C.mut,fontSize:13}},latest.lean_mass_lbs+' lean'),
-            latest.fat_mass_lbs&&React.createElement('div',{style:{color:C.mut,fontSize:13}},latest.fat_mass_lbs+' fat')
-          )
-        )
-      )
-    ),
-    cards.length>0&&React.createElement('div',{style:{padding:'12px 16px 0'}},
-      React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8}},
-        cards.map(function(c,i){return React.createElement('div',{key:i,style:{background:C.card,borderRadius:10,padding:'10px 12px',border:'1px solid '+C.bdr}},
-          React.createElement('div',{style:{color:C.mut,fontSize:11,textTransform:'uppercase',letterSpacing:0.8}},c.l),
-          React.createElement('div',{style:{color:c.g?C.grn:(c.v>0?C.red:C.grn),fontSize:22,fontWeight:700}},(c.v>=0?'+':'')+c.v.toFixed(1),'lbs')
-        );})
-      )
-    ),
-    [{key:'weight_lbs',label:'Weight',color:'#64B5F6',unit:''},{key:'body_fat_pct',label:'Body Fat %',color:'#EF5350',unit:'%'},{key:'lean_mass_lbs',label:'Lean Mass',color:'#66BB6A',unit:''},{key:'fat_mass_lbs',label:'Fat Mass',color:'#FFA726',unit:''}].map(function(ch){
-      var cd=(ch.key==='body_fat_pct'||ch.key==='lean_mass_lbs'||ch.key==='fat_mass_lbs')?withBF:sorted;
-      if(cd.length<2)return null;
-      return React.createElement('div',{key:ch.key,style:{padding:'16px 16px 0'}},
-        React.createElement('div',{style:{background:C.card,borderRadius:12,padding:'12px 8px 8px',border:'1px solid '+C.bdr}},
-          React.createElement('div',{style:{paddingLeft:8,marginBottom:4,color:C.mut,fontSize:12,fontWeight:600,textTransform:'uppercase',letterSpacing:0.8}},ch.label),
-          React.createElement(BodyCompChart,{data:cd,dataKey:ch.key,color:ch.color,unit:ch.unit,height:120,onPointClick:function(d){setDetR(d);}})
-        )
-      );
-    }),
-    React.createElement('div',{style:{padding:'16px 16px 0'}},
-      React.createElement('div',{style:{color:C.mut,fontSize:12,fontWeight:600,textTransform:'uppercase',letterSpacing:1,marginBottom:8}},'All Readings'),
-      [].concat(sorted).reverse().map(function(r){return React.createElement('div',{key:r.date,onClick:function(){setDetR(r);},style:{background:C.card,borderRadius:10,padding:'12px 14px',marginBottom:8,border:'1px solid '+C.bdr,cursor:'pointer',display:'flex',justifyContent:'space-between',alignItems:'center'}},
-        React.createElement('div',null,
-          React.createElement('div',{style:{color:C.txt,fontSize:14,fontWeight:600}},r.date),
-          r.body_fat_pct&&React.createElement('div',{style:{color:C.mut,fontSize:12}},r.body_fat_pct+'% BF')
-        ),
-        React.createElement('div',{style:{textAlign:'right'}},
-          React.createElement('div',{style:{color:C.txt,fontSize:18,fontWeight:700}},r.weight_lbs),
-          React.createElement('div',{style:{color:C.mut,fontSize:11}},'lbs')
-        )
-      );})
-    )
-  );
-}
-
-function AnalyticsView(){
-  var s1=React.useState('bodycomp');var sub=s1[0];var setSub=s1[1];
-  var s2=React.useState([]);var readings=s2[0];var setReadings=s2[1];
-  var s3=React.useState(true);var loading=s3[0];var setLoading=s3[1];
-  React.useEffect(function(){
-    db.getBodyCompHistory(200).then(function(d){setReadings(d||[]);setLoading(false);}).catch(function(){setLoading(false);});
-  },[]);
-  return React.createElement('div',null,
-    React.createElement('div',{style:{display:'flex',borderBottom:'1px solid '+C.bdr,background:C.bg,position:'sticky',top:56,zIndex:10}},
-      [{id:'bodycomp',label:'Body Comp'},{id:'training',label:'Training'},{id:'compare',label:'Compare'}].map(function(t){
-        return React.createElement('button',{key:t.id,onClick:function(){setSub(t.id);},style:{flex:1,padding:'6px',borderRadius:8,border:'1px solid '+(sub===t.id?C.gld:C.bdr),background:sub===t.id?C.gld+'22':'transparent',color:sub===t.id?C.gld:C.mut,fontSize:11,fontWeight:700,cursor:'pointer'}},t.label);
-      })
-    ),
-    loading&&React.createElement('div',{style:{padding:40,textAlign:'center',color:C.mut}},'Loading...'),
-    !loading&&sub==='bodycomp'&&React.createElement(BodyCompView,{readings:readings}),
-    !loading&&sub!=='bodycomp'&&React.createElement('div',{style:{padding:'40px 16px',textAlign:'center',color:C.mut}},'Coming soon')
-  );
-}
-function App() {
+export default function App() {
   const [routine, setRoutine] = useState(() => {
     try {
       const saved = localStorage.getItem('training-hub-next-routine');
@@ -1777,7 +1640,7 @@ function App() {
       const appIdx = activeRoutineKeys.indexOf(nextKey);
       if (appIdx !== -1 && appIdx !== routine) setRoutine(appIdx);
 
-      // Extract week from last session notes (e.g. "Meso 1-W2D4-Lower B" â week 2)
+      // Extract week from last session notes (e.g. "Meso 1-W2D4-Lower B" → week 2)
       const weekMatch = last.notes.match(/W(\d+)D/);
       if (weekMatch) {
         const lastWeek = parseInt(weekMatch[1]);
@@ -1793,7 +1656,7 @@ function App() {
 
   // One-time: rename exercise with degree symbol so DB matches app
   useEffect(() => {
-    supabase.from('exercises').update({ name: 'Smith Incline Press' }).eq('name', 'Smith Incline Press (30Â°)').then(() => {});
+    supabase.from('exercises').update({ name: 'Smith Incline Press' }).eq('name', 'Smith Incline Press (30°)').then(() => {});
   }, []);
 
   // Load session from Supabase on mount or when routine/week changes
@@ -1829,7 +1692,7 @@ function App() {
         }
       } catch (e) {
         console.error('Load error:', e);
-        if (!cancelled) setSyncStatus("offline â using local");
+        if (!cancelled) setSyncStatus("offline — using local");
       }
       if (!cancelled) setLoaded(true);
     };
@@ -1843,7 +1706,7 @@ function App() {
     try {
       setSyncStatus("saving...");
       await db.logSet(currentSession.id, exercise, setNum, reps, weight, band);
-      setSyncStatus("saved â");
+      setSyncStatus("saved ✓");
       setTimeout(() => setSyncStatus(""), 2000);
     } catch (e) {
       console.error('Sync error:', e);
@@ -1881,7 +1744,7 @@ function App() {
         const sets = allSets[key] || {};
         const setEntries = Object.entries(sets).sort((a, b) => a[0] - b[0]);
         if (setEntries.length > 0) {
-          lines.push(`${ex.name}: ${setEntries.map(([n, d]) => `${d.reps}Ã${d.wt}`).join(", ")}`);
+          lines.push(`${ex.name}: ${setEntries.map(([n, d]) => `${d.reps}×${d.wt}`).join(", ")}`);
         }
       });
     });
@@ -1924,9 +1787,9 @@ function App() {
       return { exName: currentEx.name, muscles: currentEx.muscles, nextSetNum, totalSets: currentEx.sets, targetReps, targetWt, isBW: !currentEx.wt && currentEx.wt !== 0, restSeconds: currentEx.rest, isLastExInSession: false };
     }
 
-    // Current exercise is done â find next exercise
+    // Current exercise is done — find next exercise
     const nextEx = allExercises[currentIdx + 1];
-    if (!nextEx) return null; // Last exercise in session â no next set card
+    if (!nextEx) return null; // Last exercise in session — no next set card
 
     // First set of next exercise
     const exCat = getExCategory(nextEx.name, nextEx.rest);
@@ -1944,7 +1807,7 @@ function App() {
     setAllSets(prev => ({ ...prev, [exKey]: { ...(prev[exKey] || {}), [setNum]: data } }));
     syncToDb(exName, setNum, data.reps, data.wt, data.band);
 
-    // Start rest timer for next set â unless this is the final set of the session
+    // Start rest timer for next set — unless this is the final set of the session
     if (nextSetInfo) {
       const allExercises = r.sections.flatMap(sec => sec.exercises);
       const isLastExercise = allExercises[allExercises.length - 1]?.name === exName;
@@ -1991,10 +1854,10 @@ function App() {
               style={{ padding: "3px 8px", borderRadius: 6, border: `1px solid ${soundOn ? C.grn + "44" : C.org + "44"}`,
                 background: soundOn ? C.grn + "15" : C.org + "15",
                 color: soundOn ? C.grn : C.org, fontSize: 9, fontWeight: 600, cursor: "pointer" }}>
-              {soundOn ? "ð On" : "ð Sound"}
+              {soundOn ? "🔊 On" : "🔇 Sound"}
             </button>
             {syncStatus && (
-              <div style={{ fontSize: 8, color: syncStatus.includes("â") || syncStatus === "ready" ? C.grn : syncStatus.includes("err") || syncStatus.includes("offline") ? C.red : C.mut }}>
+              <div style={{ fontSize: 8, color: syncStatus.includes("✓") || syncStatus === "ready" ? C.grn : syncStatus.includes("err") || syncStatus.includes("offline") ? C.red : C.mut }}>
                 {syncStatus}
               </div>
             )}
@@ -2015,7 +1878,6 @@ function App() {
             style={{ flex: 1, padding: "6px", borderRadius: 8, border: `1px solid ${view === "history" ? C.gld : C.bdr}`, background: view === "history" ? C.gld + "22" : "transparent", color: view === "history" ? C.gld : C.mut, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
             History
           </button>
-        <button onClick={() => setView("analytics")} style={{ flex: 1, padding: "6px", borderRadius: 8, border: "1px solid " + C.bdr, color: C.mut, fontSize: 11, fontWeight: 700, cursor: "pointer", background: "transparent" }}>Analytics</button>
         </div>
       </div>
 
@@ -2030,7 +1892,7 @@ function App() {
                 style={{ flex: 1, padding: "5px 4px", borderRadius: 6, border: `1px solid ${isActive ? C.gld : C.bdr}`,
                   background: isActive ? C.gld + "22" : "transparent",
                   color: isActive ? C.gld : C.mut, fontSize: 10, fontWeight: 600, cursor: "pointer" }}>
-                {m.shortName}{isCurrent ? " â" : ""}
+                {m.shortName}{isCurrent ? " ●" : ""}
               </button>
             );
           })}
@@ -2041,9 +1903,8 @@ function App() {
       <div style={{ display: view === "history" ? "block" : "none" }}>
         <HistoryView />
       </div>
-          <div style={{ display: view === "analytics" ? "block" : "none" }}><AnalyticsView /></div>
 
-      {/* WORKOUT VIEW â use display:none instead of unmounting to preserve typed data */}
+      {/* WORKOUT VIEW — use display:none instead of unmounting to preserve typed data */}
       <div style={{ display: view === "workout" ? "block" : "none" }}>
       {!loaded && (
         <div style={{ textAlign: "center", padding: 40, color: C.mut, fontSize: 12 }}>Loading session data...</div>
@@ -2104,25 +1965,25 @@ function App() {
           <div style={{ marginTop: 16 }}>
             <button onClick={() => { sessionStartRef.current = Date.now(); setSessionStarted(true); }}
               style={{ width: "100%", padding: "14px", borderRadius: 10, border: `1px solid ${C.blu}44`, background: C.blu + "11", color: C.blu, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-              â¶ Start Session
+              ▶ Start Session
             </button>
           </div>
         ) : !showFinishReview ? (
           <div style={{ marginTop: 16, display: "flex", gap: 6 }}>
             <button onClick={() => setShowFinishReview(true)}
               style={{ flex: 1, padding: "14px", borderRadius: 10, border: `1px solid ${C.grn}44`, background: C.grn + "11", color: C.grn, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-              â Finish Session
+              ✓ Finish Session
             </button>
             <button onClick={() => setShowExport(!showExport)}
               style={{ flex: 1, padding: "14px", borderRadius: 10, border: `1px solid ${C.blu}44`, background: C.blu + "11", color: C.blu, fontSize: 13, fontWeight: 700, cursor: "pointer" }}>
-              {showExport ? "Hide" : "ð Export"}
+              {showExport ? "Hide" : "📋 Export"}
             </button>
           </div>
         ) : (
           <div style={{ marginTop: 16, background: C.card, borderRadius: 12, border: `1px solid ${C.grn}33`, padding: 14 }}>
             <div style={{ fontSize: 14, fontWeight: 800, color: C.grn, marginBottom: 10 }}>Session Review</div>
             <div style={{ fontSize: 11, color: C.mut, marginBottom: 8 }}>
-              {rKey} Â· {activeWeeks[week].rir} Â· {Math.round((Date.now() - (sessionStartRef.current || Date.now())) / 60000)} min
+              {rKey} · {activeWeeks[week].rir} · {Math.round((Date.now() - (sessionStartRef.current || Date.now())) / 60000)} min
             </div>
 
             {/* Review each exercise */}
@@ -2141,7 +2002,7 @@ function App() {
                           <div key={setNum} style={{ background: C.c2, borderRadius: 6, padding: "4px 8px", fontSize: 12, fontFamily: "monospace" }}>
                             <span style={{ color: C.mut, fontSize: 9 }}>S{setNum} </span>
                             <span style={{ color: C.blu }}>{data.reps}</span>
-                            <span style={{ color: C.mut }}>Ã</span>
+                            <span style={{ color: C.mut }}>×</span>
                             <span style={{ color: C.gld }}>{data.wt === 0 ? "BW" : data.wt}</span>
                           </div>
                         ))}
@@ -2173,7 +2034,7 @@ function App() {
             <div style={{ display: "flex", gap: 6 }}>
               <button onClick={() => setShowFinishReview(false)}
                 style={{ flex: 1, padding: "12px", borderRadius: 8, border: `1px solid ${C.bdr}`, background: "transparent", color: C.mut, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-                â Back to Edit
+                ← Back to Edit
               </button>
               <button onClick={async () => {
                   if (!currentSession) return;
@@ -2194,12 +2055,12 @@ function App() {
                   setRoutine(nextRoutine);
                   setAllSets({});
                   setCurrentSession(null);
-                  setSyncStatus("session saved â â next up: " + activeRoutineKeys[nextRoutine]);
+                  setSyncStatus("session saved ✓ — next up: " + activeRoutineKeys[nextRoutine]);
                   setShowFinishReview(false);
                   setTimeout(() => setSyncStatus(""), 5000);
                 }}
                 style={{ flex: 1, padding: "12px", borderRadius: 8, border: "none", background: C.grn, color: C.bg, fontSize: 12, fontWeight: 800, cursor: "pointer" }}>
-                â Confirm & Save
+                ✓ Confirm & Save
               </button>
             </div>
           </div>
@@ -2211,12 +2072,12 @@ function App() {
             </pre>
             <button onClick={() => { navigator.clipboard?.writeText(exportData()); setCopied(true); setTimeout(() => setCopied(false), 3000); }}
               style={{ marginTop: 6, width: "100%", padding: "12px", borderRadius: 8, border: "none", background: copied ? C.grn : C.blu, color: C.bg, fontWeight: 700, fontSize: 13, cursor: "pointer" }}>
-              {copied ? "Copied â" : "Copy to Clipboard"}
+              {copied ? "Copied ✓" : "Copy to Clipboard"}
             </button>
           </div>
         )}
         <div style={{ fontSize: 9, color: C.mut, textAlign: "center", marginTop: 16 }}>
-          RP Hypertrophy Â· ForceUSA G3 Â· {activeMeso.name} Â· {today} Â· {dbConnected ? "â synced" : "offline"}
+          RP Hypertrophy · ForceUSA G3 · {activeMeso.name} · {today} · {dbConnected ? "☁ synced" : "offline"}
         </div>
       </>)}
       </div>
