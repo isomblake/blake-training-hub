@@ -1588,8 +1588,141 @@ function HistoryView() {
 }
 
 export default 
+function BodyCompChart({data,dataKey,color,unit,height,onPointClick}){
+  height=height||120;unit=unit||'';
+  var valid=data.filter(function(d){return d[dataKey]!=null;});
+  if(valid.length<2)return React.createElement('div',{style:{height:height,display:'flex',alignItems:'center',justifyContent:'center',color:C.mut,fontSize:12}},'No data');
+  var vals=valid.map(function(d){return d[dataKey];});
+  var mn=Math.min.apply(null,vals),mx=Math.max.apply(null,vals),rng=mx-mn||1;
+  var W=320,H=height,pl=36,pr=8,pt=8,pb=20,cW=W-pl-pr,cH=H-pt-pb;
+  var xS=function(i){return pl+(i/(valid.length-1))*cW;};
+  var yS=function(v){return pt+cH-((v-mn)/rng)*cH;};
+  var path=valid.map(function(d,i){return (i===0?'M':'L')+xS(i).toFixed(1)+','+yS(d[dataKey]).toFixed(1);}).join(' ');
+  var tks=[mn,(mn+mx)/2,mx];
+  return React.createElement('svg',{width:'100%',viewBox:'0 0 '+W+' '+H,style:{display:'block',overflow:'visible'}},
+    tks.map(function(t,i){return [
+      React.createElement('line',{key:'l'+i,x1:pl,x2:W-pr,y1:yS(t),y2:yS(t),stroke:C.bdr,strokeWidth:'0.5',strokeDasharray:'3,3'}),
+      React.createElement('text',{key:'t'+i,x:pl-3,y:yS(t)+4,textAnchor:'end',fill:C.mut,fontSize:'9'},(t%1===0?t.toFixed(0):t.toFixed(1))+unit)
+    ];}),
+    React.createElement('path',{key:'p',d:path,fill:'none',stroke:color,strokeWidth:'2'}),
+    valid.map(function(d,i){return React.createElement('circle',{key:'c'+i,cx:xS(i),cy:yS(d[dataKey]),r:3,fill:C.card,stroke:color,strokeWidth:'1.5',style:{cursor:'pointer'},onClick:function(){onPointClick&&onPointClick(d);}});}),
+    React.createElement('text',{key:'x0',x:pl,y:H-2,fill:C.mut,fontSize:'8'},valid[0].date.slice(5)),
+    React.createElement('text',{key:'x1',x:W-pr,y:H-2,textAnchor:'end',fill:C.mut,fontSize:'8'},valid[valid.length-1].date.slice(5))
+  );
+}
+
+function ReadingDetailView({reading,allReadings,onBack}){
+  var idx=allReadings.findIndex(function(r){return r.date===reading.date;});
+  var prev=idx>0?allReadings[idx-1]:null;
+  var nxt=idx<allReadings.length-1?allReadings[idx+1]:null;
+  var dl=function(a,b){if(a==null||b==null)return null;var d=a-b;return(d>=0?'+':'')+d.toFixed(1);};
+  return React.createElement('div',{style:{padding:'0 16px 24px'}},
+    React.createElement('div',{style:{display:'flex',alignItems:'center',gap:12,marginBottom:20}},
+      React.createElement('button',{onClick:onBack,style:{background:'none',border:'none',color:C.blu,fontSize:22,cursor:'pointer',padding:0}},'back'),
+      React.createElement('div',null,
+        React.createElement('div',{style:{color:C.txt,fontSize:18,fontWeight:700}},reading.date),
+        React.createElement('div',{style:{color:C.mut,fontSize:12}},'Body Comp')
+      )
+    ),
+    [['Weight',reading.weight_lbs,' lbs',prev?dl(reading.weight_lbs,prev.weight_lbs):null],
+     ['Body Fat',reading.body_fat_pct,'%',prev?dl(reading.body_fat_pct,prev.body_fat_pct):null],
+     ['Lean',reading.lean_mass_lbs,' lbs',prev?dl(reading.lean_mass_lbs,prev.lean_mass_lbs):null],
+     ['Fat',reading.fat_mass_lbs,' lbs',prev?dl(reading.fat_mass_lbs,prev.fat_mass_lbs):null]
+    ].map(function(row,i){return React.createElement('div',{key:i,style:{display:'flex',justifyContent:'space-between',padding:'10px 0',borderBottom:'1px solid '+C.bdr}},
+      React.createElement('span',{style:{color:C.mut,fontSize:14}},row[0]),
+      React.createElement('span',{style:{color:C.txt,fontSize:15,fontWeight:600}},(row[1]!=null?row[1]+row[2]:'—')+(row[3]?' ('+row[3]+row[2]+')':''))
+    );}),
+    React.createElement('div',{style:{display:'flex',gap:12,marginTop:24}},
+      prev&&React.createElement('button',{onClick:function(){onBack(prev);},style:{flex:1,padding:'10px 0',background:C.card,border:'1px solid '+C.bdr,borderRadius:8,color:C.mut,fontSize:13,cursor:'pointer'}},'prev'),
+      nxt&&React.createElement('button',{onClick:function(){onBack(nxt);},style:{flex:1,padding:'10px 0',background:C.card,border:'1px solid '+C.bdr,borderRadius:8,color:C.mut,fontSize:13,cursor:'pointer'}},'next')
+    )
+  );
+}
+
+function BodyCompView({readings}){
+  var s=React.useState(null);var detR=s[0];var setDetR=s[1];
+  var sorted=[].concat(readings).sort(function(a,b){return a.date<b.date?-1:1;});
+  var withBF=sorted.filter(function(r){return r.body_fat_pct!=null;});
+  var latest=sorted[sorted.length-1];
+  var prev7=sorted.filter(function(r){return latest&&r.date<latest.date;}).slice(-7)[0];
+  var prev28=sorted.filter(function(r){return latest&&r.date<latest.date;}).slice(-28)[0];
+  var peak=sorted.reduce(function(p,r){return(!p||r.weight_lbs>p.weight_lbs)?r:p;},null);
+  var m1=sorted.find(function(r){return r.date>='2026-04-14';});
+  if(detR)return React.createElement(ReadingDetailView,{reading:detR,allReadings:sorted,onBack:function(r){setDetR(r&&r.date?r:null);}});
+  var cards=[
+    prev7&&latest?{l:'7d',v:(latest.weight_lbs-prev7.weight_lbs),g:latest.weight_lbs<prev7.weight_lbs}:null,
+    prev28&&latest?{l:'28d',v:(latest.weight_lbs-prev28.weight_lbs),g:latest.weight_lbs<prev28.weight_lbs}:null,
+    peak&&latest?{l:'peak',v:(latest.weight_lbs-peak.weight_lbs),g:true}:null,
+    m1&&latest?{l:'M1',v:(latest.weight_lbs-m1.weight_lbs),g:latest.weight_lbs<m1.weight_lbs}:null,
+  ].filter(Boolean);
+  return React.createElement('div',{style:{paddingBottom:80}},
+    latest&&React.createElement('div',{style:{padding:'16px 16px 0',cursor:'pointer'},onClick:function(){setDetR(latest);}},
+      React.createElement('div',{style:{background:C.card,borderRadius:12,padding:16,border:'1px solid '+C.bdr}},
+        React.createElement('div',{style:{display:'flex',justifyContent:'space-between'}},
+          React.createElement('div',null,
+            React.createElement('div',{style:{color:C.mut,fontSize:11,textTransform:'uppercase',letterSpacing:1}},'Latest - '+latest.date),
+            React.createElement('div',{style:{color:C.txt,fontSize:36,fontWeight:700}},latest.weight_lbs),
+            React.createElement('div',{style:{color:C.mut,fontSize:13}},'lbs')
+          ),
+          React.createElement('div',{style:{textAlign:'right'}},
+            latest.body_fat_pct&&React.createElement('div',{style:{color:C.txt,fontSize:22,fontWeight:600}},latest.body_fat_pct+'%'),
+            latest.lean_mass_lbs&&React.createElement('div',{style:{color:C.mut,fontSize:13}},latest.lean_mass_lbs+' lean'),
+            latest.fat_mass_lbs&&React.createElement('div',{style:{color:C.mut,fontSize:13}},latest.fat_mass_lbs+' fat')
+          )
+        )
+      )
+    ),
+    cards.length>0&&React.createElement('div',{style:{padding:'12px 16px 0'}},
+      React.createElement('div',{style:{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:8}},
+        cards.map(function(c,i){return React.createElement('div',{key:i,style:{background:C.card,borderRadius:10,padding:'10px 12px',border:'1px solid '+C.bdr}},
+          React.createElement('div',{style:{color:C.mut,fontSize:11,textTransform:'uppercase',letterSpacing:0.8}},c.l),
+          React.createElement('div',{style:{color:c.g?C.grn:(c.v>0?C.red:C.grn),fontSize:22,fontWeight:700}},(c.v>=0?'+':'')+c.v.toFixed(1),'lbs')
+        );})
+      )
+    ),
+    [{key:'weight_lbs',label:'Weight',color:'#64B5F6',unit:''},{key:'body_fat_pct',label:'Body Fat %',color:'#EF5350',unit:'%'},{key:'lean_mass_lbs',label:'Lean Mass',color:'#66BB6A',unit:''},{key:'fat_mass_lbs',label:'Fat Mass',color:'#FFA726',unit:''}].map(function(ch){
+      var cd=(ch.key==='body_fat_pct'||ch.key==='lean_mass_lbs'||ch.key==='fat_mass_lbs')?withBF:sorted;
+      if(cd.length<2)return null;
+      return React.createElement('div',{key:ch.key,style:{padding:'16px 16px 0'}},
+        React.createElement('div',{style:{background:C.card,borderRadius:12,padding:'12px 8px 8px',border:'1px solid '+C.bdr}},
+          React.createElement('div',{style:{paddingLeft:8,marginBottom:4,color:C.mut,fontSize:12,fontWeight:600,textTransform:'uppercase',letterSpacing:0.8}},ch.label),
+          React.createElement(BodyCompChart,{data:cd,dataKey:ch.key,color:ch.color,unit:ch.unit,height:120,onPointClick:function(d){setDetR(d);}})
+        )
+      );
+    }),
+    React.createElement('div',{style:{padding:'16px 16px 0'}},
+      React.createElement('div',{style:{color:C.mut,fontSize:12,fontWeight:600,textTransform:'uppercase',letterSpacing:1,marginBottom:8}},'All Readings'),
+      [].concat(sorted).reverse().map(function(r){return React.createElement('div',{key:r.date,onClick:function(){setDetR(r);},style:{background:C.card,borderRadius:10,padding:'12px 14px',marginBottom:8,border:'1px solid '+C.bdr,cursor:'pointer',display:'flex',justifyContent:'space-between',alignItems:'center'}},
+        React.createElement('div',null,
+          React.createElement('div',{style:{color:C.txt,fontSize:14,fontWeight:600}},r.date),
+          r.body_fat_pct&&React.createElement('div',{style:{color:C.mut,fontSize:12}},r.body_fat_pct+'% BF')
+        ),
+        React.createElement('div',{style:{textAlign:'right'}},
+          React.createElement('div',{style:{color:C.txt,fontSize:18,fontWeight:700}},r.weight_lbs),
+          React.createElement('div',{style:{color:C.mut,fontSize:11}},'lbs')
+        )
+      );})
+    )
+  );
+}
+
 function AnalyticsView(){
-  return React.createElement('div', {style:{padding:40,color:C.txt,fontSize:16}}, 'Analytics coming soon');
+  var s1=React.useState('bodycomp');var sub=s1[0];var setSub=s1[1];
+  var s2=React.useState([]);var readings=s2[0];var setReadings=s2[1];
+  var s3=React.useState(true);var loading=s3[0];var setLoading=s3[1];
+  React.useEffect(function(){
+    db.getBodyCompHistory(200).then(function(d){setReadings(d||[]);setLoading(false);}).catch(function(){setLoading(false);});
+  },[]);
+  return React.createElement('div',null,
+    React.createElement('div',{style:{display:'flex',borderBottom:'1px solid '+C.bdr,background:C.bg,position:'sticky',top:56,zIndex:10}},
+      [{id:'bodycomp',label:'Body Comp'},{id:'training',label:'Training'},{id:'compare',label:'Compare'}].map(function(t){
+        return React.createElement('button',{key:t.id,onClick:function(){setSub(t.id);},style:{flex:1,padding:'6px',borderRadius:8,border:'1px solid '+(sub===t.id?C.gld:C.bdr),background:sub===t.id?C.gld+'22':'transparent',color:sub===t.id?C.gld:C.mut,fontSize:11,fontWeight:700,cursor:'pointer'}},t.label);
+      })
+    ),
+    loading&&React.createElement('div',{style:{padding:40,textAlign:'center',color:C.mut}},'Loading...'),
+    !loading&&sub==='bodycomp'&&React.createElement(BodyCompView,{readings:readings}),
+    !loading&&sub!=='bodycomp'&&React.createElement('div',{style:{padding:'40px 16px',textAlign:'center',color:C.mut}},'Coming soon')
+  );
 }
 function App() {
   const [routine, setRoutine] = useState(() => {
