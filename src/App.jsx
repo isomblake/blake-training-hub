@@ -1587,7 +1587,41 @@ function HistoryView() {
   );
 }
 
-export default function App() {
+export default 
+function AnalyticsView(){
+  var s1=React.useState('bodycomp');var sub=s1[0];var setSub=s1[1];
+  var s2=React.useState([]);var readings=s2[0];var setReadings=s2[1];
+  var s3=React.useState(true);var loading=s3[0];var setLoading=s3[1];
+  React.useEffect(function(){
+    db.getBodyCompHistory(200).then(function(d){setReadings(d||[]);setLoading(false);}).catch(function(){setLoading(false);});
+  },[]);
+  var cards=[];
+  if(!loading&&readings.length>0){
+    var sorted=readings.slice().sort(function(a,b){return a.date<b.date?-1:1;});
+    var latest=sorted[sorted.length-1];
+    return React.createElement('div',{style:{padding:20}},
+      React.createElement('div',{style:{color:C.txt,fontSize:20,fontWeight:700,marginBottom:8}},'Body Comp'),
+      React.createElement('div',{style:{color:C.mut,fontSize:13,marginBottom:16}},'Latest: '+latest.date),
+      React.createElement('div',{style:{background:C.card,borderRadius:12,padding:16,border:'1px solid '+C.bdr,marginBottom:12}},
+        React.createElement('div',{style:{color:C.txt,fontSize:36,fontWeight:700}},latest.weight_lbs+''),
+        React.createElement('div',{style:{color:C.mut,fontSize:13}},'lbs'+(latest.body_fat_pct?' | '+latest.body_fat_pct+'% BF':'')),
+        latest.lean_mass_lbs&&React.createElement('div',{style:{color:C.mut,fontSize:12,marginTop:4}},latest.lean_mass_lbs+' lean / '+latest.fat_mass_lbs+' fat')
+      ),
+      React.createElement('div',{style:{color:C.mut,fontSize:12,fontWeight:600,textTransform:'uppercase',letterSpacing:1,marginBottom:8}},'All Readings ('+readings.length+')'),
+      sorted.slice().reverse().slice(0,20).map(function(r,i){
+        return React.createElement('div',{key:i,style:{display:'flex',justifyContent:'space-between',padding:'10px 0',borderBottom:'1px solid '+C.bdr}},
+          React.createElement('div',null,
+            React.createElement('div',{style:{color:C.txt,fontSize:14,fontWeight:600}},r.date),
+            r.body_fat_pct&&React.createElement('div',{style:{color:C.mut,fontSize:12}},r.body_fat_pct+'% BF')
+          ),
+          React.createElement('div',{style:{color:C.txt,fontSize:16,fontWeight:700}},r.weight_lbs+'')
+        );
+      })
+    );
+  }
+  return React.createElement('div',{style:{padding:40,textAlign:'center',color:C.mut}},loading?'Loading...':'No readings yet');
+}
+function App() {
   const [routine, setRoutine] = useState(() => {
     try {
       const saved = localStorage.getItem('training-hub-next-routine');
@@ -1877,7 +1911,7 @@ export default function App() {
           <button onClick={() => setView("history")}
             style={{ flex: 1, padding: "6px", borderRadius: 8, border: `1px solid ${view === "history" ? C.gld : C.bdr}`, background: view === "history" ? C.gld + "22" : "transparent", color: view === "history" ? C.gld : C.mut, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
             History
-          </button>
+          </button><button onClick={() => setView("analytics")} style={{ flex: 1, padding: "6px", borderRadius: 8, border: "1px solid " + C.bdr, color: C.mut, fontSize: 11, fontWeight: 700, cursor: "pointer", background: "transparent" }}>Analytics</button>
         </div>
       </div>
 
@@ -1902,7 +1936,7 @@ export default function App() {
       {/* HISTORY VIEW */}
       <div style={{ display: view === "history" ? "block" : "none" }}>
         <HistoryView />
-      </div>
+      </div><div style={{ display: view === "analytics" ? "block" : "none" }}><AnalyticsView /></div>
 
       {/* WORKOUT VIEW — use display:none instead of unmounting to preserve typed data */}
       <div style={{ display: view === "workout" ? "block" : "none" }}>
