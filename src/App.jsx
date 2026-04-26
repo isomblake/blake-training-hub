@@ -46,7 +46,7 @@ if (typeof document !== 'undefined') {
       _appBackgrounded = true;
     } else {
       // Suppress sounds for 500ms after returning to prevent queued playback
-      _soundSuppressUntil = Date.now() + 500;
+      _soundSuppressUntil = Date.now() + 2000;
       _appBackgrounded = false;
       if (_ctx && _soundEnabled) _ctx.resume().catch(() => {});
     }
@@ -170,15 +170,26 @@ async function sendPushViaServer(delaySec, title, body, tag) {
 // Schedule both 10s-warning and completion notifications via server
 function scheduleTimerNotification(seconds, exName) {
   if (!_pushSubscription) return [];
-  // 10-second warning (only if rest > 15s)
-  if (seconds > 15) {
-    sendPushViaServer(seconds - 10, "⏱ 10 seconds left", exName + " — get ready", "rest-warning");
-  }
-  // Completion notification
-  sendPushViaServer(seconds, "✅ Rest Complete", exName + " — time for next set", "rest-done");
-  return []; // No client-side timeouts needed
+  // Only schedule server-side push when app goes to background
+  // Listen for visibility change and schedule at that point
+  const handler = () => {
+    if (document.visibilityState === 'hidden') {
+      const remaining = Math.max(0, seconds - Math.floor((Date.now() - _timerStartedAt) / 1000));
+      if (remaining > 10) {
+        sendPushViaServer(remaining - 10, "⏱ 10 seconds left", exName + " — get ready", "rest-warning");
+      }
+      if (remaining > 0) {
+        sendPushViaServer(remaining, "✅ Rest Complete", exName + " — time for next set", "rest-done");
+      }
+    }
+  };
+  _timerStartedAt = Date.now();
+  document.addEventListener('visibilitychange', handler, { once: true });
+  // Store handler so we can clean up
+  return handler;
 }
-function cancelTimerNotification(ids) { /* Server-side — can't cancel, but notifications are tagged so they replace each other */ }
+let _timerStartedAt = 0;
+function cancelTimerNotification(handler) { if (handler) document.removeEventListener('visibilitychange', handler); }
 
 function _playOsc(freq, dur, vol) {
   if (_appBackgrounded) return; // Don't queue sounds while backgrounded
@@ -998,7 +1009,17 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone, nextSetInfo, on
   if (showNextSet && nextSetInfo) {
     const nsi = nextSetInfo;
     return (
-      <div style={{ position: "fixed", inset: 0, background: C.bg, zIndex: 1000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div
+        onTouchStart={e => { touchStartY.current = e.touches[0].clientY; }}
+        onTouchEnd={e => {
+          if (touchStartY.current !== null) {
+            const dy = touchStartY.current - e.changedTouches[0].clientY;
+            if (dy > 60) { onDone(); } // Swipe up > 60px = dismiss
+            touchStartY.current = null;
+          }
+        }}
+        style={{ position: "fixed", inset: 0, background: C.bg, zIndex: 1000, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 24 }}>
+        <div style={{ width: 40, height: 4, borderRadius: 2, background: C.bdr, marginBottom: 16 }}></div>
         <div style={{ fontSize: 12, color: C.grn, marginBottom: 4, textTransform: "uppercase", letterSpacing: 1, fontWeight: 700 }}>Next Set</div>
         <div style={{ fontSize: 20, color: C.txt, fontWeight: 800, marginBottom: 6 }}>{nsi.exName}</div>
         <div style={{ fontSize: 12, color: C.mut, marginBottom: 20 }}>{nsi.muscles}</div>
@@ -1030,7 +1051,7 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone, nextSetInfo, on
 
         <button onClick={() => {
             const r = parseInt(logReps); const w = nsi.isBW ? 0 : parseFloat(logWt);
-            if (r && (nsi.isBW || w >= 0)) { onLogFromTimer(nsi.exName, nsi.nextSetNum, { reps: r, wt: w }, nsi); onDone(); }
+            if (r && (nsi.isBW || w >= 0)) { onLogFromTimer(nsi.exName, nsi.nextSetNum, { reps: r, wt: w }, nsi, onDone); }
           }}
           style={{ padding: "16px 60px", borderRadius: 14, border: "none", background: C.grn, color: C.bg, fontSize: 16, fontWeight: 800, cursor: "pointer", marginBottom: 12 }}>
           Log Set {nsi.nextSetNum} ✓
@@ -1831,7 +1852,7 @@ export default function App() {
   }, [timer, r, sessionKey, allSets, activeWeeks, week]);
 
   // Handle logging a set from the timer's NextSetCard
-  const logFromTimer = useCallback((exName, setNum, data, nextSetInfo) => {
+  const logFromTimer = useCallback((exName, setNum, data, nextSetInfo, dismissTimer) => {
     const exKey = `${sessionKey}|${exName}`;
     setAllSets(prev => ({ ...prev, [exKey]: { ...(prev[exKey] || {}), [setNum]: data } }));
     syncToDb(exName, setNum, data.reps, data.wt, data.band);
@@ -1850,7 +1871,12 @@ export default function App() {
         const isDeload = activeWeeks[week]?.deload;
         const cappedRest = isDeload ? Math.min(restSeconds, 75) : restSeconds;
         setTimer({ seconds: cappedRest, exName, setNum, totalSets: currentEx?.sets || nextSetInfo.totalSets });
+      } else {
+        // Final set of session — dismiss the timer without starting a new one
+        if (dismissTimer) dismissTimer();
       }
+    } else {
+      if (dismissTimer) dismissTimer();
     }
   }, [sessionKey, syncToDb, r, activeWeeks, week]);
 
