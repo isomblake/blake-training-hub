@@ -167,32 +167,23 @@ async function sendPushViaServer(delaySec, title, body, tag) {
   } catch (e) { console.error("Push schedule error:", e); }
 }
 
-// Schedule both 10s-warning and completion notifications via server
+// Schedule server-side push notifications for timer alerts
+// These fire regardless of app state — server handles the delay
+// Notifications only DISPLAY as banners when app is backgrounded (handled in service worker)
 function scheduleTimerNotification(seconds, exName) {
   if (!_pushSubscription) return [];
-  // Only schedule server-side push when app goes to background
-  // Listen for visibility change and schedule at that point
-  const handler = () => {
-    if (document.visibilityState === 'hidden') {
-      const remaining = Math.max(0, seconds - Math.floor((Date.now() - _timerStartedAt) / 1000));
-      if (remaining > 10) {
-        sendPushViaServer(remaining - 10, "⏱ 10 seconds left", exName + " — get ready", "rest-warning");
-      }
-      if (remaining > 0) {
-        sendPushViaServer(remaining, "✅ Rest Complete", exName + " — time for next set", "rest-done");
-      }
-    }
-  };
-  _timerStartedAt = Date.now();
-  document.addEventListener('visibilitychange', handler, { once: true });
-  // Store handler so we can clean up
-  return handler;
+  const ids = [];
+  // 10-second warning (only if rest > 15s)
+  if (seconds > 15) {
+    sendPushViaServer(seconds - 10, "⏱ 10 seconds left", exName + " — get ready", "rest-warning");
+  }
+  // Completion notification
+  sendPushViaServer(seconds, "✅ Rest Complete", exName + " — time for next set", "rest-done");
+  return ids;
 }
-let _timerStartedAt = 0;
-function cancelTimerNotification(handler) { if (handler) document.removeEventListener('visibilitychange', handler); }
+function cancelTimerNotification(ids) { /* Server-side delays can't be cancelled, but tagged notifications replace each other */ }
 
 function _playOsc(freq, dur, vol) {
-  if (_appBackgrounded) return; // Don't queue sounds while backgrounded
   try {
     const ctx = _ensureCtx();
     if (ctx.state === 'suspended') ctx.resume().catch(() => {});

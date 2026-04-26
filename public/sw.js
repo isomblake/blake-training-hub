@@ -22,8 +22,18 @@ self.addEventListener('push', function(event) {
     data: { url: self.location.origin }
   };
 
+  // Only show banner notification if no app window is currently focused
+  // When app is in foreground, the in-app timer UI handles everything
   event.waitUntil(
-    self.registration.showNotification(data.title || 'Training Hub', options)
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+      const appFocused = clientList.some(function(client) {
+        return client.url.includes(self.location.origin) && client.visibilityState === 'visible';
+      });
+      if (!appFocused) {
+        return self.registration.showNotification(data.title || 'Training Hub', options);
+      }
+      // App is in foreground — skip the banner, in-app sounds handle it
+    })
   );
 });
 
