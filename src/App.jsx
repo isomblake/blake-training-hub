@@ -100,34 +100,44 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 async function registerServiceWorker() {
-  if (!("serviceWorker" in navigator)) return null;
+  if (!("serviceWorker" in navigator)) { console.log("PUSH: serviceWorker not supported"); return null; }
   try {
+    console.log("PUSH: registering service worker...");
     const reg = await navigator.serviceWorker.register("/sw.js");
+    console.log("PUSH: waiting for SW ready...");
     await navigator.serviceWorker.ready;
+    console.log("PUSH: SW ready", reg);
     return reg;
   } catch (e) {
-    console.error("SW registration failed:", e);
+    console.error("PUSH: SW registration failed:", e);
     return null;
   }
 }
 
 async function subscribeToPush(reg) {
-  if (!reg) return null;
+  if (!reg) { console.log("PUSH: no registration, skipping subscribe"); return null; }
   try {
+    console.log("PUSH: checking existing subscription...");
     let sub = await reg.pushManager.getSubscription();
     if (!sub) {
+      console.log("PUSH: no existing sub, subscribing...");
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
       });
+      console.log("PUSH: subscribed!", sub);
     }
     _pushSubscription = sub.toJSON();
+    console.log("PUSH: subscription JSON:", JSON.stringify(_pushSubscription).substring(0, 100));
     // Save subscription to Supabase
-    await supabase.from("push_subscriptions").upsert({
+    console.log("PUSH: saving to Supabase...");
+    const { error: pushError } = await supabase.from("push_subscriptions").upsert({
       endpoint: _pushSubscription.endpoint,
       p256dh: _pushSubscription.keys.p256dh,
       auth: _pushSubscription.keys.auth,
     }, { onConflict: "endpoint" });
+    if (pushError) console.error("PUSH: save error:", pushError);
+    else console.log("PUSH: saved successfully");
     return _pushSubscription;
   } catch (e) {
     console.error("Push subscribe failed:", e);
@@ -136,7 +146,8 @@ async function subscribeToPush(reg) {
 }
 
 async function requestNotifPermission() {
-  if (!("Notification" in window)) return false;
+  console.log("PUSH: requestNotifPermission called");
+  if (!("Notification" in window)) { console.log("PUSH: Notification API not available"); return false; }
   if (Notification.permission === "granted") {
     _notifPermission = true;
     const reg = await registerServiceWorker();
@@ -155,7 +166,8 @@ async function requestNotifPermission() {
 
 // Send push via Supabase Edge Function (server-side delay, works in background)
 async function sendPushViaServer(delaySec, title, body, tag) {
-  if (!_pushSubscription) return;
+  if (!_pushSubscription) { console.log("PUSH: no subscription, skipping push for", tag); return; }
+  console.log("PUSH: sending to edge function, delay:", delaySec, "tag:", tag);
   try {
     const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
     const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
@@ -171,7 +183,8 @@ async function sendPushViaServer(delaySec, title, body, tag) {
 // These fire regardless of app state — server handles the delay
 // Notifications only DISPLAY as banners when app is backgrounded (handled in service worker)
 function scheduleTimerNotification(seconds, exName) {
-  if (!_pushSubscription) return [];
+  if (!_pushSubscription) { console.log("PUSH: scheduleTimerNotification — no subscription"); return []; }
+  console.log("PUSH: scheduling notifications for", seconds, "seconds rest,", exName);
   const ids = [];
   // 10-second warning (only if rest > 15s)
   if (seconds > 15) {
@@ -1641,6 +1654,7 @@ export default function App() {
   const [showExport, setShowExport] = useState(false);
   const [copied, setCopied] = useState(false);
   const [timer, setTimer] = useState(null);
+  const [timerKey, setTimerKey] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [currentSession, setCurrentSession] = useState(null);
   const [syncStatus, setSyncStatus] = useState("");
@@ -1798,6 +1812,7 @@ export default function App() {
     // Issue #2: Cap rest at 75s during deload weeks
     const isDeload = activeWeeks[week]?.deload;
     const deloadRest = isDeload ? Math.min(seconds, 75) : seconds;
+    setTimerKey(k => k + 1);
     setTimer({ seconds: deloadRest, exName, setNum, totalSets });
   }, [activeWeeks, week]);
 
@@ -1861,6 +1876,7 @@ export default function App() {
         const restSeconds = restEx ? restEx.rest : 90;
         const isDeload = activeWeeks[week]?.deload;
         const cappedRest = isDeload ? Math.min(restSeconds, 75) : restSeconds;
+        setTimerKey(k => k + 1);
         setTimer({ seconds: cappedRest, exName, setNum, totalSets: currentEx?.sets || nextSetInfo.totalSets });
       } else {
         // Final set of session — dismiss the timer without starting a new one
@@ -1878,6 +1894,7 @@ export default function App() {
       {/* GLOBAL REST TIMER */}
       {timer && (
         <RestTimer
+          key={timerKey}
           seconds={timer.seconds}
           exName={timer.exName}
           setNum={timer.setNum}
