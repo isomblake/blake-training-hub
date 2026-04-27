@@ -89,6 +89,32 @@ function disableSound() {
 // === PUSH NOTIFICATION SYSTEM ===
 // Uses service worker + Supabase Edge Function for true background notifications
 const VAPID_PUBLIC_KEY = "BJWYcIo0sRyX_IJ-ydcbh1_mq-U0STuQvqWUvQFE45c_y0Jxg--291FakMSA28oyP_nGsglvZu_2pODypQo-uxU";
+
+// Auto-register service worker on page load so it's ready for push
+let _swRegistration = null;
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => {
+        console.log("PUSH: SW auto-registered on load");
+        _swRegistration = reg;
+        return navigator.serviceWorker.ready;
+      })
+      .then(reg => {
+        _swRegistration = reg;
+        console.log("PUSH: SW ready on load");
+        // Check if already subscribed
+        return reg.pushManager.getSubscription();
+      })
+      .then(sub => {
+        if (sub) {
+          _pushSubscription = sub.toJSON();
+          console.log("PUSH: existing subscription found on load");
+        }
+      })
+      .catch(e => console.error("PUSH: SW auto-register failed:", e));
+  });
+}
 let _pushSubscription = null;
 let _notifPermission = false;
 
@@ -102,11 +128,17 @@ function urlBase64ToUint8Array(base64String) {
 async function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) { console.log("PUSH: serviceWorker not supported"); return null; }
   try {
+    // Use cached registration if available, otherwise register fresh
+    if (_swRegistration) {
+      console.log("PUSH: using cached SW registration");
+      return _swRegistration;
+    }
     console.log("PUSH: registering service worker...");
     const reg = await navigator.serviceWorker.register("/sw.js");
     console.log("PUSH: waiting for SW ready...");
     await navigator.serviceWorker.ready;
-    console.log("PUSH: SW ready", reg);
+    _swRegistration = reg;
+    console.log("PUSH: SW ready");
     return reg;
   } catch (e) {
     console.error("PUSH: SW registration failed:", e);
