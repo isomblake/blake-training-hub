@@ -197,7 +197,7 @@ async function requestNotifPermission() {
 }
 
 // Send push via Supabase Edge Function (server-side delay, works in background)
-async function sendPushViaServer(delaySec, title, body, tag) {
+async function sendPushViaServer(delaySec, title, body, tag, timerId) {
   if (!_pushSubscription) { console.log("PUSH: no subscription, skipping push for", tag); return; }
   console.log("PUSH: sending to edge function, delay:", delaySec, "tag:", tag);
   try {
@@ -211,22 +211,55 @@ async function sendPushViaServer(delaySec, title, body, tag) {
   } catch (e) { console.error("Push schedule error:", e); }
 }
 
-// Schedule server-side push notifications for timer alerts
-// These fire regardless of app state — server handles the delay
-// Notifications only DISPLAY as banners when app is backgrounded (handled in service worker)
+// Schedule push notifications — only sent to server when app is backgrounded
+// When app is in foreground, in-app sounds handle alerts
+let _currentTimerId = null;
+let _visibilityHandler = null;
+
 function scheduleTimerNotification(seconds, exName) {
-  if (!_pushSubscription) { console.log("PUSH: scheduleTimerNotification — no subscription"); return []; }
-  console.log("PUSH: scheduling notifications for", seconds, "seconds rest,", exName);
-  const ids = [];
-  // 10-second warning (only if rest > 15s)
-  if (seconds > 15) {
-    sendPushViaServer(seconds - 10, "⏱ 10 seconds left", exName + " — get ready", "rest-warning");
+  if (!_pushSubscription) { console.log("PUSH: no subscription"); return null; }
+
+  // Generate a unique timer ID for cancellation
+  _currentTimerId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const timerId = _currentTimerId;
+  const timerStartedAt = Date.now();
+
+  // Clean up any previous listener
+  if (_visibilityHandler) {
+    document.removeEventListener('visibilitychange', _visibilityHandler);
   }
-  // Completion notification
-  sendPushViaServer(seconds, "✅ Rest Complete", exName + " — time for next set", "rest-done");
-  return ids;
+
+  _visibilityHandler = () => {
+    if (document.visibilityState === 'hidden' && timerId === _currentTimerId) {
+      // App just went to background — calculate remaining time and schedule pushes
+      const elapsed = Math.floor((Date.now() - timerStartedAt) / 1000);
+      const remaining = Math.max(0, seconds - elapsed);
+      console.log("PUSH: app backgrounded, remaining:", remaining, "seconds");
+
+      if (remaining > 10) {
+        sendPushViaServer(remaining - 10, "⏱ 10 seconds left", exName + " — get ready", "rest-warning", timerId);
+      }
+      if (remaining > 0) {
+        sendPushViaServer(remaining, "✅ Rest Complete", exName + " — time for next set", "rest-done", timerId);
+      }
+    }
+  };
+
+  document.addEventListener('visibilitychange', _visibilityHandler);
+  console.log("PUSH: timer scheduled, id:", timerId);
+  return timerId;
 }
-function cancelTimerNotification(ids) { /* Server-side delays can't be cancelled, but tagged notifications replace each other */ }
+
+function cancelTimerNotification(timerId) {
+  console.log("PUSH: cancelling timer", timerId);
+  // Clear the visibility listener so backgrounding won't schedule pushes
+  if (_visibilityHandler) {
+    document.removeEventListener('visibilitychange', _visibilityHandler);
+    _visibilityHandler = null;
+  }
+  // Invalidate the timer ID so any in-flight Edge Functions check and skip
+  _currentTimerId = null;
+}
 
 function _playOsc(freq, dur, vol) {
   try {
