@@ -475,7 +475,7 @@ const db = {
   async getRecentSessions(limit = 200) {
     const { data } = await supabase
       .from('sessions')
-      .select('*, sets(*, exercises(name, muscles, muscle_group))')
+      .select('*, sets(*, exercises(name, muscles, muscle_group, cable_ratio))')
       .order('date', { ascending: false })
       .limit(limit);
     return data || [];
@@ -2189,20 +2189,23 @@ function PerformanceView() {
   var s1 = React.useState(null); var loaded = s1[0]; var setLoaded = s1[1];
   var s2 = React.useState([]); var navStack = s2[0]; var setNavStack = s2[1];
   React.useEffect(function() {
-    Promise.all([db.getAllSets(), db.getAllSessions(), db.getAllExercises(), db.getVolumeLandmarks(), db.getAllMesocycles()])
-      .then(function(arr) { setLoaded({ sets: arr[0] || [], sessions: arr[1] || [], exercises: arr[2] || [], landmarks: arr[3] || [] }); })
-      .catch(function() { setLoaded({ sets: [], sessions: [], exercises: [], landmarks: [] }); });
+    Promise.all([db.getRecentSessions(1000), db.getVolumeLandmarks()])
+      .then(function(arr) { setLoaded({ sessions: arr[0] || [], landmarks: arr[1] || [] }); })
+      .catch(function() { setLoaded({ sessions: [], landmarks: [] }); });
   }, []);
   if (!loaded) return React.createElement("div", { style: { padding: 32, textAlign: "center", color: C.mut } }, "Loading…");
-  var sessions = loaded.sessions, exercises = loaded.exercises, landmarks = loaded.landmarks;
+  var sessions = loaded.sessions, landmarks = loaded.landmarks;
   if (sessions.length === 0) return React.createElement("div", { style: { padding: 32, textAlign: "center", color: C.mut } }, "No sessions logged yet.");
   var sessById = {}; sessions.forEach(function(s) { sessById[s.id] = s; });
-  var exById = {}; exercises.forEach(function(e) { exById[e.id] = e; });
   var lmByMG = {}; landmarks.forEach(function(l) { lmByMG[l.muscle_group] = l; });
-  var annotatedSets = loaded.sets.map(function(st) {
-    var s = sessById[st.session_id], e = exById[st.exercise_id];
-    return { id: st.id, reps: st.reps, weight: parseFloat(st.weight) || 0, set_number: st.set_number, date: s ? s.date : null, sessionId: st.session_id, mesoNote: s ? ((s.notes || "").match(/^(Meso \d+)/) || [])[1] || null : null, week: s ? s.week_number : null, exId: st.exercise_id, exName: e ? e.name : "Unknown", muscleGroup: e ? e.muscle_group : null, cableRatio: e ? (parseFloat(e.cable_ratio) || 1) : 1 };
-  }).filter(function(s) { return s.date != null; });
+  var annotatedSets = [];
+  sessions.forEach(function(sess) {
+    var mesoNote = ((sess.notes || "").match(/^(Meso \d+)/) || [])[1] || null;
+    (sess.sets || []).forEach(function(st) {
+      var e = st.exercises || {};
+      annotatedSets.push({ id: st.id, reps: st.reps, weight: parseFloat(st.weight) || 0, set_number: st.set_number, date: sess.date, sessionId: sess.id, mesoNote: mesoNote, week: sess.week_number, exId: st.exercise_id, exName: e.name || "Unknown", muscleGroup: e.muscle_group || null, cableRatio: parseFloat(e.cable_ratio) || 1 });
+    });
+  });
   function push(page) { setNavStack(navStack.concat([page])); }
   function pop() { setNavStack(navStack.slice(0, -1)); }
   var cur = navStack.length ? navStack[navStack.length - 1] : null;
