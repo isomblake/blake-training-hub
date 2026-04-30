@@ -2914,7 +2914,7 @@ function PerformanceView() {
                   }
                   return (
                     <div key={l.name} onClick={function() { setExpandedEx(l.name); }}
-                      style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 8, padding: "6px 7px", cursor: "pointer" }}>
+                      style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 8, padding: "6px 7px", cursor: "pointer", minWidth: 0 }}>
                       <div style={{ color: C.txt, fontSize: 10, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 2 }}>
                         {l.name}
                       </div>
