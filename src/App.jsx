@@ -909,6 +909,15 @@ const SetRow = React.memo(function SetRow({ setNum, targetReps, targetWt, lastWe
   const [band, setBand] = useState(bands ? bands[0] : null);
   const [editing, setEditing] = useState(false);
   const isDone = logged != null && !editing;
+  const userEditedReps = useRef(false);
+
+  // Sync rep preset when the smart target resolves asynchronously (DB call),
+  // but only if the user hasn't manually changed the input yet
+  useEffect(() => {
+    if (!isDone && !editing && !userEditedReps.current) {
+      setEditReps(targetReps || "");
+    }
+  }, [targetReps]);
 
   // Display values: show logged data when done, local state when editing/entering
   const reps = isDone ? logged.reps.toString() : editReps;
@@ -986,7 +995,8 @@ const SetRow = React.memo(function SetRow({ setNum, targetReps, targetWt, lastWe
         </>
       ) : (
         <>
-          <input type="number" inputMode="numeric" placeholder={targetReps} value={editReps} onChange={e => setEditReps(e.target.value)}
+          <input type="number" inputMode="numeric" placeholder={targetReps} value={editReps}
+            onChange={e => { userEditedReps.current = true; setEditReps(e.target.value); }}
             onFocus={e => e.target.select()}
             style={{ width: 48, padding: "5px 4px", borderRadius: 6, border: `1px solid ${C.bdr}`, background: C.c2, color: C.txt, fontSize: 13, textAlign: "center" }}
           />
@@ -1255,6 +1265,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
   const [expanded, setExpanded] = useState(false);
   const [smartTarget, setSmartTarget] = useState(null);
   const [progressNote, setProgressNote] = useState(null);
+  const [smartTargetReps, setSmartTargetReps] = useState(null);
   const lastWeightRef = useRef(null);
   const exKey = `${sessionKey}|${ex.name}`;
   const logged = allSets[exKey] || {};
@@ -1277,6 +1288,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
     if (!ex.wt || wkData.deload) return;
     setSmartTarget(null);
     setProgressNote(null);
+    setSmartTargetReps(null);
     // Use tomorrow's date so we include today's earlier sessions too
     const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
     db.getLastSessionForExercise(ex.name, tomorrow, mesoPrefix).then(last => {
@@ -1298,21 +1310,27 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
         // Couldn't hit min reps — hold at actual weight, no progression
         adjusted = Math.round(avgWt / minStep) * minStep;
         note = `⏸ Holding @ ${Math.round(avgWt)} lb — only ${Math.round(avgReps)} reps last session (min ${minReps})`;
+        // Keep rep target at bottom of range when struggling
       } else if (avgReps > maxReps) {
         // Blew past rep ceiling — extra bump on top of week's increment
         adjusted = Math.round((avgWt + weeklyAdd + minStep) / minStep) * minStep;
         note = `↑ Bumped — ${Math.round(avgReps)} reps @ ${Math.round(avgWt)} lb last session (exceeded range)`;
       } else {
-        // Hit the rep range — always anchor next suggestion to what was ACTUALLY lifted
-        // (not the programmed base), then apply this week's increment
+        // Hit the rep range (including "used more or less than programmed") —
+        // always anchor next suggestion to what was ACTUALLY lifted, then add week's increment
         adjusted = Math.round((avgWt + weeklyAdd) / minStep) * minStep;
         const rirTag = lastRir ? ` (${lastRir})` : "";
-        if (adjusted < baseTarget) {
-          note = `↓ ${Math.round(avgWt)} lb last session${rirTag} → ${adjusted} lb this week`;
-        } else if (adjusted > baseTarget) {
-          note = `↑ ${Math.round(avgWt)} lb last session${rirTag} → ${adjusted} lb this week`;
+        if (avgWt < ex.wt - minStep / 2) {
+          note = `↓ ${Math.round(avgWt)} lb used last${rirTag} → ${adjusted} lb this week`;
+        } else if (avgWt > ex.wt + minStep / 2) {
+          note = `↑ ${Math.round(avgWt)} lb used last${rirTag} → ${adjusted} lb this week`;
         }
-        // If adjusted === baseTarget, no note needed — matches programmed
+        // If weight is staying the same this week (no increment or offset cancels),
+        // push the rep preset to the top of the range to encourage rep progression
+        const roundedLastWt = Math.round(avgWt / minStep) * minStep;
+        if (adjusted === roundedLastWt) {
+          setSmartTargetReps(maxReps);
+        }
       }
 
       if (adjusted !== undefined && adjusted !== baseTarget) {
@@ -1404,7 +1422,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
           )}
 
           {Array.from({ length: totalSets }, (_, i) => (
-            <SetRow key={i} setNum={i + 1} targetReps={ex.reps.split("-")[0]} targetWt={targetWt} lastWeight={lastWeightRef.current} isBW={!!ex.bodyweight} bands={ex.bands} logged={logged[i + 1]} onLog={logSet} onDelete={deleteSet} />
+            <SetRow key={i} setNum={i + 1} targetReps={smartTargetReps ? String(smartTargetReps) : ex.reps.split("-")[0]} targetWt={targetWt} lastWeight={lastWeightRef.current} isBW={!!ex.bodyweight} bands={ex.bands} logged={logged[i + 1]} onLog={logSet} onDelete={deleteSet} />
           ))}
         </div>
       )}
