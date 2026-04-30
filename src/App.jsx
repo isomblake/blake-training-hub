@@ -910,14 +910,23 @@ const SetRow = React.memo(function SetRow({ setNum, targetReps, targetWt, lastWe
   const [editing, setEditing] = useState(false);
   const isDone = logged != null && !editing;
   const userEditedReps = useRef(false);
+  const userEditedWt = useRef(false);
 
-  // Sync rep preset when the smart target resolves asynchronously (DB call),
-  // but only if the user hasn't manually changed the input yet
+  // Sync presets when smart targets resolve asynchronously after the DB call.
+  // Guard with userEdited refs so manual input is never clobbered.
   useEffect(() => {
     if (!isDone && !editing && !userEditedReps.current) {
       setEditReps(targetReps || "");
     }
   }, [targetReps]);
+
+  // Only sync weight for the first set (lastWeight null = no cascade yet).
+  // For set 2+ the cascade from the previous logged set takes priority.
+  useEffect(() => {
+    if (!isDone && !editing && !userEditedWt.current && lastWeight == null) {
+      setEditWt(targetWt?.toString() || (isBW ? "0" : ""));
+    }
+  }, [targetWt]);
 
   // Display values: show logged data when done, local state when editing/entering
   const reps = isDone ? logged.reps.toString() : editReps;
@@ -958,6 +967,8 @@ const SetRow = React.memo(function SetRow({ setNum, targetReps, targetWt, lastWe
   const handleDelete = (e) => {
     e.stopPropagation();
     onDelete(setNum);
+    userEditedReps.current = false;
+    userEditedWt.current = false;
     setEditReps(targetReps || "");
     setEditWt(targetWt?.toString() || (isBW ? "0" : ""));
     setEditing(false);
@@ -1011,7 +1022,8 @@ const SetRow = React.memo(function SetRow({ setNum, targetReps, targetWt, lastWe
           {!isBW && (
             <>
               <span style={{ fontSize: 12, color: C.mut }}>×</span>
-              <input type="number" inputMode="decimal" placeholder={targetWt || "wt"} value={editWt} onChange={e => setEditWt(e.target.value)}
+              <input type="number" inputMode="decimal" placeholder={targetWt || "wt"} value={editWt}
+                onChange={e => { userEditedWt.current = true; setEditWt(e.target.value); }}
                 onFocus={e => e.target.select()}
                 style={{ width: 56, padding: "5px 4px", borderRadius: 6, border: `1px solid ${C.bdr}`, background: C.c2, color: C.txt, fontSize: 13, textAlign: "center" }}
               />
