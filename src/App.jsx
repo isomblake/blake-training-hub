@@ -2047,7 +2047,7 @@ function SessionDetailView(props) {
           ),
           React.createElement("tbody", null,
             ex.sets.map(function(s, si) {
-              var trueW = s.weight / (s.cableRatio || 1), e1rm = trueW * (1 + s.reps / 30);
+              var e1rm = s.weight * (1 + s.reps / 30);
               return React.createElement("tr", { key: si, style: { borderBottom: "1px solid " + C.bdr } },
                 React.createElement("td", { style: { padding: "5px 6px", textAlign: "center", color: C.mut } }, si + 1),
                 React.createElement("td", { style: { padding: "5px 6px", textAlign: "right", color: C.txt, fontWeight: 600 } }, s.weight + " lb"),
@@ -2080,7 +2080,7 @@ function MuscleGroupDetailView(props) {
   var exMap = {}, exNames = [];
   mgSets.forEach(function(s) {
     if (!exMap[s.exName]) { exMap[s.exName] = { topE1rm: 0, count: 0 }; exNames.push(s.exName); }
-    var trueW = s.weight / (s.cableRatio || 1), e1rm = trueW * (1 + s.reps / 30);
+    var e1rm = s.weight * (1 + s.reps / 30);
     if (e1rm > exMap[s.exName].topE1rm) exMap[s.exName].topE1rm = e1rm;
     exMap[s.exName].count++;
   });
@@ -2128,7 +2128,7 @@ function ExerciseDetailView(props) {
   });
   var sessionTops = Object.keys(bySession).map(function(sid) {
     var b = bySession[sid];
-    var top = b.sets.reduce(function(m, s) { var trueW = s.weight / (s.cableRatio || 1), e1rm = trueW * (1 + s.reps / 30); return (m == null || e1rm > m.e1rm) ? { weight: s.weight, reps: s.reps, e1rm: e1rm } : m; }, null);
+    var top = b.sets.reduce(function(m, s) { var e1rm = s.weight * (1 + s.reps / 30); return (m == null || e1rm > m.e1rm) ? { weight: s.weight, reps: s.reps, e1rm: e1rm } : m; }, null);
     return { sessionId: sid, date: b.date, mesoNote: b.mesoNote, week: b.week, top: top };
   }).sort(function(a, b) { return a.date < b.date ? -1 : 1; });
   var mesoColors = [C.blu, C.gld, C.grn, C.red, C.pur, C.org, C.teal];
@@ -2231,7 +2231,7 @@ function PerformanceView() {
     if (!exSessMap[s.exName]) exSessMap[s.exName] = {};
     var key = s.sessionId;
     if (!exSessMap[s.exName][key]) exSessMap[s.exName][key] = { date: s.date, topE1rm: 0 };
-    var trueW = s.weight / (s.cableRatio || 1), e1rm = trueW * (1 + s.reps / 30);
+    var e1rm = s.weight * (1 + s.reps / 30);
     if (e1rm > exSessMap[s.exName][key].topE1rm) exSessMap[s.exName][key].topE1rm = e1rm;
   });
   var topLifts = Object.keys(exSessMap).map(function(n) {
@@ -2416,8 +2416,7 @@ function CompareView() {
       var w = parseFloat(st.weight) || 0, r = parseInt(st.reps) || 0;
       totalVolume += w * r;
       var e = st.exercises || {}; if (!e.name) return;
-      var cableRatio = parseFloat(e.cable_ratio) || 1;
-      var e1rm = (w / cableRatio) * (1 + r / 30);
+      var e1rm = w * (1 + r / 30);
       if (!topByEx[e.name] || e1rm > topByEx[e.name].e1rm) topByEx[e.name] = { e1rm: e1rm, weight: w, reps: r };
       if (e.muscle_group) mgVol[e.muscle_group] = (mgVol[e.muscle_group] || 0) + 1;
     });
