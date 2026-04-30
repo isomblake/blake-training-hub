@@ -613,7 +613,7 @@ const db = {
         .eq('exercise_id', ex.id);
 
       if (sets && sets.length > 0) {
-        return { date: session.date, weekNumber: session.week_number, sets };
+        return { date: session.date, weekNumber: session.week_number, rir: session.rir, sets };
       }
     }
     return null;
@@ -1286,35 +1286,38 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
       const maxReps = repRange[1] || repRange[0];
       const avgWt = last.sets.reduce((a, s) => a + s.weight, 0) / last.sets.length;
       const avgReps = last.sets.reduce((a, s) => a + s.reps, 0) / last.sets.length;
-      const increment = minStep; // 5 for Smith, 2.5 for cable/iso
       const lastWk = last.weekNumber || 0;
+      const lastRir = last.rir || "";
 
-      let adjusted = baseTarget;
-      let note = null;
-
-      // Only adjust if last data was from a PREVIOUS week (not current week being viewed)
+      // Only adjust based on a PREVIOUS week's data, not the current week
       if (lastWk >= (week + 1)) return;
 
-      if (avgReps >= maxReps && avgWt >= (baseTarget || 0)) {
-        // Exceeded rep range at or above target — extra bump
-        adjusted = Math.round((avgWt + increment) / minStep) * minStep;
-        note = `↑ Bumped — hit ${Math.round(avgReps)} reps @ ${avgWt} lb last session (exceeded range)`;
-      } else if (avgReps < minReps) {
-        // Couldn't hit min reps — hold weight, don't progress
+      let adjusted, note;
+
+      if (avgReps < minReps) {
+        // Couldn't hit min reps — hold at actual weight, no progression
         adjusted = Math.round(avgWt / minStep) * minStep;
-        note = `⏸ Holding @ ${avgWt} lb — only ${Math.round(avgReps)} reps last session (below ${minReps} min)`;
-      } else if (avgWt > (baseTarget || 0)) {
-        // Went heavier than programmed — adjust up from actual
-        adjusted = Math.round((avgWt + increment) / minStep) * minStep;
-        note = `↑ Adjusted — you lifted ${avgWt} lb last session (above programmed ${baseTarget})`;
+        note = `⏸ Holding @ ${Math.round(avgWt)} lb — only ${Math.round(avgReps)} reps last session (min ${minReps})`;
+      } else if (avgReps > maxReps) {
+        // Blew past rep ceiling — extra bump on top of week's increment
+        adjusted = Math.round((avgWt + weeklyAdd + minStep) / minStep) * minStep;
+        note = `↑ Bumped — ${Math.round(avgReps)} reps @ ${Math.round(avgWt)} lb last session (exceeded range)`;
       } else {
-        // Normal progression — reps in range, weight on target
-        return;
+        // Hit the rep range — always anchor next suggestion to what was ACTUALLY lifted
+        // (not the programmed base), then apply this week's increment
+        adjusted = Math.round((avgWt + weeklyAdd) / minStep) * minStep;
+        const rirTag = lastRir ? ` (${lastRir})` : "";
+        if (adjusted < baseTarget) {
+          note = `↓ ${Math.round(avgWt)} lb last session${rirTag} → ${adjusted} lb this week`;
+        } else if (adjusted > baseTarget) {
+          note = `↑ ${Math.round(avgWt)} lb last session${rirTag} → ${adjusted} lb this week`;
+        }
+        // If adjusted === baseTarget, no note needed — matches programmed
       }
 
-      if (adjusted !== baseTarget) {
+      if (adjusted !== undefined && adjusted !== baseTarget) {
         setSmartTarget(adjusted);
-        setProgressNote(note);
+        if (note) setProgressNote(note);
       }
     }).catch(() => {});
   }, [ex.name, week]);
