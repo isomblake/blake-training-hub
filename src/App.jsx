@@ -1421,6 +1421,8 @@ function HistoryView() {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [editingSetId, setEditingSetId] = useState(null);
   const [editSetFields, setEditSetFields] = useState({ reps: '', weight: '' });
+  const [addingSet, setAddingSet] = useState(null); // { sessionId, exName, muscles, nextNum }
+  const [addSetFields, setAddSetFields] = useState({ reps: '', weight: '' });
 
   useEffect(() => {
     db.getRecentSessions(200).then(data => {
@@ -1530,7 +1532,7 @@ function HistoryView() {
                   <div key={i} style={{ marginTop: 8 }}>
                     <div style={{ fontSize: 12, fontWeight: 700, color: C.txt }}>{ex.name}</div>
                     <div style={{ fontSize: 9, color: C.mut, marginBottom: 4 }}>{ex.muscles}</div>
-                    {ex.sets.map((s, j) => {
+                    {ex.sets.map(s => {
                       const isEditingSet = editingSetId === s.id;
                       return (
                         <div key={s.id || j} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 2, paddingLeft: 8 }}>
@@ -1595,6 +1597,41 @@ function HistoryView() {
                         </div>
                       );
                     })}
+                    {addingSet && addingSet.sessionId === session.id && addingSet.exName === ex.name ? (
+                      <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 4, paddingLeft: 8 }}>
+                        <input type="number" inputMode="numeric" placeholder="reps" value={addSetFields.reps}
+                          onChange={e => setAddSetFields(f => ({...f, reps: e.target.value}))}
+                          onFocus={e => e.target.select()}
+                          style={{ width: 38, padding: "3px", borderRadius: 4, border: `1px solid ${C.grn}55`, background: C.c2, color: C.txt, fontSize: 11, textAlign: "center" }} />
+                        <span style={{ color: C.mut, fontSize: 11 }}>×</span>
+                        <input type="number" inputMode="decimal" placeholder="lb" value={addSetFields.weight}
+                          onChange={e => setAddSetFields(f => ({...f, weight: e.target.value}))}
+                          onFocus={e => e.target.select()}
+                          style={{ width: 46, padding: "3px", borderRadius: 4, border: `1px solid ${C.grn}55`, background: C.c2, color: C.txt, fontSize: 11, textAlign: "center" }} />
+                        <button onClick={async () => {
+                            const reps = parseInt(addSetFields.reps);
+                            const weight = parseFloat(addSetFields.weight) || 0;
+                            if (!reps) return;
+                            await db.logSet(session.id, ex.name, addingSet.nextNum, reps, weight, null, ex.muscles);
+                            const { data: fresh } = await supabase.from('sets').select('*, exercises(name, muscles, muscle_group, cable_ratio)').eq('session_id', session.id).order('set_number', { ascending: true });
+                            setSessions(prev => prev.map(sess => sess.id === session.id ? { ...sess, sets: fresh || sess.sets } : sess));
+                            setAddingSet(null);
+                            setAddSetFields({ reps: '', weight: '' });
+                          }}
+                          style={{ padding: "2px 8px", borderRadius: 4, border: "none", background: C.grn, color: C.bg, fontSize: 9, fontWeight: 700, cursor: "pointer" }}>
+                          ✓
+                        </button>
+                        <button onClick={() => { setAddingSet(null); setAddSetFields({ reps: '', weight: '' }); }}
+                          style={{ padding: "2px 6px", borderRadius: 4, border: `1px solid ${C.bdr}`, background: "transparent", color: C.mut, fontSize: 9, cursor: "pointer" }}>
+                          ✕
+                        </button>
+                      </div>
+                    ) : (
+                      <button onClick={() => { setAddingSet({ sessionId: session.id, exName: ex.name, muscles: ex.muscles, nextNum: ex.sets.length + 1 }); setAddSetFields({ reps: '', weight: '' }); }}
+                        style={{ marginTop: 4, marginLeft: 8, padding: "2px 10px", borderRadius: 4, border: `1px solid ${C.bdr}`, background: "transparent", color: C.mut, fontSize: 9, cursor: "pointer" }}>
+                        + set
+                      </button>
+                    )}
                   </div>
                 ))}
                 {totalVolume > 0 && (
