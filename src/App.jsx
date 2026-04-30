@@ -2923,6 +2923,7 @@ function PerformanceView() {
                         <span style={{ color: C.mut, fontSize: 9 }}>e1RM</span>
                         {l.pct !== 0 && <span style={{ color: sc, fontSize: 9, fontWeight: 700 }}>{(l.pct > 0 ? "+" : "") + l.pct + "%"}</span>}
                       </div>
+                      <SparkLine data={l.spark} color={sc} width={120} height={22} />
                     </div>
                   );
                 })}
@@ -3328,7 +3329,7 @@ function AnalyticsView() {
     { k: "cmp", label: "Compare", color: C.pur }
   ];
   return (
-    <div style={{ padding: "10px 12px 40px" }}>
+    <div style={{ padding: "10px 0 40px" }}>
       <div
         style={{ display: "flex", gap: 4, marginBottom: 12, position: "sticky", top: 0, background: C.bg, zIndex: 4, paddingBottom: 4 }}>
         {TABS.map(function(t) {
@@ -3599,7 +3600,7 @@ export default function App() {
     }
   }, [sessionKey, syncToDb, r, activeWeeks, week]);
 
-  const W = { background: C.bg, minHeight: "100vh", color: C.txt, fontFamily: "'SF Pro Display',system-ui,sans-serif", padding: "12px 10px", paddingTop: timer ? 64 : 12, maxWidth: 480, margin: "0 auto" };
+  const W = { background: C.bg, minHeight: "100vh", color: C.txt, fontFamily: "'SF Pro Display',system-ui,sans-serif", padding: "12px 10px", paddingTop: timer ? 64 : 12, maxWidth: 480, margin: "0 auto", overflowX: "hidden" };
 
   return (
     <div style={W}>
