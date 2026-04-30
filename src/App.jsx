@@ -2217,7 +2217,7 @@ function PerformanceView() {
   var curMesoNote = lastSession ? ((lastSession.notes || "").match(/^(Meso \d+)/) || [])[1] || null : null;
   var curMesoSessions = sessions.filter(function(s) { return curMesoNote && ((s.notes || "").match(/^(Meso \d+)/) || [])[1] === curMesoNote; });
   var curMesoSets = annotatedSets.filter(function(s) { return curMesoNote && s.mesoNote === curMesoNote; });
-  var curMesoVolume = curMesoSets.reduce(function(sm, s) { return sm + s.weight * s.reps; }, 0);
+  var curMesoVolume = curMesoSets.reduce(function(sm, s) { return sm + (s.weight / (s.cableRatio || 1)) * s.reps; }, 0);
   var weekSets = annotatedSets.filter(function(s) { return curWeek != null && s.week === curWeek && s.mesoNote === curMesoNote; });
   var volByMG = {};
   weekSets.forEach(function(s) { if (!s.muscleGroup) return; volByMG[s.muscleGroup] = (volByMG[s.muscleGroup] || 0) + 1; });
@@ -2287,7 +2287,7 @@ function PerformanceView() {
       React.createElement("div", { style: { color: C.mut, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 } }, "Recent Sessions"),
       recentSessions.map(function(sess) {
         var sessSets = annotatedSets.filter(function(s) { return s.sessionId === sess.id; });
-        var vol = sessSets.reduce(function(sm, s) { return sm + s.weight * s.reps; }, 0);
+        var vol = sessSets.reduce(function(sm, s) { return sm + (s.weight / (s.cableRatio || 1)) * s.reps; }, 0);
         var exSeen = {}, exNames = [];
         sessSets.forEach(function(s) { if (!exSeen[s.exName]) { exSeen[s.exName] = true; exNames.push(s.exName); } });
         return React.createElement("div", { key: sess.id, onClick: function() { push({ type: "session", session: sess }); }, style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 12, marginBottom: 6, cursor: "pointer" } },
@@ -2414,8 +2414,9 @@ function CompareView() {
     var totalVolume = 0, topByEx = {}, mgVol = {};
     mSets.forEach(function(st) {
       var w = parseFloat(st.weight) || 0, r = parseInt(st.reps) || 0;
-      totalVolume += w * r;
-      var e = st.exercises || {}; if (!e.name) return;
+      var e = st.exercises || {};
+      totalVolume += (w / (parseFloat(e.cable_ratio) || 1)) * r;
+      if (!e.name) return;
       var e1rm = w * (1 + r / 30);
       if (!topByEx[e.name] || e1rm > topByEx[e.name].e1rm) topByEx[e.name] = { e1rm: e1rm, weight: w, reps: r };
       if (e.muscle_group) mgVol[e.muscle_group] = (mgVol[e.muscle_group] || 0) + 1;
