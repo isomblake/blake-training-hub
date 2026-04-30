@@ -2012,6 +2012,17 @@ function ReadingDetailView(props) {
     )
   );
 }
+function SparkLine(props) {
+  var data = (props.data || []).filter(function(d) { return d != null && d.val != null; });
+  var w = props.width || 80, h = props.height || 30, color = props.color || C.blu;
+  if (data.length < 2) return React.createElement("div", { style: { width: w, height: h } });
+  var vals = data.map(function(d) { return d.val; });
+  var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals), rng = mx - mn || 1;
+  var pts = data.map(function(d, i) { return ((i / (data.length - 1)) * (w - 4) + 2).toFixed(1) + "," + (h - 2 - ((d.val - mn) / rng) * (h - 6)).toFixed(1); });
+  return React.createElement("svg", { width: w, height: h, style: { display: "block", marginTop: 6 } },
+    React.createElement("polyline", { points: pts.join(" "), fill: "none", stroke: color, strokeWidth: 1.5, strokeLinejoin: "round", strokeLinecap: "round" })
+  );
+}
 function BackBtn(props) {
   return React.createElement("button", { onClick: props.onClick, style: { background: "transparent", border: "1px solid " + C.bdr, color: C.mut, fontSize: 12, borderRadius: 8, padding: "6px 14px", marginBottom: 12, cursor: "pointer" } }, "\u2190 Back");
 }
@@ -2100,7 +2111,16 @@ function MuscleGroupDetailView(props) {
       ) : null
     ),
     wData.length ? React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10, marginBottom: 8 } },
-      React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 700, marginBottom: 6 } }, "Sets per Week"),
+      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 } },
+        React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 700 } }, "Sets per Week"),
+        (function() {
+          if (wData.length < 2) return null;
+          var trend = wData[wData.length - 1].val - wData[0].val;
+          var label = trend > 0 ? "↑ Progressing" : trend < 0 ? "↓ Tapering" : "→ Stable";
+          var color = trend > 0 ? C.grn : trend < 0 ? C.gld : C.mut;
+          return React.createElement("div", { style: { color: color, fontSize: 10, fontWeight: 700 } }, label);
+        })()
+      ),
       React.createElement(BarsChart, { data: wData })
     ) : null,
     exNames.length ? React.createElement("div", null,
@@ -2129,7 +2149,7 @@ function ExerciseDetailView(props) {
   var sessionTops = Object.keys(bySession).map(function(sid) {
     var b = bySession[sid];
     var top = b.sets.reduce(function(m, s) { var e1rm = s.weight * (1 + s.reps / 30); return (m == null || e1rm > m.e1rm) ? { weight: s.weight, reps: s.reps, e1rm: e1rm } : m; }, null);
-    return { sessionId: sid, date: b.date, mesoNote: b.mesoNote, week: b.week, top: top };
+    return { sessionId: sid, date: b.date, mesoNote: b.mesoNote, week: b.week, top: top, setCount: b.sets.length };
   }).sort(function(a, b) { return a.date < b.date ? -1 : 1; });
   var mesoColors = [C.blu, C.gld, C.grn, C.red, C.pur, C.org, C.teal];
   var mesoNoteOrder = ["Meso 0","Meso 1","Meso 2","Meso 3","Meso 4","Meso 5"];
@@ -2137,34 +2157,45 @@ function ExerciseDetailView(props) {
   var seriesByMeso = {};
   sessionTops.forEach(function(st) {
     var mid = st.mesoNote || "none";
-    if (!seriesByMeso[mid]) seriesByMeso[mid] = { mid: mid, points: [] };
+    if (!seriesByMeso[mid]) seriesByMeso[mid] = { points: [] };
     seriesByMeso[mid].points.push({ date: st.date, val: +st.top.e1rm.toFixed(1) });
   });
   var strengthSeries = Object.keys(seriesByMeso).map(function(mid) { return { label: mid === "none" ? "Other" : mid, color: mesoColor(mid), points: seriesByMeso[mid].points }; });
+  var volSeries = sessionTops.map(function(st) { return { date: st.date, val: st.setCount }; });
   var latest = sessionTops.length ? sessionTops[sessionTops.length - 1] : null;
   var first = sessionTops.length ? sessionTops[0] : null;
   var pct = first && latest && first.top.e1rm > 0 ? Math.round((latest.top.e1rm / first.top.e1rm - 1) * 100) : 0;
+  var bestSet = exSets.reduce(function(m, s) { return (m == null || s.weight > m.weight || (s.weight === m.weight && s.reps > m.reps)) ? s : m; }, null);
+  var avgSets = sessionTops.length ? (exSets.length / sessionTops.length).toFixed(1) : "—";
   return React.createElement("div", null,
     React.createElement(BackBtn, { onClick: props.onBack }),
     React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: 14, marginBottom: 10 } },
-      React.createElement("div", { style: { color: C.txt, fontSize: 15, fontWeight: 800, marginBottom: 6 } }, exName),
-      latest ? React.createElement("div", { style: { display: "flex", alignItems: "baseline", gap: 8 } },
-        React.createElement("div", { style: { color: C.blu, fontSize: 28, fontWeight: 800, lineHeight: 1 } }, latest.top.e1rm.toFixed(0)),
+      React.createElement("div", { style: { color: C.txt, fontSize: 15, fontWeight: 800, marginBottom: 8 } }, exName),
+      latest ? React.createElement("div", { style: { display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 } },
+        React.createElement("div", { style: { color: C.blu, fontSize: 32, fontWeight: 800, lineHeight: 1 } }, latest.top.e1rm.toFixed(0)),
         React.createElement("div", { style: { color: C.mut, fontSize: 13 } }, "lb e1RM"),
-        pct !== 0 ? React.createElement("div", { style: { color: pct > 0 ? C.grn : C.red, fontSize: 14, fontWeight: 700 } }, (pct > 0 ? "+" : "") + pct + "%") : null
+        pct !== 0 ? React.createElement("div", { style: { color: pct > 0 ? C.grn : C.red, fontSize: 16, fontWeight: 700 } }, (pct > 0 ? "+" : "") + pct + "%") : null
+      ) : null,
+      React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 } },
+        React.createElement("div", { style: { background: C.c2, borderRadius: 8, padding: "6px 8px", textAlign: "center" } }, React.createElement("div", { style: { color: C.mut, fontSize: 9, textTransform: "uppercase" } }, "Sessions"), React.createElement("div", { style: { color: C.txt, fontSize: 15, fontWeight: 700 } }, sessionTops.length)),
+        React.createElement("div", { style: { background: C.c2, borderRadius: 8, padding: "6px 8px", textAlign: "center" } }, React.createElement("div", { style: { color: C.mut, fontSize: 9, textTransform: "uppercase" } }, "Total Sets"), React.createElement("div", { style: { color: C.txt, fontSize: 15, fontWeight: 700 } }, exSets.length)),
+        React.createElement("div", { style: { background: C.c2, borderRadius: 8, padding: "6px 8px", textAlign: "center" } }, React.createElement("div", { style: { color: C.mut, fontSize: 9, textTransform: "uppercase" } }, "Avg/Sess"), React.createElement("div", { style: { color: C.txt, fontSize: 15, fontWeight: 700 } }, avgSets))
+      ),
+      bestSet ? React.createElement("div", { style: { marginTop: 8, paddingTop: 8, borderTop: "1px solid " + C.bdr, display: "flex", justifyContent: "space-between", alignItems: "center" } },
+        React.createElement("div", { style: { color: C.mut, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 } }, "Best Set"),
+        React.createElement("div", { style: { color: C.gld, fontSize: 12, fontWeight: 700 } }, bestSet.weight + " lb × " + bestSet.reps + " · " + fmtShortDate(bestSet.date))
       ) : null
     ),
     strengthSeries.length ? React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10, marginBottom: 8 } },
       React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 700, marginBottom: 6 } }, "e1RM Trend"),
       React.createElement(MultiSeriesChart, { series: strengthSeries, markerDate: META_MESO_START }),
       strengthSeries.length > 1 ? React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 } },
-        strengthSeries.map(function(s, i) {
-          return React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 4 } },
-            React.createElement("div", { style: { width: 10, height: 2, background: s.color, borderRadius: 1 } }),
-            React.createElement("div", { style: { color: C.mut, fontSize: 10 } }, s.label)
-          );
-        })
+        strengthSeries.map(function(s, i) { return React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 4 } }, React.createElement("div", { style: { width: 10, height: 2, background: s.color, borderRadius: 1 } }), React.createElement("div", { style: { color: C.mut, fontSize: 10 } }, s.label)); })
       ) : null
+    ) : null,
+    volSeries.length > 1 ? React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10, marginBottom: 8 } },
+      React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 700, marginBottom: 6 } }, "Sets per Session"),
+      React.createElement(TrendChart, { data: volSeries, color: C.pur, unit: " sets", markerDate: META_MESO_START })
     ) : null,
     React.createElement("div", { style: { color: C.mut, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, marginTop: 4 } }, "Sessions (" + sessionTops.length + ")"),
     sessionTops.slice().reverse().map(function(st, i) {
@@ -2172,7 +2203,7 @@ function ExerciseDetailView(props) {
       return React.createElement("div", { key: i, onClick: sess ? function() { props.onSession(sess); } : undefined, style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 6px", borderBottom: "1px solid " + C.bdr, cursor: sess ? "pointer" : "default" } },
         React.createElement("div", null,
           React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 600 } }, fmtShortDate(st.date)),
-          React.createElement("div", { style: { color: C.mut, fontSize: 10 } }, (st.mesoNote || "—") + (st.week != null ? " · W" + st.week : ""))
+          React.createElement("div", { style: { color: C.mut, fontSize: 10 } }, (st.mesoNote || "—") + (st.week != null ? " · W" + st.week : "") + " · " + st.setCount + " sets")
         ),
         React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
           React.createElement("div", { style: { textAlign: "right" } },
@@ -2218,68 +2249,91 @@ function PerformanceView() {
   var curMesoSessions = sessions.filter(function(s) { return curMesoNote && ((s.notes || "").match(/^(Meso \d+)/) || [])[1] === curMesoNote; });
   var curMesoSets = annotatedSets.filter(function(s) { return curMesoNote && s.mesoNote === curMesoNote; });
   var curMesoVolume = curMesoSets.reduce(function(sm, s) { return sm + (s.weight / (s.cableRatio || 1)) * s.reps; }, 0);
+  var curMesoEx = (function() { var ex = {}; curMesoSets.forEach(function(s) { ex[s.exName] = true; }); return Object.keys(ex).length; })();
   var weekSets = annotatedSets.filter(function(s) { return curWeek != null && s.week === curWeek && s.mesoNote === curMesoNote; });
   var volByMG = {};
   weekSets.forEach(function(s) { if (!s.muscleGroup) return; volByMG[s.muscleGroup] = (volByMG[s.muscleGroup] || 0) + 1; });
-  var volBars = Object.keys(lmByMG).sort().map(function(mg) {
+  var allMGKeys = (function() { var k = {}; Object.keys(lmByMG).forEach(function(m) { k[m] = true; }); weekSets.forEach(function(s) { if (s.muscleGroup) k[s.muscleGroup] = true; }); return Object.keys(k).sort(); })();
+  var mgPills = allMGKeys.map(function(mg) {
+    var lm = lmByMG[mg], v = volByMG[mg] || 0;
+    var color = v === 0 ? C.mut : (!lm ? C.blu : v < (lm.mev_sets || 0) ? C.red : v <= (lm.mav_sets || 99) ? C.grn : v <= (lm.mrv_sets || 99) ? C.gld : C.red);
+    return { label: mg, val: v, color: color };
+  }).filter(function(p) { return p.val > 0 || lmByMG[p.label]; });
+  var exSessMap = {};
+  annotatedSets.forEach(function(s) {
+    if (!exSessMap[s.exName]) exSessMap[s.exName] = {};
+    if (!exSessMap[s.exName][s.sessionId]) exSessMap[s.exName][s.sessionId] = { date: s.date, topE1rm: 0 };
+    var e1rm = s.weight * (1 + s.reps / 30);
+    if (e1rm > exSessMap[s.exName][s.sessionId].topE1rm) exSessMap[s.exName][s.sessionId].topE1rm = e1rm;
+  });
+  var topLifts = Object.keys(exSessMap).map(function(n) {
+    var arr = Object.keys(exSessMap[n]).map(function(k) { return exSessMap[n][k]; }).sort(function(a, b) { return a.date < b.date ? -1 : 1; });
+    var first = arr[0], last = arr[arr.length - 1];
+    var pct = first && first.topE1rm > 0 ? Math.round((last.topE1rm / first.topE1rm - 1) * 100) : 0;
+    return { name: n, e1rm: last.topE1rm, lastDate: last.date, pct: pct, spark: arr.map(function(s) { return { val: +s.topE1rm.toFixed(0) }; }) };
+  }).sort(function(a, b) { return a.lastDate < b.lastDate ? 1 : -1; });
+  var volBars = allMGKeys.map(function(mg) {
     var lm = lmByMG[mg], v = volByMG[mg] || 0, color = C.mut;
     if (lm) { if (v < (lm.mev_sets || 0)) color = C.red; else if (v <= (lm.mav_sets || 99)) color = C.grn; else if (v <= (lm.mrv_sets || 99)) color = C.gld; else color = C.red; }
     return { label: mg, val: v, color: color, unit: " sets" };
   }).filter(function(b) { return b.val > 0 || lmByMG[b.label]; });
-  var exSessMap = {};
-  annotatedSets.forEach(function(s) {
-    if (!exSessMap[s.exName]) exSessMap[s.exName] = {};
-    var key = s.sessionId;
-    if (!exSessMap[s.exName][key]) exSessMap[s.exName][key] = { date: s.date, topE1rm: 0 };
-    var e1rm = s.weight * (1 + s.reps / 30);
-    if (e1rm > exSessMap[s.exName][key].topE1rm) exSessMap[s.exName][key].topE1rm = e1rm;
-  });
-  var topLifts = Object.keys(exSessMap).map(function(n) {
-    var sessArr = Object.keys(exSessMap[n]).map(function(k) { return exSessMap[n][k]; }).sort(function(a, b) { return a.date < b.date ? -1 : 1; });
-    var first = sessArr[0], last = sessArr[sessArr.length - 1];
-    var pct = first && first.topE1rm > 0 ? Math.round((last.topE1rm / first.topE1rm - 1) * 100) : 0;
-    return { name: n, e1rm: last.topE1rm, lastDate: last.date, pct: pct };
-  }).sort(function(a, b) { return a.lastDate < b.lastDate ? 1 : -1; });
   var recentSessions = sessions.slice().sort(function(a, b) { return a.date < b.date ? 1 : -1; });
   return React.createElement("div", null,
     curMesoNote ? React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: 14, marginBottom: 10 } },
-      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 } },
-        React.createElement("div", { style: { color: C.txt, fontSize: 14, fontWeight: 800 } }, curMesoNote),
-        curWeek != null ? React.createElement("div", { style: { color: C.mut, fontSize: 11 } }, "Week " + curWeek) : null
+      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 } },
+        React.createElement("div", null,
+          React.createElement("div", { style: { color: C.txt, fontSize: 16, fontWeight: 800 } }, curMesoNote),
+          curWeek != null ? React.createElement("div", { style: { color: C.mut, fontSize: 11, marginTop: 2 } }, "Week " + curWeek) : null
+        ),
+        React.createElement("div", { style: { textAlign: "right" } },
+          React.createElement("div", { style: { color: C.gld, fontSize: 22, fontWeight: 800, lineHeight: 1 } }, (curMesoVolume / 1000).toFixed(1) + "k"),
+          React.createElement("div", { style: { color: C.mut, fontSize: 9, marginTop: 2 } }, "true volume")
+        )
       ),
-      React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 } },
-        React.createElement("div", { style: { background: C.c2, borderRadius: 8, padding: "6px 8px" } }, React.createElement("div", { style: { color: C.mut, fontSize: 9, textTransform: "uppercase" } }, "Sessions"), React.createElement("div", { style: { color: C.txt, fontSize: 15, fontWeight: 700, marginTop: 2 } }, curMesoSessions.length)),
-        React.createElement("div", { style: { background: C.c2, borderRadius: 8, padding: "6px 8px" } }, React.createElement("div", { style: { color: C.mut, fontSize: 9, textTransform: "uppercase" } }, "Sets"), React.createElement("div", { style: { color: C.txt, fontSize: 15, fontWeight: 700, marginTop: 2 } }, curMesoSets.length)),
-        React.createElement("div", { style: { background: C.c2, borderRadius: 8, padding: "6px 8px" } }, React.createElement("div", { style: { color: C.mut, fontSize: 9, textTransform: "uppercase" } }, "Volume"), React.createElement("div", { style: { color: C.gld, fontSize: 15, fontWeight: 700, marginTop: 2 } }, (curMesoVolume / 1000).toFixed(1) + "k"))
+      React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 } },
+        React.createElement("div", { style: { background: C.c2, borderRadius: 8, padding: "6px 8px", textAlign: "center" } }, React.createElement("div", { style: { color: C.mut, fontSize: 9, textTransform: "uppercase" } }, "Sessions"), React.createElement("div", { style: { color: C.txt, fontSize: 17, fontWeight: 700 } }, curMesoSessions.length)),
+        React.createElement("div", { style: { background: C.c2, borderRadius: 8, padding: "6px 8px", textAlign: "center" } }, React.createElement("div", { style: { color: C.mut, fontSize: 9, textTransform: "uppercase" } }, "Sets"), React.createElement("div", { style: { color: C.txt, fontSize: 17, fontWeight: 700 } }, curMesoSets.length)),
+        React.createElement("div", { style: { background: C.c2, borderRadius: 8, padding: "6px 8px", textAlign: "center" } }, React.createElement("div", { style: { color: C.mut, fontSize: 9, textTransform: "uppercase" } }, "Exercises"), React.createElement("div", { style: { color: C.txt, fontSize: 17, fontWeight: 700 } }, curMesoEx))
       )
     ) : null,
-    React.createElement("div", { style: { marginBottom: 10 } },
-      React.createElement("div", { style: { color: C.mut, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 } }, "Top Lifts"),
-      topLifts.map(function(l) {
-        return React.createElement("div", { key: l.name, onClick: function() { push({ type: "exercise", exName: l.name }); }, style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 12px", background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, marginBottom: 6, cursor: "pointer" } },
-          React.createElement("div", { style: { flex: 1, minWidth: 0, marginRight: 10 } },
-            React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, l.name),
-            React.createElement("div", { style: { color: C.mut, fontSize: 10, marginTop: 2 } }, fmtShortDate(l.lastDate))
-          ),
-          React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } },
-            React.createElement("div", { style: { textAlign: "right" } },
-              React.createElement("div", { style: { color: C.blu, fontSize: 13, fontWeight: 700 } }, l.e1rm.toFixed(0) + " lb"),
-              l.pct !== 0 ? React.createElement("div", { style: { color: l.pct > 0 ? C.grn : C.red, fontSize: 10 } }, (l.pct > 0 ? "+" : "") + l.pct + "%") : null
-            ),
-            React.createElement("div", { style: { color: C.mut, fontSize: 16 } }, "›")
-          )
-        );
-      })
-    ),
-    React.createElement("div", { style: { background: C.card, borderRadius: 10, padding: 10, marginBottom: 10 } },
-      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 } },
-        React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 700 } }, "This Week's Volume"),
-        React.createElement("div", { style: { color: C.mut, fontSize: 10 } }, (curWeek != null ? "W" + curWeek : "—") + (curMesoNote ? " · " + curMesoNote : ""))
+    mgPills.length ? React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: "10px 12px", marginBottom: 10 } },
+      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 } },
+        React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 700 } }, "This Week"),
+        React.createElement("div", { style: { color: C.mut, fontSize: 10 } }, curWeek != null ? "W" + curWeek + (curMesoNote ? " · " + curMesoNote : "") : "—")
       ),
-      React.createElement("div", { style: { display: "flex", gap: 12, marginBottom: 8, fontSize: 10 } },
-        React.createElement("div", null, React.createElement("span", { style: { color: C.red } }, "■ "), "< MEV"),
-        React.createElement("div", null, React.createElement("span", { style: { color: C.grn } }, "■ "), "MEV–MAV"),
-        React.createElement("div", null, React.createElement("span", { style: { color: C.gld } }, "■ "), "MAV–MRV")
+      React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 } },
+        mgPills.map(function(mg) {
+          return React.createElement("div", { key: mg.label, onClick: function() { push({ type: "mg", mg: mg.label }); }, style: { background: mg.color + "1a", border: "1px solid " + mg.color + "55", borderRadius: 20, padding: "4px 10px", display: "flex", alignItems: "center", gap: 5, cursor: "pointer" } },
+            React.createElement("span", { style: { color: mg.color, fontSize: 13, fontWeight: 800 } }, mg.val),
+            React.createElement("span", { style: { color: C.mut, fontSize: 10 } }, mg.label)
+          );
+        })
+      ),
+      React.createElement("div", { style: { display: "flex", gap: 10, flexWrap: "wrap" } },
+        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 3 } }, React.createElement("div", { style: { width: 7, height: 7, borderRadius: "50%", background: C.red } }), React.createElement("span", { style: { color: C.mut, fontSize: 9 } }, "< MEV")),
+        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 3 } }, React.createElement("div", { style: { width: 7, height: 7, borderRadius: "50%", background: C.grn } }), React.createElement("span", { style: { color: C.mut, fontSize: 9 } }, "MEV–MAV")),
+        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 3 } }, React.createElement("div", { style: { width: 7, height: 7, borderRadius: "50%", background: C.gld } }), React.createElement("span", { style: { color: C.mut, fontSize: 9 } }, "MAV–MRV"))
+      )
+    ) : null,
+    topLifts.length ? React.createElement("div", { style: { marginBottom: 10 } },
+      React.createElement("div", { style: { color: C.mut, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 } }, "Strength Progress"),
+      React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 } },
+        topLifts.map(function(l) {
+          var sc = l.pct >= 0 ? C.grn : C.red;
+          return React.createElement("div", { key: l.name, onClick: function() { push({ type: "exercise", exName: l.name }); }, style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10, cursor: "pointer" } },
+            React.createElement("div", { style: { color: C.txt, fontSize: 10, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 4 } }, l.name),
+            React.createElement("div", { style: { color: C.blu, fontSize: 20, fontWeight: 800, lineHeight: 1 } }, l.e1rm.toFixed(0)),
+            React.createElement("div", { style: { color: C.mut, fontSize: 9 } }, "lb e1RM"),
+            l.pct !== 0 ? React.createElement("div", { style: { color: sc, fontSize: 10, fontWeight: 700, marginTop: 2 } }, (l.pct > 0 ? "+" : "") + l.pct + "% overall") : React.createElement("div", { style: { height: 14 } }),
+            React.createElement(SparkLine, { data: l.spark, color: sc, width: 100, height: 28 })
+          );
+        })
+      )
+    ) : null,
+    React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10, marginBottom: 10 } },
+      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 } },
+        React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 700 } }, "Volume vs Targets"),
+        React.createElement("div", { style: { color: C.mut, fontSize: 10 } }, "Tap to drill in")
       ),
       React.createElement(BarsChart, { data: volBars, onBar: function(d) { push({ type: "mg", mg: d.label }); } })
     ),
@@ -2288,20 +2342,22 @@ function PerformanceView() {
       recentSessions.map(function(sess) {
         var sessSets = annotatedSets.filter(function(s) { return s.sessionId === sess.id; });
         var vol = sessSets.reduce(function(sm, s) { return sm + (s.weight / (s.cableRatio || 1)) * s.reps; }, 0);
-        var exSeen = {}, exNames = [];
-        sessSets.forEach(function(s) { if (!exSeen[s.exName]) { exSeen[s.exName] = true; exNames.push(s.exName); } });
+        var exSeen = {}, exArr = [];
+        sessSets.forEach(function(s) { if (!exSeen[s.exName]) { exSeen[s.exName] = true; exArr.push(s.exName); } });
+        var sessWeek = sess.week_number;
         return React.createElement("div", { key: sess.id, onClick: function() { push({ type: "session", session: sess }); }, style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 12, marginBottom: 6, cursor: "pointer" } },
           React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" } },
-            React.createElement("div", { style: { flex: 1, minWidth: 0, marginRight: 8 } },
-              React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 700 } }, sess.notes || fmtShortDate(sess.date)),
-              React.createElement("div", { style: { color: C.mut, fontSize: 10, marginTop: 2 } }, fmtShortDate(sess.date))
+            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
+              React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, sess.notes || fmtShortDate(sess.date)),
+              React.createElement("div", { style: { color: C.mut, fontSize: 10, marginTop: 1 } }, fmtShortDate(sess.date) + (sessWeek != null ? " · W" + sessWeek : ""))
             ),
-            React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
-              vol > 0 ? React.createElement("div", { style: { color: C.gld, fontSize: 12, fontWeight: 700 } }, (vol / 1000).toFixed(1) + "k") : null,
-              React.createElement("div", { style: { color: C.mut, fontSize: 16 } }, "›")
-            )
+            React.createElement("div", { style: { color: C.mut, fontSize: 14, marginLeft: 8 } }, "›")
           ),
-          exNames.length ? React.createElement("div", { style: { color: C.mut, fontSize: 10, marginTop: 5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, exNames.slice(0, 5).join(" · ") + (exNames.length > 5 ? " +" + (exNames.length - 5) : "")) : null
+          React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, marginTop: 7 } },
+            React.createElement("div", null, React.createElement("span", { style: { color: C.txt, fontWeight: 700, fontSize: 12 } }, sessSets.length), React.createElement("span", { style: { color: C.mut, fontSize: 10 } }, " sets")),
+            vol > 0 ? React.createElement("div", null, React.createElement("span", { style: { color: C.gld, fontWeight: 700, fontSize: 12 } }, (vol / 1000).toFixed(1) + "k"), React.createElement("span", { style: { color: C.mut, fontSize: 10 } }, " vol")) : null,
+            exArr.length ? React.createElement("div", { style: { color: C.mut, fontSize: 10, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, exArr.slice(0, 3).join(" ·") + (exArr.length > 3 ? " +" + (exArr.length - 3) : "")) : null
+          )
         );
       })
     )
