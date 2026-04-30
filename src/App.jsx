@@ -2743,7 +2743,7 @@ function PerformanceView() {
     var lm = lmByMG[mg], v = volByMG[mg] || 0;
     var color = v === 0 ? C.mut : (!lm ? C.blu : v < (lm.mev_sets || 0) ? C.red : v <= (lm.mav_sets || 99) ? C.grn : v <= (lm.mrv_sets || 99) ? C.gld : C.red);
     return { label: mg, val: v, color: color };
-  }).filter(function(p) { return p.val > 0 || lmByMG[p.label]; });
+  }).filter(function(p) { return p.val > 0; });
   var exSessMap = {};
   annotatedSets.forEach(function(s) {
     if (!exSessMap[s.exName]) exSessMap[s.exName] = { mg: s.muscleGroup, sessions: {} };
@@ -2762,10 +2762,13 @@ function PerformanceView() {
   var liftsByMG = {};
   topLifts.forEach(function(l) { var k = l.mg || "Other"; if (!liftsByMG[k]) liftsByMG[k] = []; liftsByMG[k].push(l); });
   var liftMGKeys = allMGKeys.filter(function(mg) { return liftsByMG[mg]; }).concat(liftsByMG["Other"] ? ["Other"] : []);
+  var mesoWeeksElapsed = curWeek || 1;
+  var mesoVolByMG = {};
+  curMesoSets.forEach(function(s) { if (!s.muscleGroup) return; mesoVolByMG[s.muscleGroup] = (mesoVolByMG[s.muscleGroup] || 0) + 1; });
   var volBars = allMGKeys.map(function(mg) {
-    var lm = lmByMG[mg], v = volByMG[mg] || 0, color = C.mut;
+    var lm = lmByMG[mg], total = mesoVolByMG[mg] || 0, v = Math.round(total / mesoWeeksElapsed), color = C.mut;
     if (lm) { if (v < (lm.mev_sets || 0)) color = C.red; else if (v <= (lm.mav_sets || 99)) color = C.grn; else if (v <= (lm.mrv_sets || 99)) color = C.gld; else color = C.red; }
-    return { label: mg, val: v, color: color, unit: " sets" };
+    return { label: mg, val: v, color: color, unit: " sets/wk" };
   }).filter(function(b) { return b.val > 0 || lmByMG[b.label]; });
   var recentSessions = sessions.filter(function(s) { return (s.sets || []).length > 0; }).sort(function(a, b) { return a.date < b.date ? 1 : -1; });
   return (
@@ -2937,10 +2940,10 @@ function PerformanceView() {
         <div
           style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
           <div style={{ color: C.txt, fontSize: 12, fontWeight: 700 }}>
-            Volume vs Targets
+            Avg Sets/Week vs Targets
           </div>
           <div style={{ color: C.mut, fontSize: 10 }}>
-            Tap to drill in
+            {curMesoNote ? "W1–W" + mesoWeeksElapsed + " avg · tap to drill" : "tap to drill"}
           </div>
         </div>
         <BarsChart data={volBars} onBar={function(d) { push({ type: "mg", mg: d.label }); }} />
