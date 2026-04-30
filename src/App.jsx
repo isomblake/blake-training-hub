@@ -1819,8 +1819,9 @@ function BarsChart(props) {
     ) : null,
     data.map(function(d, i) {
       var by = pad.t + i * 24 + 3, bw = ((d.val || 0) / maxV) * iw, color = d.color || C.blu;
-      return React.createElement("g", { key: i },
-        React.createElement("text", { x: pad.l - 6, y: by + 12, fill: C.txt, fontSize: 11, textAnchor: "end" }, d.label),
+      var cb = typeof props.onBar === "function";
+      return React.createElement("g", { key: i, onClick: cb ? (function(dd) { return function() { props.onBar(dd); }; })(d) : undefined, style: cb ? { cursor: "pointer" } : undefined },
+        React.createElement("text", { x: pad.l - 6, y: by + 12, fill: C.txt, fontSize: 11, textAnchor: "end", fontWeight: cb ? "600" : "normal" }, d.label),
         React.createElement("rect", { x: pad.l, y: by, width: bw, height: 16, fill: color, rx: 2 }),
         React.createElement("text", { x: pad.l + bw + 4, y: by + 12, fill: C.mut, fontSize: 10, textAnchor: "start" }, (d.val || 0).toFixed(d.dp == null ? 0 : d.dp) + (d.unit || ""))
       );
@@ -2000,9 +2001,116 @@ function ReadingDetailView(props) {
     )
   );
 }
+function BackBtn(props) {
+  return React.createElement("button", { onClick: props.onClick, style: { background: "transparent", border: "1px solid " + C.bdr, color: C.mut, fontSize: 12, borderRadius: 8, padding: "6px 14px", marginBottom: 12, cursor: "pointer" } }, "\u2190 Back");
+}
+function SessionDetailView(props) {
+  var session = props.session, allSets = props.allSets;
+  var sSets = allSets.filter(function(s) { return s.sessionId === session.id; }).sort(function(a, b) { return (a.set_number || 0) - (b.set_number || 0); });
+  var exOrder = [], byEx = {};
+  sSets.forEach(function(s) { if (!byEx[s.exId]) { byEx[s.exId] = { name: s.exName, sets: [] }; exOrder.push(s.exId); } byEx[s.exId].sets.push(s); });
+  var totalVol = sSets.reduce(function(sm, s) { return sm + s.weight * s.reps; }, 0);
+  return React.createElement("div", null,
+    React.createElement(BackBtn, { onClick: props.onBack }),
+    React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: 14, marginBottom: 10 } },
+      React.createElement("div", { style: { color: C.txt, fontSize: 15, fontWeight: 800, marginBottom: 4 } }, session.notes || fmtShortDate(session.date)),
+      React.createElement("div", { style: { color: C.mut, fontSize: 11, marginBottom: 10 } }, fmtShortDate(session.date) + (session.week_number != null ? " \u00b7 W" + session.week_number : "") + (session.rir != null ? " \u00b7 " + session.rir + " RIR" : "")),
+      React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 } },
+        React.createElement("div", { style: { background: C.c2, borderRadius: 8, padding: "6px 8px" } }, React.createElement("div", { style: { color: C.mut, fontSize: 9, textTransform: "uppercase" } }, "Exercises"), React.createElement("div", { style: { color: C.txt, fontSize: 15, fontWeight: 700, marginTop: 2 } }, exOrder.length)),
+        React.createElement("div", { style: { background: C.c2, borderRadius: 8, padding: "6px 8px" } }, React.createElement("div", { style: { color: C.mut, fontSize: 9, textTransform: "uppercase" } }, "Sets"), React.createElement("div", { style: { color: C.txt, fontSize: 15, fontWeight: 700, marginTop: 2 } }, sSets.length)),
+        React.createElement("div", { style: { background: C.c2, borderRadius: 8, padding: "6px 8px" } }, React.createElement("div", { style: { color: C.mut, fontSize: 9, textTransform: "uppercase" } }, "Volume"), React.createElement("div", { style: { color: C.gld, fontSize: 15, fontWeight: 700, marginTop: 2 } }, (totalVol / 1000).toFixed(1) + "k"))
+      )
+    ),
+    exOrder.map(function(exId) {
+      var ex = byEx[exId];
+      return React.createElement("div", { key: exId, style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 12, marginBottom: 8 } },
+        React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 700, marginBottom: 8 } }, ex.name),
+        React.createElement("table", { style: { width: "100%", fontSize: 11, borderCollapse: "collapse" } },
+          React.createElement("thead", null,
+            React.createElement("tr", { style: { color: C.mut, borderBottom: "1px solid " + C.bdr } },
+              React.createElement("th", { style: { padding: "3px 6px", textAlign: "center", fontWeight: 600 } }, "#"),
+              React.createElement("th", { style: { padding: "3px 6px", textAlign: "right", fontWeight: 600 } }, "Weight"),
+              React.createElement("th", { style: { padding: "3px 6px", textAlign: "right", fontWeight: 600 } }, "Reps"),
+              React.createElement("th", { style: { padding: "3px 6px", textAlign: "right", fontWeight: 600 } }, "e1RM")
+            )
+          ),
+          React.createElement("tbody", null,
+            ex.sets.map(function(s, si) {
+              var trueW = s.weight / (s.cableRatio || 1), e1rm = trueW * (1 + s.reps / 30);
+              return React.createElement("tr", { key: si, style: { borderBottom: "1px solid " + C.bdr } },
+                React.createElement("td", { style: { padding: "5px 6px", textAlign: "center", color: C.mut } }, si + 1),
+                React.createElement("td", { style: { padding: "5px 6px", textAlign: "right", color: C.txt, fontWeight: 600 } }, s.weight + " lb"),
+                React.createElement("td", { style: { padding: "5px 6px", textAlign: "right", color: C.grn } }, s.reps),
+                React.createElement("td", { style: { padding: "5px 6px", textAlign: "right", color: C.mut } }, e1rm.toFixed(0))
+              );
+            })
+          )
+        )
+      );
+    })
+  );
+}
+function MuscleGroupDetailView(props) {
+  var mg = props.mg, allSets = props.allSets, lmByMG = props.lmByMG;
+  var lm = lmByMG[mg] || null;
+  var mgSets = allSets.filter(function(s) { return s.muscleGroup === mg; });
+  var weekKeys = [], weekCounts = {};
+  mgSets.forEach(function(s) {
+    if (s.week == null) return;
+    var key = (s.mesoNote ? s.mesoNote.replace("Meso ", "M") : "?") + "-W" + s.week;
+    if (!weekCounts[key]) { weekCounts[key] = 0; weekKeys.push(key); }
+    weekCounts[key]++;
+  });
+  var wData = weekKeys.map(function(k) {
+    var v = weekCounts[k], col = C.mut;
+    if (lm) { if (v < (lm.mev_sets || 0)) col = C.red; else if (v <= (lm.mav_sets || 99)) col = C.grn; else if (v <= (lm.mrv_sets || 99)) col = C.gld; else col = C.red; }
+    return { label: k, val: v, color: col, unit: " sets" };
+  });
+  var exMap = {}, exNames = [];
+  mgSets.forEach(function(s) {
+    if (!exMap[s.exName]) { exMap[s.exName] = { topE1rm: 0, count: 0 }; exNames.push(s.exName); }
+    var trueW = s.weight / (s.cableRatio || 1), e1rm = trueW * (1 + s.reps / 30);
+    if (e1rm > exMap[s.exName].topE1rm) exMap[s.exName].topE1rm = e1rm;
+    exMap[s.exName].count++;
+  });
+  exNames = exNames.sort(function(a, b) { return exMap[b].topE1rm - exMap[a].topE1rm; });
+  function mini(label, val, color) {
+    return React.createElement("div", { style: { background: C.c2, borderRadius: 8, padding: "6px 8px" } },
+      React.createElement("div", { style: { color: C.mut, fontSize: 9, textTransform: "uppercase" } }, label),
+      React.createElement("div", { style: { color: color || C.txt, fontSize: 14, fontWeight: 700, marginTop: 2 } }, val != null ? String(val) : "\u2014")
+    );
+  }
+  return React.createElement("div", null,
+    React.createElement(BackBtn, { onClick: props.onBack }),
+    React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: 14, marginBottom: 10 } },
+      React.createElement("div", { style: { color: C.txt, fontSize: 16, fontWeight: 800, marginBottom: lm ? 10 : 0 } }, mg),
+      lm ? React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 } },
+        mini("MEV", lm.mev_sets, C.red), mini("MAV", lm.mav_sets, C.grn), mini("MRV", lm.mrv_sets, C.gld)
+      ) : null
+    ),
+    wData.length ? React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10, marginBottom: 8 } },
+      React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 700, marginBottom: 6 } }, "Sets per Week"),
+      React.createElement(BarsChart, { data: wData })
+    ) : null,
+    exNames.length ? React.createElement("div", null,
+      React.createElement("div", { style: { color: C.mut, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 } }, "Exercises (" + exNames.length + ")"),
+      exNames.map(function(n) {
+        var ex = exMap[n];
+        return React.createElement("div", { key: n, style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 6px", borderBottom: "1px solid " + C.bdr } },
+          React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 600 } }, n),
+          React.createElement("div", { style: { textAlign: "right" } },
+            React.createElement("div", { style: { color: C.blu, fontSize: 12, fontWeight: 700 } }, ex.topE1rm.toFixed(0) + " lb e1RM"),
+            React.createElement("div", { style: { color: C.mut, fontSize: 10 } }, ex.count + " sets")
+          )
+        );
+      })
+    ) : null
+  );
+}
 function PerformanceView() {
   var s1 = React.useState(null); var loaded = s1[0]; var setLoaded = s1[1];
   var s2 = React.useState(""); var selExName = s2[0]; var setSelExName = s2[1];
+  var s3 = React.useState(null); var drill = s3[0]; var setDrill = s3[1];
   React.useEffect(function() {
     Promise.all([db.getAllSets(), db.getAllSessions(), db.getAllExercises(), db.getVolumeLandmarks(), db.getAllMesocycles()])
       .then(function(arr) { setLoaded({ sets: arr[0] || [], sessions: arr[1] || [], exercises: arr[2] || [], landmarks: arr[3] || [], mesos: arr[4] || [] }); })
@@ -2037,7 +2145,7 @@ function PerformanceView() {
   var sessionTops = Object.keys(bySession).map(function(sid) {
     var b = bySession[sid];
     var top = b.sets.reduce(function(m, s) { var trueW = s.weight / (s.cableRatio || 1); var e1rm = trueW * (1 + s.reps / 30); return (m == null || e1rm > m.e1rm) ? { weight: s.weight, reps: s.reps, e1rm: e1rm } : m; }, null);
-    return { date: b.date, mesoId: b.mesoId, mesoNote: b.mesoNote, week: b.week, top: top };
+    return { sessionId: sid, date: b.date, mesoId: b.mesoId, mesoNote: b.mesoNote, week: b.week, top: top };
   }).sort(function(a, b) { return a.date < b.date ? -1 : 1; });
   var mesoColors = [C.blu, C.gld, C.grn, C.red, C.pur, C.org, C.teal];
   var mesoNoteOrder = ["Meso 0","Meso 1","Meso 2","Meso 3","Meso 4","Meso 5"];
@@ -2065,6 +2173,8 @@ function PerformanceView() {
   var byWeek = {};
   curMesoSessions.forEach(function(s) { if (s.week_number == null) return; if (!byWeek[s.week_number]) byWeek[s.week_number] = []; byWeek[s.week_number].push(s); });
   var rirRows = Object.keys(byWeek).sort().map(function(wn) { var ses = byWeek[wn], rir = ses[0] && ses[0].rir; return { week: "W" + wn, rir: rir, count: ses.length }; });
+  if (drill && drill.type === "session") return React.createElement(SessionDetailView, { session: drill.session, allSets: annotatedSets, onBack: function() { setDrill(null); } });
+  if (drill && drill.type === "mg") return React.createElement(MuscleGroupDetailView, { mg: drill.mg, allSets: annotatedSets, lmByMG: lmByMG, onBack: function() { setDrill(null); } });
   return React.createElement("div", null,
     React.createElement("div", { style: { background: C.card, borderRadius: 10, padding: 10, marginBottom: 8 } },
       React.createElement("div", { style: { color: C.mut, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 } }, "Exercise"),
@@ -2090,8 +2200,8 @@ function PerformanceView() {
     React.createElement("div", { style: { background: C.card, borderRadius: 10, padding: 10, marginBottom: 8 } },
       React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 700, marginBottom: 8 } }, selExName + " · Recent Sessions"),
       sessionTops.slice().reverse().slice(0, 12).map(function(st, i) {
-        var mesoLabel = st.mesoNote || "—";
-        return React.createElement("div", { key: i, style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid " + C.bdr } },
+        var mesoLabel = st.mesoNote || "\u2014";
+        return React.createElement("div", { key: i, onClick: function() { setDrill({ type: "session", session: sessById[st.sessionId] }); }, style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid " + C.bdr, cursor: "pointer" } },
           React.createElement("div", null, React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 600 } }, fmtShortDate(st.date)), React.createElement("div", { style: { color: C.mut, fontSize: 10 } }, mesoLabel + (st.week != null ? " · W" + st.week : ""))),
           React.createElement("div", { style: { textAlign: "right" } }, React.createElement("div", { style: { color: C.txt, fontSize: 13, fontWeight: 700 } }, st.top.weight + " × " + st.top.reps), React.createElement("div", { style: { color: mesoColor(st.mesoNote), fontSize: 10 } }, "e1RM " + st.top.e1rm.toFixed(0)))
         );
@@ -2108,7 +2218,7 @@ function PerformanceView() {
         React.createElement("div", null, React.createElement("span", { style: { color: C.gld } }, "■ "), "MAV–MRV"),
         React.createElement("div", null, React.createElement("span", { style: { color: C.red } }, "■ "), "> MRV")
       ),
-      React.createElement(BarsChart, { data: volBars })
+      React.createElement(BarsChart, { data: volBars, onBar: function(d) { setDrill({ type: "mg", mg: d.label }); } })
     ),
     rirRows.length ? React.createElement("div", { style: { background: C.card, borderRadius: 10, padding: 10, marginBottom: 8 } },
       React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 700, marginBottom: 8 } }, "RIR by Week"),
