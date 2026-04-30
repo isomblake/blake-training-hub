@@ -366,16 +366,27 @@ const db = {
   },
 
   // Log a set to the database
-  async logSet(sessionId, exerciseName, setNumber, reps, weight, band) {
-    // Find exercise ID
-    const { data: ex } = await supabase
+  async logSet(sessionId, exerciseName, setNumber, reps, weight, band, muscles) {
+    // Find exercise, auto-creating if missing so new meso exercises are never lost
+    let { data: ex } = await supabase
       .from('exercises')
       .select('id')
       .eq('name', exerciseName)
       .single();
 
     if (!ex) {
-      console.error('Exercise not found:', exerciseName);
+      const cableRatio = /^Cable /i.test(exerciseName) ? 2 : 1;
+      const muscleGroup = muscles ? muscles.split(/\s*[·,]\s*/)[0].trim() : null;
+      const { data: created } = await supabase
+        .from('exercises')
+        .insert({ name: exerciseName, cable_ratio: cableRatio, muscle_group: muscleGroup })
+        .select('id')
+        .single();
+      ex = created;
+    }
+
+    if (!ex) {
+      console.error('Exercise save failed:', exerciseName);
       return null;
     }
 
@@ -1325,7 +1336,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
     });
     // Store the latest weight so unlogged SetRows can pick it up
     if (data.wt !== undefined) lastWeightRef.current = data.wt;
-    onSync(ex.name, setNum, data.reps, data.wt, data.band);
+    onSync(ex.name, setNum, data.reps, data.wt, data.band, ex.muscles);
     const isLastSet = setNum >= totalSets;
     if (!(isLastExercise && isLastSet)) {
       onStartRest(wkData.deload ? Math.min(ex.rest, 75) : ex.rest, ex.name, setNum, totalSets);
@@ -2599,11 +2610,11 @@ export default function App() {
   }, [today, rKey, week, sessionKey]);
 
   // Sync a set to Supabase
-  const syncToDb = useCallback(async (exercise, setNum, reps, weight, band) => {
+  const syncToDb = useCallback(async (exercise, setNum, reps, weight, band, muscles) => {
     if (!currentSession) return;
     try {
       setSyncStatus("saving...");
-      await db.logSet(currentSession.id, exercise, setNum, reps, weight, band);
+      await db.logSet(currentSession.id, exercise, setNum, reps, weight, band, muscles);
       setSyncStatus("saved ✓");
       setTimeout(() => setSyncStatus(""), 2000);
     } catch (e) {
@@ -2704,7 +2715,9 @@ export default function App() {
   const logFromTimer = useCallback((exName, setNum, data, nextSetInfo, dismissTimer) => {
     const exKey = `${sessionKey}|${exName}`;
     setAllSets(prev => ({ ...prev, [exKey]: { ...(prev[exKey] || {}), [setNum]: data } }));
-    syncToDb(exName, setNum, data.reps, data.wt, data.band);
+    const allExercisesForSync = r.sections.flatMap(sec => sec.exercises);
+    const curExForSync = allExercisesForSync.find(ex => ex.name === exName);
+    syncToDb(exName, setNum, data.reps, data.wt, data.band, curExForSync ? curExForSync.muscles : null);
 
     // Start rest timer for next set — unless this is the final set of the session
     if (nextSetInfo) {
