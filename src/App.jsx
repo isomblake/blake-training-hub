@@ -2204,17 +2204,26 @@ function RecoveryView() {
 function CompareView() {
   var s1 = React.useState(null); var loaded = s1[0]; var setLoaded = s1[1];
   React.useEffect(function() {
-    Promise.all([db.getAllSets(), db.getAllSessions(), db.getAllExercises(), db.getAllMesocycles(), db.getBodyCompHistory(500)])
-      .then(function(arr) { setLoaded({ sets: arr[0] || [], sessions: arr[1] || [], exercises: arr[2] || [], mesos: arr[3] || [], body: arr[4] || [] }); })
-      .catch(function() { setLoaded({ sets: [], sessions: [], exercises: [], mesos: [], body: [] }); });
+    Promise.all([db.getAllSets(), db.getAllSessions(), db.getAllExercises(), db.getHealthDaily(800)])
+      .then(function(arr) { setLoaded({ sets: arr[0] || [], sessions: arr[1] || [], exercises: arr[2] || [], body: arr[3] || [] }); })
+      .catch(function() { setLoaded({ sets: [], sessions: [], exercises: [], body: [] }); });
   }, []);
   if (!loaded) return React.createElement("div", { style: { padding: 32, textAlign: "center", color: C.mut } }, "Loading…");
-  if (loaded.mesos.length === 0) return React.createElement("div", { style: { padding: 32, textAlign: "center", color: C.mut } }, "No mesocycles yet.");
   var exById = {}; loaded.exercises.forEach(function(e) { exById[e.id] = e; });
-  var mesoById = {}; loaded.mesos.forEach(function(m) { mesoById[m.id] = m; });
-  var perMeso = loaded.mesos.map(function(m) {
-    var mNum = (m.name.match(/(\d+)/) || [])[1];
-    var mSessions = loaded.sessions.filter(function(s) { var sNum = ((s.notes || "").match(/Meso (\d+)/) || [])[1]; return sNum && mNum && sNum === mNum; });
+  var mesoOrderMap = {}, mesoSessionsMap = {};
+  loaded.sessions.forEach(function(s) {
+    var mn = ((s.notes || "").match(/^(Meso \d+)/) || [])[1] || "Other";
+    if (!mesoSessionsMap[mn]) { mesoSessionsMap[mn] = []; mesoOrderMap[mn] = true; }
+    mesoSessionsMap[mn].push(s);
+  });
+  var mesoKeys = Object.keys(mesoOrderMap).sort(function(a, b) {
+    if (a === "Other") return 1; if (b === "Other") return -1;
+    return parseInt((a.match(/\d+/) || [0])[0]) - parseInt((b.match(/\d+/) || [0])[0]);
+  });
+  if (mesoKeys.length === 0) return React.createElement("div", { style: { padding: 32, textAlign: "center", color: C.mut } }, "No sessions yet.");
+  var ascBody = loaded.body.filter(function(r) { return r.weight_kg != null || r.body_fat_pct != null; }).slice().sort(function(a, b) { return a.date < b.date ? -1 : 1; });
+  var perMeso = mesoKeys.map(function(mn) {
+    var mSessions = mesoSessionsMap[mn].slice().sort(function(a, b) { return a.date < b.date ? -1 : 1; });
     var mSessIds = {}; mSessions.forEach(function(s) { mSessIds[s.id] = true; });
     var mSets = loaded.sets.filter(function(s) { return mSessIds[s.session_id]; });
     var totalVolume = 0, topByEx = {}, mgVol = {};
@@ -2227,15 +2236,12 @@ function CompareView() {
       if (!topByEx[ex.name] || e1rm > topByEx[ex.name].e1rm) topByEx[ex.name] = { e1rm: e1rm, weight: w, reps: r };
       if (ex.muscle_group) mgVol[ex.muscle_group] = (mgVol[ex.muscle_group] || 0) + 1;
     });
+    var startDate = mSessions[0].date, endDate = mSessions[mSessions.length - 1].date;
     var startBC = null, endBC = null;
-    if (m.start_date) {
-      var ascB = loaded.body.slice().sort(function(a, b) { return a.date < b.date ? -1 : 1; });
-      for (var i = 0; i < ascB.length; i++) { if (ascB[i].date >= m.start_date) { startBC = deriveBodyComp(ascB[i]); break; } }
-      var endRef = m.end_date || (mSessions.length ? mSessions[mSessions.length - 1].date : null);
-      if (endRef) { for (var j = ascB.length - 1; j >= 0; j--) { if (ascB[j].date <= endRef) { endBC = deriveBodyComp(ascB[j]); break; } } }
-    }
-    return { meso: m, sessions: mSessions.length, sets: mSets.length, totalVolume: totalVolume, topByEx: topByEx, mgVol: mgVol, startBC: startBC, endBC: endBC };
-  }).filter(function(pm) { return pm.sessions > 0; });
+    for (var i = 0; i < ascBody.length; i++) { if (ascBody[i].date >= startDate) { startBC = deriveBodyComp(ascBody[i]); break; } }
+    for (var j = ascBody.length - 1; j >= 0; j--) { if (ascBody[j].date <= endDate) { endBC = deriveBodyComp(ascBody[j]); break; } }
+    return { mesoNote: mn, sessions: mSessions.length, sets: mSets.length, totalVolume: totalVolume, topByEx: topByEx, mgVol: mgVol, startBC: startBC, endBC: endBC, startDate: startDate, endDate: endDate };
+  });
   function deltaCell(curV, prevV, unit, dp, betterDir) {
     var d = curV != null && prevV != null ? curV - prevV : null, dpx = dp == null ? 1 : dp, color = C.mut;
     if (d != null && Math.abs(d) > 0.001) color = betterDir === "up" ? (d > 0 ? C.grn : C.red) : betterDir === "down" ? (d < 0 ? C.grn : C.red) : C.mut;
@@ -2248,10 +2254,10 @@ function CompareView() {
     perMeso.map(function(pm, idx) {
       var prev = idx > 0 ? perMeso[idx - 1] : null, prevTopByEx = prev ? prev.topByEx : {};
       var topExNames = Object.keys(pm.topByEx).sort(function(a, b) { return (pm.topByEx[b].e1rm || 0) - (pm.topByEx[a].e1rm || 0); }).slice(0, 6);
-      return React.createElement("div", { key: pm.meso.id, style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: 14, marginBottom: 10 } },
+      return React.createElement("div", { key: pm.mesoNote, style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: 14, marginBottom: 10 } },
         React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 } },
-          React.createElement("div", { style: { color: C.txt, fontSize: 13, fontWeight: 800 } }, pm.meso.name),
-          React.createElement("div", { style: { color: C.mut, fontSize: 10 } }, (pm.meso.start_date || "?") + " → " + (pm.meso.end_date || "ongoing"))
+          React.createElement("div", { style: { color: C.txt, fontSize: 13, fontWeight: 800 } }, pm.mesoNote),
+          React.createElement("div", { style: { color: C.mut, fontSize: 10 } }, pm.startDate + " → " + pm.endDate)
         ),
         React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 } },
           React.createElement("div", null, React.createElement("div", { style: { color: C.mut, fontSize: 9 } }, "Sessions"), React.createElement("div", { style: { color: C.txt, fontSize: 14, fontWeight: 700 } }, pm.sessions)),
@@ -2261,10 +2267,10 @@ function CompareView() {
         pm.startBC && pm.endBC ? React.createElement("div", { style: { borderTop: "1px solid " + C.bdr, paddingTop: 8, marginTop: 4, marginBottom: 8 } },
           React.createElement("div", { style: { color: C.mut, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 } }, "Body Comp"),
           React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 4 } },
-            React.createElement("div", null, React.createElement("div", { style: { color: C.mut, fontSize: 9 } }, "Weight"), deltaCell(pm.endBC.weight, pm.startBC.weight, " lb", 1, "down")),
+            React.createElement("div", null, React.createElement("div", { style: { color: C.mut, fontSize: 9 } }, "Weight"), deltaCell(pm.endBC.weight, pm.startBC.weight, "lb", 1, "down")),
             React.createElement("div", null, React.createElement("div", { style: { color: C.mut, fontSize: 9 } }, "BF%"), deltaCell(pm.endBC.bf, pm.startBC.bf, "%", 1, "down")),
-            React.createElement("div", null, React.createElement("div", { style: { color: C.mut, fontSize: 9 } }, "Lean"), deltaCell(pm.endBC.lean, pm.startBC.lean, " lb", 1, "up")),
-            React.createElement("div", null, React.createElement("div", { style: { color: C.mut, fontSize: 9 } }, "Fat"), deltaCell(pm.endBC.fat, pm.startBC.fat, " lb", 1, "down"))
+            React.createElement("div", null, React.createElement("div", { style: { color: C.mut, fontSize: 9 } }, "Lean"), deltaCell(pm.endBC.lean, pm.startBC.lean, "lb", 1, "up")),
+            React.createElement("div", null, React.createElement("div", { style: { color: C.mut, fontSize: 9 } }, "Fat"), deltaCell(pm.endBC.fat, pm.startBC.fat, "lb", 1, "down"))
           )
         ) : null,
         topExNames.length ? React.createElement("div", { style: { borderTop: "1px solid " + C.bdr, paddingTop: 8 } },
