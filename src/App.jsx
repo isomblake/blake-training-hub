@@ -2305,20 +2305,22 @@ function ReadingDetailView(props) {
 }
 function SparkLine(props) {
   var data = (props.data || []).filter(function(d) { return d != null && d.val != null; });
-  var w = props.width || 80, h = props.height || 30, color = props.color || C.blu;
-  if (data.length < 2) return <div style={{ width: w, height: h }} />;
+  var full = props.full, w = props.width || 80, h = props.height || 30, color = props.color || C.blu;
+  if (data.length < 2) return <div style={{ width: full ? "100%" : w, height: h }} />;
   var vals = data.map(function(d) { return d.val; });
   var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals), rng = mx - mn || 1;
-  var pts = data.map(function(d, i) { return ((i / (data.length - 1)) * (w - 4) + 2).toFixed(1) + "," + (h - 2 - ((d.val - mn) / rng) * (h - 6)).toFixed(1); });
+  var vw = 100, pts = data.map(function(d, i) { return ((i / (data.length - 1)) * (vw - 4) + 2).toFixed(1) + "," + (h - 2 - ((d.val - mn) / rng) * (h - 6)).toFixed(1); });
+  if (full) {
+    return (
+      <svg viewBox={"0 0 " + vw + " " + h} preserveAspectRatio="none" width="100%" height={h} style={{ display: "block", marginTop: 6 }}>
+        <polyline points={pts.join(" ")} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  var fixPts = data.map(function(d, i) { return ((i / (data.length - 1)) * (w - 4) + 2).toFixed(1) + "," + (h - 2 - ((d.val - mn) / rng) * (h - 6)).toFixed(1); });
   return (
     <svg width={w} height={h} style={{ display: "block", marginTop: 6 }}>
-      <polyline
-        points={pts.join(" ")}
-        fill="none"
-        stroke={color}
-        strokeWidth={1.5}
-        strokeLinejoin="round"
-        strokeLinecap="round" />
+      <polyline points={fixPts.join(" ")} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
     </svg>
   );
 }
@@ -2686,6 +2688,7 @@ function ExerciseDetailView(props) {
 function PerformanceView() {
   var s1 = React.useState(null); var loaded = s1[0]; var setLoaded = s1[1];
   var s2 = React.useState([]); var navStack = s2[0]; var setNavStack = s2[1];
+  var s3 = React.useState(null); var expandedEx = s3[0]; var setExpandedEx = s3[1];
   React.useEffect(function() {
     Promise.all([db.getRecentSessions(1000), db.getVolumeLandmarks()])
       .then(function(arr) { setLoaded({ sessions: arr[0] || [], landmarks: arr[1] || [] }); })
@@ -2768,7 +2771,7 @@ function PerformanceView() {
   return (
     <div>
       {curMesoNote ? <div
-        style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: 14, marginBottom: 10 }}>
+        style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: "10px 12px", marginBottom: 10 }}>
         <div
           style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
           <div>
@@ -2885,8 +2888,32 @@ function PerformanceView() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
                 {exList.map(function(l) {
                   var sc = l.pct >= 0 ? C.grn : C.red;
+                  var isExpanded = expandedEx === l.name;
+                  if (isExpanded) {
+                    return (
+                      <div key={l.name} style={{ gridColumn: "1 / -1", background: C.card, border: "1px solid " + C.blu + "55", borderRadius: 10, padding: "10px 10px 8px", cursor: "pointer" }}
+                        onClick={function() { setExpandedEx(null); }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                          <div style={{ color: C.txt, fontSize: 11, fontWeight: 700, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {l.name}
+                          </div>
+                          <div style={{ color: C.mut, fontSize: 10, marginLeft: 8, flexShrink: 0 }}>▾ collapse</div>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 4 }}>
+                          <span style={{ color: C.blu, fontSize: 26, fontWeight: 800, lineHeight: 1 }}>{l.e1rm.toFixed(0)}</span>
+                          <span style={{ color: C.mut, fontSize: 10 }}>lb e1RM</span>
+                          {l.pct !== 0 && <span style={{ color: sc, fontSize: 12, fontWeight: 700 }}>{(l.pct > 0 ? "+" : "") + l.pct + "%"}</span>}
+                        </div>
+                        <SparkLine data={l.spark} color={sc} full height={28} />
+                        <div onClick={function(e) { e.stopPropagation(); push({ type: "exercise", exName: l.name }); }}
+                          style={{ marginTop: 8, color: C.blu, fontSize: 11, fontWeight: 700, textAlign: "right" }}>
+                          Full detail →
+                        </div>
+                      </div>
+                    );
+                  }
                   return (
-                    <div key={l.name} onClick={function() { push({ type: "exercise", exName: l.name }); }}
+                    <div key={l.name} onClick={function() { setExpandedEx(l.name); }}
                       style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 8, cursor: "pointer" }}>
                       <div style={{ color: C.txt, fontSize: 10, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                         {l.name}
@@ -2935,7 +2962,7 @@ function PerformanceView() {
             <div
               key={sess.id}
               onClick={function() { push({ type: "session", session: sess }); }}
-              style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 12, marginBottom: 6, cursor: "pointer" }}>
+              style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10, marginBottom: 6, cursor: "pointer" }}>
               <div
                 style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
