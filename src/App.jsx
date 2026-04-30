@@ -2728,10 +2728,10 @@ function PerformanceView() {
       onBack={pop}
       onSession={function(sess) { push({ type: "session", session: sess }); }} />
   );
-  var lastSession = sessions.slice().sort(function(a, b) { return a.date < b.date ? 1 : -1; })[0];
+  var lastSession = sessions.filter(function(s) { return (s.sets || []).length > 0; }).sort(function(a, b) { return a.date < b.date ? 1 : -1; })[0];
   var curWeek = lastSession ? lastSession.week_number : null;
   var curMesoNote = lastSession ? ((lastSession.notes || "").match(/^(Meso \d+)/) || [])[1] || null : null;
-  var curMesoSessions = sessions.filter(function(s) { return curMesoNote && ((s.notes || "").match(/^(Meso \d+)/) || [])[1] === curMesoNote; });
+  var curMesoSessions = sessions.filter(function(s) { return (s.sets || []).length > 0 && curMesoNote && ((s.notes || "").match(/^(Meso \d+)/) || [])[1] === curMesoNote; });
   var curMesoSets = annotatedSets.filter(function(s) { return curMesoNote && s.mesoNote === curMesoNote; });
   var curMesoVolume = curMesoSets.reduce(function(sm, s) { return sm + (s.weight / (s.cableRatio || 1)) * s.reps; }, 0);
   var curMesoEx = (function() { var ex = {}; curMesoSets.forEach(function(s) { ex[s.exName] = true; }); return Object.keys(ex).length; })();
@@ -2767,7 +2767,7 @@ function PerformanceView() {
     if (lm) { if (v < (lm.mev_sets || 0)) color = C.red; else if (v <= (lm.mav_sets || 99)) color = C.grn; else if (v <= (lm.mrv_sets || 99)) color = C.gld; else color = C.red; }
     return { label: mg, val: v, color: color, unit: " sets" };
   }).filter(function(b) { return b.val > 0 || lmByMG[b.label]; });
-  var recentSessions = sessions.slice().sort(function(a, b) { return a.date < b.date ? 1 : -1; });
+  var recentSessions = sessions.filter(function(s) { return (s.sets || []).length > 0; }).sort(function(a, b) { return a.date < b.date ? 1 : -1; });
   return (
     <div>
       {curMesoNote ? <div
