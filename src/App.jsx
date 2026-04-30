@@ -2156,7 +2156,7 @@ function ExerciseDetailView(props) {
       ) : null
     ) : null,
     React.createElement("div", { style: { color: C.mut, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, marginTop: 4 } }, "Sessions (" + sessionTops.length + ")"),
-    sessionTops.slice().reverse().slice(0, 12).map(function(st, i) {
+    sessionTops.slice().reverse().map(function(st, i) {
       var sess = sessById[st.sessionId];
       return React.createElement("div", { key: i, onClick: sess ? function() { props.onSession(sess); } : undefined, style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 6px", borderBottom: "1px solid " + C.bdr, cursor: sess ? "pointer" : "default" } },
         React.createElement("div", null,
@@ -2212,17 +2212,21 @@ function PerformanceView() {
     if (lm) { if (v < (lm.mev_sets || 0)) color = C.red; else if (v <= (lm.mav_sets || 99)) color = C.grn; else if (v <= (lm.mrv_sets || 99)) color = C.gld; else color = C.red; }
     return { label: mg, val: v, color: color, unit: " sets" };
   }).filter(function(b) { return b.val > 0 || lmByMG[b.label]; });
-  var lastSeenByEx = {}, firstE1rmByEx = {}, lastE1rmByEx = {};
+  var exSessMap = {};
   annotatedSets.forEach(function(s) {
+    if (!exSessMap[s.exName]) exSessMap[s.exName] = {};
+    var key = s.sessionId;
+    if (!exSessMap[s.exName][key]) exSessMap[s.exName][key] = { date: s.date, topE1rm: 0 };
     var trueW = s.weight / (s.cableRatio || 1), e1rm = trueW * (1 + s.reps / 30);
-    if (!lastSeenByEx[s.exName] || s.date > lastSeenByEx[s.exName]) { lastSeenByEx[s.exName] = s.date; lastE1rmByEx[s.exName] = e1rm; }
-    if (!firstE1rmByEx[s.exName]) firstE1rmByEx[s.exName] = e1rm;
+    if (e1rm > exSessMap[s.exName][key].topE1rm) exSessMap[s.exName][key].topE1rm = e1rm;
   });
-  var topLifts = Object.keys(lastSeenByEx).sort(function(a, b) { return lastSeenByEx[a] < lastSeenByEx[b] ? 1 : -1; }).slice(0, 10).map(function(n) {
-    var last = lastE1rmByEx[n] || 0, first = firstE1rmByEx[n] || 0;
-    return { name: n, e1rm: last, pct: first > 0 ? Math.round((last / first - 1) * 100) : 0 };
-  });
-  var recentSessions = sessions.slice().sort(function(a, b) { return a.date < b.date ? 1 : -1; }).slice(0, 6);
+  var topLifts = Object.keys(exSessMap).map(function(n) {
+    var sessArr = Object.keys(exSessMap[n]).map(function(k) { return exSessMap[n][k]; }).sort(function(a, b) { return a.date < b.date ? -1 : 1; });
+    var first = sessArr[0], last = sessArr[sessArr.length - 1];
+    var pct = first && first.topE1rm > 0 ? Math.round((last.topE1rm / first.topE1rm - 1) * 100) : 0;
+    return { name: n, e1rm: last.topE1rm, lastDate: last.date, pct: pct };
+  }).sort(function(a, b) { return a.lastDate < b.lastDate ? 1 : -1; });
+  var recentSessions = sessions.slice().sort(function(a, b) { return a.date < b.date ? 1 : -1; });
   return React.createElement("div", null,
     curMesoNote ? React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: 14, marginBottom: 10 } },
       React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 } },
@@ -2241,7 +2245,7 @@ function PerformanceView() {
         return React.createElement("div", { key: l.name, onClick: function() { push({ type: "exercise", exName: l.name }); }, style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "11px 12px", background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, marginBottom: 6, cursor: "pointer" } },
           React.createElement("div", { style: { flex: 1, minWidth: 0, marginRight: 10 } },
             React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, l.name),
-            React.createElement("div", { style: { color: C.mut, fontSize: 10, marginTop: 2 } }, fmtShortDate(lastSeenByEx[l.name]))
+            React.createElement("div", { style: { color: C.mut, fontSize: 10, marginTop: 2 } }, fmtShortDate(l.lastDate))
           ),
           React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 10 } },
             React.createElement("div", { style: { textAlign: "right" } },
