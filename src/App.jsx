@@ -1722,7 +1722,8 @@ function daysBetween(a, b) {
   return Math.round((new Date(b).getTime() - new Date(a).getTime()) / (1000 * 60 * 60 * 24));
 }
 function deriveBodyComp(r) {
-  var w = r.weight_lbs != null ? parseFloat(r.weight_lbs) : null;
+  var wKg = r.weight_kg != null ? parseFloat(r.weight_kg) : null;
+  var w = r.weight_lbs != null ? parseFloat(r.weight_lbs) : (wKg != null ? +(wKg * 2.20462).toFixed(1) : null);
   var bf = r.body_fat_pct != null ? parseFloat(r.body_fat_pct) : null;
   var lean = r.lean_mass_lbs != null ? parseFloat(r.lean_mass_lbs)
     : (w != null && bf != null ? +(w * (1 - bf / 100)).toFixed(2) : null);
@@ -1871,7 +1872,7 @@ function BodyCompView() {
   var s2 = React.useState(true); var loading = s2[0]; var setLoading = s2[1];
   var s3 = React.useState(null); var detailIdx = s3[0]; var setDetailIdx = s3[1];
   React.useEffect(function() {
-    db.getBodyCompHistory(500).then(function(d) { setRawReadings(d || []); setLoading(false); }).catch(function() { setLoading(false); });
+    db.getHealthDaily(800).then(function(d) { var filtered = (d || []).filter(function(h) { return h.weight_kg != null || h.body_fat_pct != null; }); setRawReadings(filtered); setLoading(false); }).catch(function() { setLoading(false); });
   }, []);
   if (loading) return React.createElement("div", { style: { padding: 32, textAlign: "center", color: C.mut } }, "Loading…");
   if (!rawReadings.length) return React.createElement("div", { style: { padding: 32, textAlign: "center", color: C.mut } }, "No body comp readings yet.");
@@ -2017,7 +2018,7 @@ function PerformanceView() {
   var lmByMG = {}; landmarks.forEach(function(l) { lmByMG[l.muscle_group] = l; });
   var annotatedSets = sets.map(function(st) {
     var s = sessById[st.session_id], e = exById[st.exercise_id];
-    return { id: st.id, reps: st.reps, weight: parseFloat(st.weight) || 0, set_number: st.set_number, rpe: st.rpe, date: s ? s.date : null, sessionId: st.session_id, mesoId: s ? s.mesocycle_id : null, week: s ? s.week_number : null, exId: st.exercise_id, exName: e ? e.name : "Unknown", muscleGroup: e ? e.muscle_group : null, sessionRir: s ? s.rir : null };
+    return { id: st.id, reps: st.reps, weight: parseFloat(st.weight) || 0, set_number: st.set_number, rpe: st.rpe, date: s ? s.date : null, sessionId: st.session_id, mesoId: s ? s.mesocycle_id : null, mesoNote: s ? ((s.notes || "").match(/^(Meso \d+)/) || [])[1] || null : null, week: s ? s.week_number : null, exId: st.exercise_id, exName: e ? e.name : "Unknown", muscleGroup: e ? e.muscle_group : null, sessionRir: s ? s.rir : null, cableRatio: e ? (parseFloat(e.cable_ratio) || 1) : 1 };
   }).filter(function(s) { return s.date != null; });
   if (!selExName && annotatedSets.length) {
     var firstEx = annotatedSets[annotatedSets.length - 1];
@@ -2030,28 +2031,28 @@ function PerformanceView() {
   var exSets = annotatedSets.filter(function(s) { return s.exName === selExName; });
   var bySession = {};
   exSets.forEach(function(s) {
-    if (!bySession[s.sessionId]) bySession[s.sessionId] = { date: s.date, mesoId: s.mesoId, week: s.week, sets: [] };
+    if (!bySession[s.sessionId]) bySession[s.sessionId] = { date: s.date, mesoId: s.mesoId, mesoNote: s.mesoNote, week: s.week, sets: [] };
     bySession[s.sessionId].sets.push(s);
   });
   var sessionTops = Object.keys(bySession).map(function(sid) {
     var b = bySession[sid];
-    var top = b.sets.reduce(function(m, s) { var e1rm = s.weight * (1 + s.reps / 30); return (m == null || e1rm > m.e1rm) ? { weight: s.weight, reps: s.reps, e1rm: e1rm } : m; }, null);
-    return { date: b.date, mesoId: b.mesoId, week: b.week, top: top };
+    var top = b.sets.reduce(function(m, s) { var trueW = s.weight / (s.cableRatio || 1); var e1rm = trueW * (1 + s.reps / 30); return (m == null || e1rm > m.e1rm) ? { weight: s.weight, reps: s.reps, e1rm: e1rm } : m; }, null);
+    return { date: b.date, mesoId: b.mesoId, mesoNote: b.mesoNote, week: b.week, top: top };
   }).sort(function(a, b) { return a.date < b.date ? -1 : 1; });
   var mesoColors = [C.blu, C.gld, C.grn, C.red, C.pur, C.org, C.teal];
-  var mesoOrder = mesos.map(function(m) { return m.id; });
-  var mesoColor = function(mid) { var i = mesoOrder.indexOf(mid); return i < 0 ? C.mut : mesoColors[i % mesoColors.length]; };
+  var mesoNoteOrder = ["Meso 0","Meso 1","Meso 2","Meso 3","Meso 4","Meso 5"];
+  var mesoColor = function(mid) { var i = mesoNoteOrder.indexOf(mid); return i < 0 ? C.mut : mesoColors[i % mesoColors.length]; };
   var seriesByMeso = {};
   sessionTops.forEach(function(st) {
-    var mid = st.mesoId || "none";
+    var mid = st.mesoNote || "none";
     if (!seriesByMeso[mid]) seriesByMeso[mid] = { mid: mid, points: [] };
     seriesByMeso[mid].points.push({ date: st.date, val: +st.top.e1rm.toFixed(1) });
   });
-  var strengthSeries = Object.keys(seriesByMeso).map(function(mid) { var m = mesoById[mid]; return { label: m ? m.name : "Other", color: mesoColor(mid), points: seriesByMeso[mid].points }; });
+  var strengthSeries = Object.keys(seriesByMeso).map(function(mid) { return { label: mid === "none" ? "Other" : mid, color: mesoColor(mid), points: seriesByMeso[mid].points }; });
   var lastSession = sessions[sessions.length - 1];
-  var curMesoId = lastSession ? lastSession.mesocycle_id : null;
   var curWeek = lastSession ? lastSession.week_number : null;
-  var weekSets = annotatedSets.filter(function(s) { return curMesoId && s.mesoId === curMesoId && s.week === curWeek; });
+  var curMesoNote = lastSession ? ((lastSession.notes || "").match(/^(Meso \d+)/) || [])[1] || null : null;
+  var weekSets = annotatedSets.filter(function(s) { return curWeek != null && s.week === curWeek && s.mesoNote === curMesoNote; });
   var volByMG = {};
   weekSets.forEach(function(s) { if (!s.muscleGroup) return; volByMG[s.muscleGroup] = (volByMG[s.muscleGroup] || 0) + 1; });
   var mgList = Object.keys(lmByMG).sort();
@@ -2060,7 +2061,7 @@ function PerformanceView() {
     if (lm) { if (v < (lm.mev_sets || 0)) color = C.red; else if (v <= (lm.mav_sets || 99)) color = C.grn; else if (v <= (lm.mrv_sets || 99)) color = C.gld; else color = C.red; }
     return { label: mg, val: v, color: color, unit: " sets" };
   }).filter(function(b) { return b.val > 0 || lmByMG[b.label]; });
-  var curMesoSessions = sessions.filter(function(s) { return s.mesocycle_id === curMesoId; });
+  var curMesoSessions = sessions.filter(function(s) { return curMesoNote && ((s.notes || "").match(/^(Meso \d+)/) || [])[1] === curMesoNote; });
   var byWeek = {};
   curMesoSessions.forEach(function(s) { if (s.week_number == null) return; if (!byWeek[s.week_number]) byWeek[s.week_number] = []; byWeek[s.week_number].push(s); });
   var rirRows = Object.keys(byWeek).sort().map(function(wn) { var ses = byWeek[wn], rir = ses[0] && ses[0].rir; return { week: "W" + wn, rir: rir, count: ses.length }; });
@@ -2089,17 +2090,17 @@ function PerformanceView() {
     React.createElement("div", { style: { background: C.card, borderRadius: 10, padding: 10, marginBottom: 8 } },
       React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 700, marginBottom: 8 } }, selExName + " · Recent Sessions"),
       sessionTops.slice().reverse().slice(0, 12).map(function(st, i) {
-        var meso = mesoById[st.mesoId];
+        var mesoLabel = st.mesoNote || "—";
         return React.createElement("div", { key: i, style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: "1px solid " + C.bdr } },
-          React.createElement("div", null, React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 600 } }, fmtShortDate(st.date)), React.createElement("div", { style: { color: C.mut, fontSize: 10 } }, (meso ? meso.name : "—") + (st.week != null ? " · W" + st.week : ""))),
-          React.createElement("div", { style: { textAlign: "right" } }, React.createElement("div", { style: { color: C.txt, fontSize: 13, fontWeight: 700 } }, st.top.weight + " × " + st.top.reps), React.createElement("div", { style: { color: mesoColor(st.mesoId), fontSize: 10 } }, "e1RM " + st.top.e1rm.toFixed(0)))
+          React.createElement("div", null, React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 600 } }, fmtShortDate(st.date)), React.createElement("div", { style: { color: C.mut, fontSize: 10 } }, mesoLabel + (st.week != null ? " · W" + st.week : ""))),
+          React.createElement("div", { style: { textAlign: "right" } }, React.createElement("div", { style: { color: C.txt, fontSize: 13, fontWeight: 700 } }, st.top.weight + " × " + st.top.reps), React.createElement("div", { style: { color: mesoColor(st.mesoNote), fontSize: 10 } }, "e1RM " + st.top.e1rm.toFixed(0)))
         );
       })
     ),
     React.createElement("div", { style: { background: C.card, borderRadius: 10, padding: 10, marginBottom: 8 } },
       React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 } },
         React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 700 } }, "Weekly Volume"),
-        React.createElement("div", { style: { color: C.mut, fontSize: 10 } }, (lastSession ? "W" + curWeek : "—") + (mesoById[curMesoId] ? " · " + mesoById[curMesoId].name : ""))
+        React.createElement("div", { style: { color: C.mut, fontSize: 10 } }, (lastSession ? "W" + curWeek : "—") + (curMesoNote ? " · " + curMesoNote : ""))
       ),
       React.createElement("div", { style: { display: "flex", gap: 12, marginBottom: 8, fontSize: 10 } },
         React.createElement("div", null, React.createElement("span", { style: { color: C.red } }, "■ "), "< MEV"),
@@ -2212,7 +2213,8 @@ function CompareView() {
   var exById = {}; loaded.exercises.forEach(function(e) { exById[e.id] = e; });
   var mesoById = {}; loaded.mesos.forEach(function(m) { mesoById[m.id] = m; });
   var perMeso = loaded.mesos.map(function(m) {
-    var mSessions = loaded.sessions.filter(function(s) { return s.mesocycle_id === m.id; });
+    var mNum = (m.name.match(/(\d+)/) || [])[1];
+    var mSessions = loaded.sessions.filter(function(s) { var sNum = ((s.notes || "").match(/Meso (\d+)/) || [])[1]; return sNum && mNum && sNum === mNum; });
     var mSessIds = {}; mSessions.forEach(function(s) { mSessIds[s.id] = true; });
     var mSets = loaded.sets.filter(function(s) { return mSessIds[s.session_id]; });
     var totalVolume = 0, topByEx = {}, mgVol = {};
@@ -2220,7 +2222,8 @@ function CompareView() {
       var w = parseFloat(st.weight) || 0, r = parseInt(st.reps) || 0;
       totalVolume += w * r;
       var ex = exById[st.exercise_id]; if (!ex) return;
-      var e1rm = w * (1 + r / 30);
+      var cableRatio = parseFloat(ex.cable_ratio) || 1;
+      var e1rm = (w / cableRatio) * (1 + r / 30);
       if (!topByEx[ex.name] || e1rm > topByEx[ex.name].e1rm) topByEx[ex.name] = { e1rm: e1rm, weight: w, reps: r };
       if (ex.muscle_group) mgVol[ex.muscle_group] = (mgVol[ex.muscle_group] || 0) + 1;
     });
