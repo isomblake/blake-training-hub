@@ -2914,18 +2914,15 @@ function PerformanceView() {
                   }
                   return (
                     <div key={l.name} onClick={function() { setExpandedEx(l.name); }}
-                      style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 8, cursor: "pointer" }}>
-                      <div style={{ color: C.txt, fontSize: 10, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 8, padding: "6px 7px", cursor: "pointer" }}>
+                      <div style={{ color: C.txt, fontSize: 10, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 2 }}>
                         {l.name}
                       </div>
-                      <div style={{ color: C.blu, fontSize: 17, fontWeight: 800, lineHeight: 1, marginTop: 3 }}>
-                        {l.e1rm.toFixed(0)}
-                      </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
-                        <span style={{ color: C.mut, fontSize: 9 }}>lb e1RM</span>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
+                        <span style={{ color: C.blu, fontSize: 15, fontWeight: 800, lineHeight: 1 }}>{l.e1rm.toFixed(0)}</span>
+                        <span style={{ color: C.mut, fontSize: 9 }}>e1RM</span>
                         {l.pct !== 0 && <span style={{ color: sc, fontSize: 9, fontWeight: 700 }}>{(l.pct > 0 ? "+" : "") + l.pct + "%"}</span>}
                       </div>
-                      <SparkLine data={l.spark} color={sc} width={100} height={22} />
                     </div>
                   );
                 })}
