@@ -2743,17 +2743,22 @@ function PerformanceView() {
   }).filter(function(p) { return p.val > 0 || lmByMG[p.label]; });
   var exSessMap = {};
   annotatedSets.forEach(function(s) {
-    if (!exSessMap[s.exName]) exSessMap[s.exName] = {};
-    if (!exSessMap[s.exName][s.sessionId]) exSessMap[s.exName][s.sessionId] = { date: s.date, topE1rm: 0 };
+    if (!exSessMap[s.exName]) exSessMap[s.exName] = { mg: s.muscleGroup, sessions: {} };
+    if (s.muscleGroup && !exSessMap[s.exName].mg) exSessMap[s.exName].mg = s.muscleGroup;
+    if (!exSessMap[s.exName].sessions[s.sessionId]) exSessMap[s.exName].sessions[s.sessionId] = { date: s.date, topE1rm: 0 };
     var e1rm = s.weight * (1 + s.reps / 30);
-    if (e1rm > exSessMap[s.exName][s.sessionId].topE1rm) exSessMap[s.exName][s.sessionId].topE1rm = e1rm;
+    if (e1rm > exSessMap[s.exName].sessions[s.sessionId].topE1rm) exSessMap[s.exName].sessions[s.sessionId].topE1rm = e1rm;
   });
   var topLifts = Object.keys(exSessMap).map(function(n) {
-    var arr = Object.keys(exSessMap[n]).map(function(k) { return exSessMap[n][k]; }).sort(function(a, b) { return a.date < b.date ? -1 : 1; });
+    var ex = exSessMap[n];
+    var arr = Object.keys(ex.sessions).map(function(k) { return ex.sessions[k]; }).sort(function(a, b) { return a.date < b.date ? -1 : 1; });
     var first = arr[0], last = arr[arr.length - 1];
     var pct = first && first.topE1rm > 0 ? Math.round((last.topE1rm / first.topE1rm - 1) * 100) : 0;
-    return { name: n, e1rm: last.topE1rm, lastDate: last.date, pct: pct, spark: arr.map(function(s) { return { val: +s.topE1rm.toFixed(0) }; }) };
+    return { name: n, mg: ex.mg, e1rm: last.topE1rm, lastDate: last.date, pct: pct, spark: arr.map(function(s) { return { val: +s.topE1rm.toFixed(0) }; }) };
   }).sort(function(a, b) { return a.lastDate < b.lastDate ? 1 : -1; });
+  var liftsByMG = {};
+  topLifts.forEach(function(l) { var k = l.mg || "Other"; if (!liftsByMG[k]) liftsByMG[k] = []; liftsByMG[k].push(l); });
+  var liftMGKeys = allMGKeys.filter(function(mg) { return liftsByMG[mg]; }).concat(liftsByMG["Other"] ? ["Other"] : []);
   var volBars = allMGKeys.map(function(mg) {
     var lm = lmByMG[mg], v = volByMG[mg] || 0, color = C.mut;
     if (lm) { if (v < (lm.mev_sets || 0)) color = C.red; else if (v <= (lm.mav_sets || 99)) color = C.grn; else if (v <= (lm.mrv_sets || 99)) color = C.gld; else color = C.red; }
@@ -2862,37 +2867,45 @@ function PerformanceView() {
           </div>
         </div>
       </div> : null}
-      {topLifts.length ? <div style={{ marginBottom: 10 }}>
-        <div
-          style={{ color: C.mut, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+      {liftMGKeys.length ? <div style={{ marginBottom: 10 }}>
+        <div style={{ color: C.mut, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
           Strength Progress
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          {topLifts.map(function(l) {
-            var sc = l.pct >= 0 ? C.grn : C.red;
-            return (
+        {liftMGKeys.map(function(mg) {
+          var exList = liftsByMG[mg];
+          var canDrill = mg !== "Other" && lmByMG[mg];
+          return (
+            <div key={mg} style={{ marginBottom: 12 }}>
               <div
-                key={l.name}
-                onClick={function() { push({ type: "exercise", exName: l.name }); }}
-                style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10, cursor: "pointer" }}>
-                <div
-                  style={{ color: C.txt, fontSize: 10, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 4 }}>
-                  {l.name}
-                </div>
-                <div style={{ color: C.blu, fontSize: 20, fontWeight: 800, lineHeight: 1 }}>
-                  {l.e1rm.toFixed(0)}
-                </div>
-                <div style={{ color: C.mut, fontSize: 9 }}>
-                  lb e1RM
-                </div>
-                {l.pct !== 0 ? <div style={{ color: sc, fontSize: 10, fontWeight: 700, marginTop: 2 }}>
-                  {(l.pct > 0 ? "+" : "") + l.pct + "% overall"}
-                </div> : <div style={{ height: 14 }} />}
-                <SparkLine data={l.spark} color={sc} width={100} height={28} />
+                onClick={canDrill ? function() { push({ type: "mg", mg: mg }); } : undefined}
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5, cursor: canDrill ? "pointer" : "default" }}>
+                <div style={{ color: canDrill ? C.txt : C.mut, fontSize: 11, fontWeight: 700 }}>{mg}</div>
+                {canDrill ? <div style={{ color: C.mut, fontSize: 12 }}>›</div> : null}
               </div>
-            );
-          })}
-        </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+                {exList.map(function(l) {
+                  var sc = l.pct >= 0 ? C.grn : C.red;
+                  return (
+                    <div key={l.name} onClick={function() { push({ type: "exercise", exName: l.name }); }}
+                      style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 8, cursor: "pointer" }}>
+                      <div style={{ color: C.txt, fontSize: 10, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {l.name}
+                      </div>
+                      <div style={{ color: C.blu, fontSize: 17, fontWeight: 800, lineHeight: 1, marginTop: 3 }}>
+                        {l.e1rm.toFixed(0)}
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 2 }}>
+                        <span style={{ color: C.mut, fontSize: 9 }}>lb e1RM</span>
+                        {l.pct !== 0 && <span style={{ color: sc, fontSize: 9, fontWeight: 700 }}>{(l.pct > 0 ? "+" : "") + l.pct + "%"}</span>}
+                      </div>
+                      <SparkLine data={l.spark} color={sc} width={100} height={22} />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </div> : null}
       <div
         style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10, marginBottom: 10 }}>
