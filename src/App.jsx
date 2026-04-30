@@ -1758,7 +1758,11 @@ var META_MESO_START = "2026-04-14";
 function TrendChart(props) {
   var data = (props.data || []).filter(function(d) { return d.val != null && !isNaN(d.val); });
   if (data.length < 2) {
-    return React.createElement("div", { style: { color: C.mut, fontSize: 11, padding: "12px 0" } }, "Not enough data yet");
+    return (
+      <div style={{ color: C.mut, fontSize: 11, padding: "12px 0" }}>
+        Not enough data yet
+      </div>
+    );
   }
   var W = 320, H = 130, pad = { l: 32, r: 8, t: 10, b: 20 };
   var iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
@@ -1786,64 +1790,167 @@ function TrendChart(props) {
     if (Math.abs(val) >= 100) return val.toFixed(0);
     return val.toFixed(1);
   };
-  return React.createElement("svg", {
-    viewBox: "0 0 " + W + " " + H,
-    style: { width: "100%", height: "auto", display: "block" },
-    preserveAspectRatio: "xMidYMid meet"
-  },
-    [0, 0.5, 1].map(function(t, i) {
-      var gv = vMin + vRange * (1 - t);
-      return React.createElement("g", { key: "g" + i },
-        React.createElement("line", { x1: pad.l, x2: W - pad.r, y1: pad.t + ih * t, y2: pad.t + ih * t, stroke: C.bdr, strokeWidth: 1, strokeDasharray: "2,3" }),
-        React.createElement("text", { x: pad.l - 4, y: pad.t + ih * t + 3, fill: C.mut, fontSize: 9, textAnchor: "end" }, fmt(gv))
-      );
-    }),
-    markerX != null ? React.createElement("g", { key: "m" },
-      React.createElement("line", { x1: markerX, x2: markerX, y1: pad.t, y2: pad.t + ih, stroke: C.pur, strokeWidth: 1, strokeDasharray: "3,3", opacity: 0.8 }),
-      React.createElement("text", { x: markerX + 3, y: pad.t + 9, fill: C.pur, fontSize: 8, fontWeight: 700 }, "M1")
-    ) : null,
-    React.createElement("path", { d: d2, fill: "none", stroke: color, strokeWidth: 1.6, strokeLinejoin: "round", strokeLinecap: "round" }),
-    data.map(function(d, i) {
-      var px = xTC(new Date(d.date).getTime()), py = yTC(d.val);
-      return React.createElement("circle", { key: i, cx: px, cy: py, r: 3.2, fill: color, stroke: C.bg, strokeWidth: 0.8, style: { cursor: props.onTap ? "pointer" : "default" }, onClick: function() { if (props.onTap) props.onTap(d, i); } });
-    }),
-    React.createElement("text", { x: pad.l, y: H - 4, fill: C.mut, fontSize: 9, textAnchor: "start" }, fmtShortDate(data[0].date)),
-    data.length > 4 ? React.createElement("text", { x: pad.l + iw / 2, y: H - 4, fill: C.mut, fontSize: 9, textAnchor: "middle" }, fmtShortDate(data[Math.floor(data.length / 2)].date)) : null,
-    React.createElement("text", { x: W - pad.r, y: H - 4, fill: C.mut, fontSize: 9, textAnchor: "end" }, fmtShortDate(data[data.length - 1].date))
+  return (
+    <svg
+      viewBox={"0 0 " + W + " " + H}
+      style={{ width: "100%", height: "auto", display: "block" }}
+      preserveAspectRatio="xMidYMid meet">
+      {[0, 0.5, 1].map(function(t, i) {
+        var gv = vMin + vRange * (1 - t);
+        return (
+          <g key={"g" + i}>
+            <line
+              x1={pad.l}
+              x2={W - pad.r}
+              y1={pad.t + ih * t}
+              y2={pad.t + ih * t}
+              stroke={C.bdr}
+              strokeWidth={1}
+              strokeDasharray="2,3" />
+            <text
+              x={pad.l - 4}
+              y={pad.t + ih * t + 3}
+              fill={C.mut}
+              fontSize={9}
+              textAnchor="end">
+              {fmt(gv)}
+            </text>
+          </g>
+        );
+      })}
+      {markerX != null ? <g key="m">
+        <line
+          x1={markerX}
+          x2={markerX}
+          y1={pad.t}
+          y2={pad.t + ih}
+          stroke={C.pur}
+          strokeWidth={1}
+          strokeDasharray="3,3"
+          opacity={0.8} />
+        <text x={markerX + 3} y={pad.t + 9} fill={C.pur} fontSize={8} fontWeight={700}>
+          M1
+        </text>
+      </g> : null}
+      <path
+        d={d2}
+        fill="none"
+        stroke={color}
+        strokeWidth={1.6}
+        strokeLinejoin="round"
+        strokeLinecap="round" />
+      {data.map(function(d, i) {
+        var px = xTC(new Date(d.date).getTime()), py = yTC(d.val);
+        return (
+          <circle
+            key={i}
+            cx={px}
+            cy={py}
+            r={3.2}
+            fill={color}
+            stroke={C.bg}
+            strokeWidth={0.8}
+            style={{ cursor: props.onTap ? "pointer" : "default" }}
+            onClick={function() { if (props.onTap) props.onTap(d, i); }} />
+        );
+      })}
+      <text x={pad.l} y={H - 4} fill={C.mut} fontSize={9} textAnchor="start">
+        {fmtShortDate(data[0].date)}
+      </text>
+      {data.length > 4 ? <text
+        x={pad.l + iw / 2}
+        y={H - 4}
+        fill={C.mut}
+        fontSize={9}
+        textAnchor="middle">
+        {fmtShortDate(data[Math.floor(data.length / 2)].date)}
+      </text> : null}
+      <text x={W - pad.r} y={H - 4} fill={C.mut} fontSize={9} textAnchor="end">
+        {fmtShortDate(data[data.length - 1].date)}
+      </text>
+    </svg>
   );
 }
 function BarsChart(props) {
   var data = props.data || [];
   if (data.length === 0) {
-    return React.createElement("div", { style: { color: C.mut, fontSize: 11, padding: "12px 0" } }, "No data");
+    return (
+      <div style={{ color: C.mut, fontSize: 11, padding: "12px 0" }}>
+        No data
+      </div>
+    );
   }
   var W = 320, H = 24 * data.length + 14, pad = { l: 90, r: 28, t: 4, b: 4 };
   var iw = W - pad.l - pad.r;
   var maxV = Math.max(props.maxOverride || 0, Math.max.apply(null, data.map(function(d) { return d.val || 0; })));
   if (props.bands && props.bands.mrv) maxV = Math.max(maxV, props.bands.mrv * 1.1);
   if (maxV < 1) maxV = 1;
-  return React.createElement("svg", { viewBox: "0 0 " + W + " " + H, style: { width: "100%", height: "auto", display: "block" }, preserveAspectRatio: "xMidYMid meet" },
-    props.bands ? React.createElement("g", { key: "bands", opacity: 0.18 },
-      props.bands.mev ? React.createElement("rect", { x: pad.l, y: pad.t, width: (props.bands.mev / maxV) * iw, height: H - pad.t - pad.b, fill: C.red }) : null,
-      props.bands.mav ? React.createElement("rect", { x: pad.l + ((props.bands.mev || 0) / maxV) * iw, y: pad.t, width: ((props.bands.mav - (props.bands.mev || 0)) / maxV) * iw, height: H - pad.t - pad.b, fill: C.grn }) : null,
-      props.bands.mrv ? React.createElement("rect", { x: pad.l + ((props.bands.mav || 0) / maxV) * iw, y: pad.t, width: ((props.bands.mrv - (props.bands.mav || 0)) / maxV) * iw, height: H - pad.t - pad.b, fill: C.gld }) : null
-    ) : null,
-    data.map(function(d, i) {
-      var by = pad.t + i * 24 + 3, bw = ((d.val || 0) / maxV) * iw, color = d.color || C.blu;
-      var cb = typeof props.onBar === "function";
-      return React.createElement("g", { key: i, onClick: cb ? (function(dd) { return function() { props.onBar(dd); }; })(d) : undefined, style: cb ? { cursor: "pointer" } : undefined },
-        React.createElement("text", { x: pad.l - 6, y: by + 12, fill: C.txt, fontSize: 11, textAnchor: "end", fontWeight: cb ? "600" : "normal" }, d.label),
-        React.createElement("rect", { x: pad.l, y: by, width: bw, height: 16, fill: color, rx: 2 }),
-        React.createElement("text", { x: pad.l + bw + 4, y: by + 12, fill: C.mut, fontSize: 10, textAnchor: "start" }, (d.val || 0).toFixed(d.dp == null ? 0 : d.dp) + (d.unit || ""))
-      );
-    })
+  return (
+    <svg
+      viewBox={"0 0 " + W + " " + H}
+      style={{ width: "100%", height: "auto", display: "block" }}
+      preserveAspectRatio="xMidYMid meet">
+      {props.bands ? <g key="bands" opacity={0.18}>
+        {props.bands.mev ? <rect
+          x={pad.l}
+          y={pad.t}
+          width={(props.bands.mev / maxV) * iw}
+          height={H - pad.t - pad.b}
+          fill={C.red} /> : null}
+        {props.bands.mav ? <rect
+          x={pad.l + ((props.bands.mev || 0) / maxV) * iw}
+          y={pad.t}
+          width={((props.bands.mav - (props.bands.mev || 0)) / maxV) * iw}
+          height={H - pad.t - pad.b}
+          fill={C.grn} /> : null}
+        {props.bands.mrv ? <rect
+          x={pad.l + ((props.bands.mav || 0) / maxV) * iw}
+          y={pad.t}
+          width={((props.bands.mrv - (props.bands.mav || 0)) / maxV) * iw}
+          height={H - pad.t - pad.b}
+          fill={C.gld} /> : null}
+      </g> : null}
+      {data.map(function(d, i) {
+        var by = pad.t + i * 24 + 3, bw = ((d.val || 0) / maxV) * iw, color = d.color || C.blu;
+        var cb = typeof props.onBar === "function";
+        return (
+          <g
+            key={i}
+            onClick={cb ? (function(dd) { return function() { props.onBar(dd); }; })(d) : undefined}
+            style={cb ? { cursor: "pointer" } : undefined}>
+            <text
+              x={pad.l - 6}
+              y={by + 12}
+              fill={C.txt}
+              fontSize={11}
+              textAnchor="end"
+              fontWeight={cb ? "600" : "normal"}>
+              {d.label}
+            </text>
+            <rect x={pad.l} y={by} width={bw} height={16} fill={color} rx={2} />
+            <text
+              x={pad.l + bw + 4}
+              y={by + 12}
+              fill={C.mut}
+              fontSize={10}
+              textAnchor="start">
+              {(d.val || 0).toFixed(d.dp == null ? 0 : d.dp) + (d.unit || "")}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 function MultiSeriesChart(props) {
   var series = props.series || [], allPoints = [];
   series.forEach(function(s) { (s.points || []).forEach(function(p) { if (p.val != null && !isNaN(p.val)) allPoints.push(p); }); });
   if (allPoints.length < 2) {
-    return React.createElement("div", { style: { color: C.mut, fontSize: 11, padding: "12px 0" } }, "Not enough data yet");
+    return (
+      <div style={{ color: C.mut, fontSize: 11, padding: "12px 0" }}>
+        Not enough data yet
+      </div>
+    );
   }
   var W = 320, H = 150, pad = { l: 32, r: 8, t: 10, b: 22 };
   var iw = W - pad.l - pad.r, ih = H - pad.t - pad.b;
@@ -1857,26 +1964,77 @@ function MultiSeriesChart(props) {
   function yMS(val) { return pad.t + (1 - (val - vMin) / vRange) * ih; }
   var markerX = null;
   if (props.markerDate) { var mt2 = new Date(props.markerDate).getTime(); if (mt2 >= tMin && mt2 <= tMax) markerX = xMS(mt2); }
-  return React.createElement("svg", { viewBox: "0 0 " + W + " " + H, style: { width: "100%", height: "auto", display: "block" }, preserveAspectRatio: "xMidYMid meet" },
-    [0, 0.5, 1].map(function(t, i) {
-      var gv = vMin + vRange * (1 - t);
-      return React.createElement("g", { key: "g" + i },
-        React.createElement("line", { x1: pad.l, x2: W - pad.r, y1: pad.t + ih * t, y2: pad.t + ih * t, stroke: C.bdr, strokeWidth: 1, strokeDasharray: "2,3" }),
-        React.createElement("text", { x: pad.l - 4, y: pad.t + ih * t + 3, fill: C.mut, fontSize: 9, textAnchor: "end" }, gv >= 100 ? gv.toFixed(0) : gv.toFixed(1))
-      );
-    }),
-    markerX != null ? React.createElement("line", { x1: markerX, x2: markerX, y1: pad.t, y2: pad.t + ih, stroke: C.pur, strokeWidth: 1, strokeDasharray: "3,3", opacity: 0.7 }) : null,
-    series.map(function(s, si) {
-      var pts = (s.points || []).filter(function(p) { return p.val != null && !isNaN(p.val); });
-      if (pts.length < 2) return null;
-      var d2 = pts.map(function(p, i) { var px = xMS(new Date(p.date).getTime()), py = yMS(p.val); return (i === 0 ? "M" : "L") + px.toFixed(1) + "," + py.toFixed(1); }).join("");
-      return React.createElement("g", { key: "s" + si },
-        React.createElement("path", { d: d2, fill: "none", stroke: s.color || C.blu, strokeWidth: 1.5, strokeLinejoin: "round", strokeLinecap: "round", opacity: s.opacity == null ? 1 : s.opacity }),
-        s.showPoints !== false ? pts.map(function(p, i) { var px = xMS(new Date(p.date).getTime()), py = yMS(p.val); return React.createElement("circle", { key: i, cx: px, cy: py, r: 2.5, fill: s.color || C.blu, stroke: C.bg, strokeWidth: 0.6 }); }) : null
-      );
-    }),
-    React.createElement("text", { x: pad.l, y: H - 6, fill: C.mut, fontSize: 9, textAnchor: "start" }, fmtShortDate(allPoints[0].date)),
-    React.createElement("text", { x: W - pad.r, y: H - 6, fill: C.mut, fontSize: 9, textAnchor: "end" }, fmtShortDate(allPoints[allPoints.length - 1].date))
+  return (
+    <svg
+      viewBox={"0 0 " + W + " " + H}
+      style={{ width: "100%", height: "auto", display: "block" }}
+      preserveAspectRatio="xMidYMid meet">
+      {[0, 0.5, 1].map(function(t, i) {
+        var gv = vMin + vRange * (1 - t);
+        return (
+          <g key={"g" + i}>
+            <line
+              x1={pad.l}
+              x2={W - pad.r}
+              y1={pad.t + ih * t}
+              y2={pad.t + ih * t}
+              stroke={C.bdr}
+              strokeWidth={1}
+              strokeDasharray="2,3" />
+            <text
+              x={pad.l - 4}
+              y={pad.t + ih * t + 3}
+              fill={C.mut}
+              fontSize={9}
+              textAnchor="end">
+              {gv >= 100 ? gv.toFixed(0) : gv.toFixed(1)}
+            </text>
+          </g>
+        );
+      })}
+      {markerX != null ? <line
+        x1={markerX}
+        x2={markerX}
+        y1={pad.t}
+        y2={pad.t + ih}
+        stroke={C.pur}
+        strokeWidth={1}
+        strokeDasharray="3,3"
+        opacity={0.7} /> : null}
+      {series.map(function(s, si) {
+        var pts = (s.points || []).filter(function(p) { return p.val != null && !isNaN(p.val); });
+        if (pts.length < 2) return null;
+        var d2 = pts.map(function(p, i) { var px = xMS(new Date(p.date).getTime()), py = yMS(p.val); return (i === 0 ? "M" : "L") + px.toFixed(1) + "," + py.toFixed(1); }).join("");
+        return (
+          <g key={"s" + si}>
+            <path
+              d={d2}
+              fill="none"
+              stroke={s.color || C.blu}
+              strokeWidth={1.5}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              opacity={s.opacity == null ? 1 : s.opacity} />
+            {s.showPoints !== false ? pts.map(function(p, i) { var px = xMS(new Date(p.date).getTime()), py = yMS(p.val); return (
+              <circle
+                key={i}
+                cx={px}
+                cy={py}
+                r={2.5}
+                fill={s.color || C.blu}
+                stroke={C.bg}
+                strokeWidth={0.6} />
+            ); }) : null}
+          </g>
+        );
+      })}
+      <text x={pad.l} y={H - 6} fill={C.mut} fontSize={9} textAnchor="start">
+        {fmtShortDate(allPoints[0].date)}
+      </text>
+      <text x={W - pad.r} y={H - 6} fill={C.mut} fontSize={9} textAnchor="end">
+        {fmtShortDate(allPoints[allPoints.length - 1].date)}
+      </text>
+    </svg>
   );
 }
 function BodyCompView() {
@@ -1886,12 +2044,25 @@ function BodyCompView() {
   React.useEffect(function() {
     db.getHealthDaily(800).then(function(d) { var filtered = (d || []).filter(function(h) { return h.weight_kg != null || h.body_fat_pct != null; }); setRawReadings(filtered); setLoading(false); }).catch(function() { setLoading(false); });
   }, []);
-  if (loading) return React.createElement("div", { style: { padding: 32, textAlign: "center", color: C.mut } }, "Loading…");
-  if (!rawReadings.length) return React.createElement("div", { style: { padding: 32, textAlign: "center", color: C.mut } }, "No body comp readings yet.");
+  if (loading) return (
+    <div style={{ padding: 32, textAlign: "center", color: C.mut }}>
+      Loading…
+    </div>
+  );
+  if (!rawReadings.length) return (
+    <div style={{ padding: 32, textAlign: "center", color: C.mut }}>
+      No body comp readings yet.
+    </div>
+  );
   var asc = rawReadings.slice().sort(function(a, b) { return a.date < b.date ? -1 : 1; }).map(deriveBodyComp);
   var L = asc[asc.length - 1];
   if (detailIdx != null) {
-    return React.createElement(ReadingDetailView, { cur: asc[detailIdx], prev: detailIdx > 0 ? asc[detailIdx - 1] : null, onBack: function() { setDetailIdx(null); } });
+    return (
+      <ReadingDetailView
+        cur={asc[detailIdx]}
+        prev={detailIdx > 0 ? asc[detailIdx - 1] : null}
+        onBack={function() { setDetailIdx(null); }} />
+    );
   }
   function findOnOrBefore(targetDate) {
     for (var i = asc.length - 1; i >= 0; i--) { if (asc[i].date <= targetDate) return asc[i]; }
@@ -1905,16 +2076,32 @@ function BodyCompView() {
   var peak = asc.reduce(function(m, r) { return (r.weight != null && (m == null || r.weight > m.weight)) ? r : m; }, null);
   var sinceMeso = asc.find(function(r) { return r.date >= META_MESO_START; }) || null;
   function mini(label, val, color) {
-    return React.createElement("div", { style: { background: C.c2, borderRadius: 8, padding: "6px 8px" } },
-      React.createElement("div", { style: { color: C.mut, fontSize: 9, textTransform: "uppercase", letterSpacing: 0.5 } }, label),
-      React.createElement("div", { style: { color: color || C.txt, fontSize: 14, fontWeight: 700, marginTop: 2 } }, val)
+    return (
+      <div style={{ background: C.c2, borderRadius: 8, padding: "6px 8px" }}>
+        <div
+          style={{ color: C.mut, fontSize: 9, textTransform: "uppercase", letterSpacing: 0.5 }}>
+          {label}
+        </div>
+        <div
+          style={{ color: color || C.txt, fontSize: 14, fontWeight: 700, marginTop: 2 }}>
+          {val}
+        </div>
+      </div>
     );
   }
   function rocCard(title, ref) {
     if (!ref) {
-      return React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10 } },
-        React.createElement("div", { style: { color: C.mut, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 } }, title),
-        React.createElement("div", { style: { color: C.mut, fontSize: 12, marginTop: 6 } }, "No reference reading")
+      return (
+        <div
+          style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10 }}>
+          <div
+            style={{ color: C.mut, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>
+            {title}
+          </div>
+          <div style={{ color: C.mut, fontSize: 12, marginTop: 6 }}>
+            No reference reading
+          </div>
+        </div>
       );
     }
     var dW = L.weight != null && ref.weight != null ? (L.weight - ref.weight) : null;
@@ -1925,60 +2112,142 @@ function BodyCompView() {
     var leanColor = dLean == null ? C.mut : (dLean >= 0 ? C.grn : C.red);
     var fatColor = dFat == null ? C.mut : (dFat <= 0 ? C.grn : C.red);
     var wColor = dW == null ? C.mut : (dW < 0 ? C.grn : C.red);
-    return React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10 } },
-      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 } },
-        React.createElement("div", { style: { color: C.mut, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 } }, title),
-        React.createElement("div", { style: { color: C.mut, fontSize: 9 } }, days + "d · " + fmtShortDate(ref.date))
-      ),
-      React.createElement("div", { style: { marginTop: 6, display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 4 } },
-        React.createElement("div", null, React.createElement("div", { style: { color: C.mut, fontSize: 9 } }, "Weight"), React.createElement("div", { style: { color: wColor, fontSize: 13, fontWeight: 700 } }, fmtSignedNum(dW, 1) + " lb")),
-        React.createElement("div", null, React.createElement("div", { style: { color: C.mut, fontSize: 9 } }, "BF%"), React.createElement("div", { style: { color: dBF == null ? C.mut : (dBF <= 0 ? C.grn : C.red), fontSize: 13, fontWeight: 700 } }, fmtSignedNum(dBF, 1) + "%")),
-        React.createElement("div", null, React.createElement("div", { style: { color: C.mut, fontSize: 9 } }, "Lean"), React.createElement("div", { style: { color: leanColor, fontSize: 13, fontWeight: 700 } }, fmtSignedNum(dLean, 1) + " lb")),
-        React.createElement("div", null, React.createElement("div", { style: { color: C.mut, fontSize: 9 } }, "Fat"), React.createElement("div", { style: { color: fatColor, fontSize: 13, fontWeight: 700 } }, fmtSignedNum(dFat, 1) + " lb"))
-      )
+    return (
+      <div
+        style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10 }}>
+        <div
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+          <div
+            style={{ color: C.mut, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>
+            {title}
+          </div>
+          <div style={{ color: C.mut, fontSize: 9 }}>
+            {days + "d · " + fmtShortDate(ref.date)}
+          </div>
+        </div>
+        <div
+          style={{ marginTop: 6, display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 4 }}>
+          <div>
+            <div style={{ color: C.mut, fontSize: 9 }}>
+              Weight
+            </div>
+            <div style={{ color: wColor, fontSize: 13, fontWeight: 700 }}>
+              {fmtSignedNum(dW, 1) + " lb"}
+            </div>
+          </div>
+          <div>
+            <div style={{ color: C.mut, fontSize: 9 }}>
+              BF%
+            </div>
+            <div
+              style={{ color: dBF == null ? C.mut : (dBF <= 0 ? C.grn : C.red), fontSize: 13, fontWeight: 700 }}>
+              {fmtSignedNum(dBF, 1) + "%"}
+            </div>
+          </div>
+          <div>
+            <div style={{ color: C.mut, fontSize: 9 }}>
+              Lean
+            </div>
+            <div style={{ color: leanColor, fontSize: 13, fontWeight: 700 }}>
+              {fmtSignedNum(dLean, 1) + " lb"}
+            </div>
+          </div>
+          <div>
+            <div style={{ color: C.mut, fontSize: 9 }}>
+              Fat
+            </div>
+            <div style={{ color: fatColor, fontSize: 13, fontWeight: 700 }}>
+              {fmtSignedNum(dFat, 1) + " lb"}
+            </div>
+          </div>
+        </div>
+      </div>
     );
   }
   function chartBlock(title, key, color, unit) {
     var pts = asc.map(function(r) { return { date: r.date, val: r[key] }; });
-    return React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10, marginBottom: 8 } },
-      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 } },
-        React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 700 } }, title),
-        React.createElement("div", { style: { color: color, fontSize: 13, fontWeight: 700 } }, L[key] != null ? L[key].toFixed(unit === "%" ? 1 : 1) + (unit ? " " + unit : "") : "—")
-      ),
-      React.createElement(TrendChart, { data: pts, color: color, unit: unit, markerDate: META_MESO_START, onTap: function(d) { var idx = asc.findIndex(function(r) { return r.date === d.date; }); if (idx >= 0) setDetailIdx(idx); } })
+    return (
+      <div
+        style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10, marginBottom: 8 }}>
+        <div
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+          <div style={{ color: C.txt, fontSize: 12, fontWeight: 700 }}>
+            {title}
+          </div>
+          <div style={{ color: color, fontSize: 13, fontWeight: 700 }}>
+            {L[key] != null ? L[key].toFixed(unit === "%" ? 1 : 1) + (unit ? " " + unit : "") : "—"}
+          </div>
+        </div>
+        <TrendChart
+          data={pts}
+          color={color}
+          unit={unit}
+          markerDate={META_MESO_START}
+          onTap={function(d) { var idx = asc.findIndex(function(r) { return r.date === d.date; }); if (idx >= 0) setDetailIdx(idx); }} />
+      </div>
     );
   }
-  return React.createElement("div", null,
-    React.createElement("div", { style: { background: C.card, borderRadius: 12, padding: 14, border: "1px solid " + C.bdr, marginBottom: 8, cursor: "pointer" }, onClick: function() { setDetailIdx(asc.length - 1); } },
-      React.createElement("div", { style: { color: C.mut, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 } }, "Latest · " + fmtShortDate(L.date)),
-      React.createElement("div", { style: { display: "flex", alignItems: "baseline", gap: 6, marginBottom: 8 } },
-        React.createElement("div", { style: { color: C.txt, fontSize: 32, fontWeight: 800, lineHeight: 1 } }, L.weight != null ? L.weight.toFixed(1) : "—"),
-        React.createElement("div", { style: { color: C.mut, fontSize: 13 } }, "lb")
-      ),
-      React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 } },
-        mini("BF%", L.bf != null ? L.bf.toFixed(1) + "%" : "—", C.gld),
-        mini("Lean", L.lean != null ? L.lean.toFixed(1) + " lb" : "—", C.grn),
-        mini("Fat", L.fat != null ? L.fat.toFixed(1) + " lb" : "—", C.red)
-      )
-    ),
-    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 } },
-      rocCard("7-Day", ref7), rocCard("28-Day", ref28), rocCard("From Peak", peak), rocCard("Since Meso 1", sinceMeso)
-    ),
-    chartBlock("Weight", "weight", C.blu, "lb"),
-    chartBlock("Body Fat", "bf", C.gld, "%"),
-    chartBlock("Lean Mass", "lean", C.grn, "lb"),
-    chartBlock("Fat Mass", "fat", C.red, "lb"),
-    React.createElement("div", { style: { color: C.mut, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, marginTop: 8 } }, "All Readings (" + asc.length + ")"),
-    asc.slice().reverse().map(function(r, i) {
-      var origIdx = asc.length - 1 - i;
-      return React.createElement("div", { key: r.date, onClick: function() { setDetailIdx(origIdx); }, style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 6px", borderBottom: "1px solid " + C.bdr, cursor: "pointer" } },
-        React.createElement("div", null,
-          React.createElement("div", { style: { color: C.txt, fontSize: 13, fontWeight: 600 } }, fmtShortDate(r.date)),
-          r.bf != null ? React.createElement("div", { style: { color: C.mut, fontSize: 11, marginTop: 2 } }, r.bf.toFixed(1) + "% BF" + (r.lean != null ? " · " + r.lean.toFixed(1) + " lean" : "")) : null
-        ),
-        React.createElement("div", { style: { color: C.txt, fontSize: 15, fontWeight: 700 } }, r.weight != null ? r.weight.toFixed(1) + " lb" : "—")
-      );
-    })
+  return (
+    <div>
+      <div
+        style={{ background: C.card, borderRadius: 12, padding: 14, border: "1px solid " + C.bdr, marginBottom: 8, cursor: "pointer" }}
+        onClick={function() { setDetailIdx(asc.length - 1); }}>
+        <div
+          style={{ color: C.mut, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 4 }}>
+          {"Latest · " + fmtShortDate(L.date)}
+        </div>
+        <div
+          style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 8 }}>
+          <div style={{ color: C.txt, fontSize: 32, fontWeight: 800, lineHeight: 1 }}>
+            {L.weight != null ? L.weight.toFixed(1) : "—"}
+          </div>
+          <div style={{ color: C.mut, fontSize: 13 }}>
+            lb
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+          {mini("BF%", L.bf != null ? L.bf.toFixed(1) + "%" : "—", C.gld)}
+          {mini("Lean", L.lean != null ? L.lean.toFixed(1) + " lb" : "—", C.grn)}
+          {mini("Fat", L.fat != null ? L.fat.toFixed(1) + " lb" : "—", C.red)}
+        </div>
+      </div>
+      <div
+        style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+        {rocCard("7-Day", ref7)}
+        {rocCard("28-Day", ref28)}
+        {rocCard("From Peak", peak)}
+        {rocCard("Since Meso 1", sinceMeso)}
+      </div>
+      {chartBlock("Weight", "weight", C.blu, "lb")}
+      {chartBlock("Body Fat", "bf", C.gld, "%")}
+      {chartBlock("Lean Mass", "lean", C.grn, "lb")}
+      {chartBlock("Fat Mass", "fat", C.red, "lb")}
+      <div
+        style={{ color: C.mut, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, marginTop: 8 }}>
+        {"All Readings (" + asc.length + ")"}
+      </div>
+      {asc.slice().reverse().map(function(r, i) {
+        var origIdx = asc.length - 1 - i;
+        return (
+          <div
+            key={r.date}
+            onClick={function() { setDetailIdx(origIdx); }}
+            style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 6px", borderBottom: "1px solid " + C.bdr, cursor: "pointer" }}>
+            <div>
+              <div style={{ color: C.txt, fontSize: 13, fontWeight: 600 }}>
+                {fmtShortDate(r.date)}
+              </div>
+              {r.bf != null ? <div style={{ color: C.mut, fontSize: 11, marginTop: 2 }}>
+                {r.bf.toFixed(1) + "% BF" + (r.lean != null ? " · " + r.lean.toFixed(1) + " lean" : "")}
+              </div> : null}
+            </div>
+            <div style={{ color: C.txt, fontSize: 15, fontWeight: 700 }}>
+              {r.weight != null ? r.weight.toFixed(1) + " lb" : "—"}
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 function ReadingDetailView(props) {
@@ -1990,41 +2259,77 @@ function ReadingDetailView(props) {
       var good = betterDir === "up" ? d > 0 : (betterDir === "down" ? d < 0 : false);
       color = good ? C.grn : (betterDir ? C.red : C.mut);
     }
-    return React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "8px 0", borderBottom: "1px solid " + C.bdr } },
-      React.createElement("div", { style: { color: C.mut, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, paddingTop: 2 } }, label),
-      React.createElement("div", { style: { textAlign: "right" } },
-        React.createElement("div", { style: { color: C.txt, fontSize: 15, fontWeight: 700 } }, curV != null ? curV.toFixed(dp1) + (unit ? " " + unit : "") : "—"),
-        d != null ? React.createElement("div", { style: { color: color, fontSize: 11, marginTop: 2 } }, fmtSignedNum(d, dp1) + (unit ? " " + unit : "") + (prev ? " vs " + fmtShortDate(prev.date) : "")) : null
-      )
+    return (
+      <div
+        style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "8px 0", borderBottom: "1px solid " + C.bdr }}>
+        <div
+          style={{ color: C.mut, fontSize: 11, textTransform: "uppercase", letterSpacing: 0.5, paddingTop: 2 }}>
+          {label}
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ color: C.txt, fontSize: 15, fontWeight: 700 }}>
+            {curV != null ? curV.toFixed(dp1) + (unit ? " " + unit : "") : "—"}
+          </div>
+          {d != null ? <div style={{ color: color, fontSize: 11, marginTop: 2 }}>
+            {fmtSignedNum(d, dp1) + (unit ? " " + unit : "") + (prev ? " vs " + fmtShortDate(prev.date) : "")}
+          </div> : null}
+        </div>
+      </div>
     );
   }
-  return React.createElement("div", null,
-    React.createElement("button", { onClick: props.onBack, style: { background: "transparent", border: "1px solid " + C.bdr, color: C.mut, fontSize: 12, borderRadius: 8, padding: "6px 14px", marginBottom: 10, cursor: "pointer" } }, "← Back"),
-    React.createElement("div", { style: { background: C.card, borderRadius: 12, padding: 14, border: "1px solid " + C.bdr } },
-      React.createElement("div", { style: { color: C.mut, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 } }, fmtShortDate(cur.date)),
-      row("Weight", cur.weight, prev ? prev.weight : null, "lb", 1, "down"),
-      row("Body Fat", cur.bf, prev ? prev.bf : null, "%", 1, "down"),
-      row("Lean Mass", cur.lean, prev ? prev.lean : null, "lb", 1, "up"),
-      row("Fat Mass", cur.fat, prev ? prev.fat : null, "lb", 1, "down"),
-      cur.raw && cur.raw.resting_hr != null ? row("Resting HR", parseFloat(cur.raw.resting_hr), prev && prev.raw && prev.raw.resting_hr != null ? parseFloat(prev.raw.resting_hr) : null, "bpm", 0, "down") : null,
-      cur.raw && cur.raw.waist_inches != null ? row("Waist", parseFloat(cur.raw.waist_inches), prev && prev.raw && prev.raw.waist_inches != null ? parseFloat(prev.raw.waist_inches) : null, "in", 1, "down") : null,
-      cur.raw && cur.raw.notes ? React.createElement("div", { style: { marginTop: 10, color: C.mut, fontSize: 12 } }, cur.raw.notes) : null
-    )
+  return (
+    <div>
+      <button
+        onClick={props.onBack}
+        style={{ background: "transparent", border: "1px solid " + C.bdr, color: C.mut, fontSize: 12, borderRadius: 8, padding: "6px 14px", marginBottom: 10, cursor: "pointer" }}>
+        ← Back
+      </button>
+      <div
+        style={{ background: C.card, borderRadius: 12, padding: 14, border: "1px solid " + C.bdr }}>
+        <div
+          style={{ color: C.mut, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 8 }}>
+          {fmtShortDate(cur.date)}
+        </div>
+        {row("Weight", cur.weight, prev ? prev.weight : null, "lb", 1, "down")}
+        {row("Body Fat", cur.bf, prev ? prev.bf : null, "%", 1, "down")}
+        {row("Lean Mass", cur.lean, prev ? prev.lean : null, "lb", 1, "up")}
+        {row("Fat Mass", cur.fat, prev ? prev.fat : null, "lb", 1, "down")}
+        {cur.raw && cur.raw.resting_hr != null ? row("Resting HR", parseFloat(cur.raw.resting_hr), prev && prev.raw && prev.raw.resting_hr != null ? parseFloat(prev.raw.resting_hr) : null, "bpm", 0, "down") : null}
+        {cur.raw && cur.raw.waist_inches != null ? row("Waist", parseFloat(cur.raw.waist_inches), prev && prev.raw && prev.raw.waist_inches != null ? parseFloat(prev.raw.waist_inches) : null, "in", 1, "down") : null}
+        {cur.raw && cur.raw.notes ? <div style={{ marginTop: 10, color: C.mut, fontSize: 12 }}>
+          {cur.raw.notes}
+        </div> : null}
+      </div>
+    </div>
   );
 }
 function SparkLine(props) {
   var data = (props.data || []).filter(function(d) { return d != null && d.val != null; });
   var w = props.width || 80, h = props.height || 30, color = props.color || C.blu;
-  if (data.length < 2) return React.createElement("div", { style: { width: w, height: h } });
+  if (data.length < 2) return <div style={{ width: w, height: h }} />;
   var vals = data.map(function(d) { return d.val; });
   var mn = Math.min.apply(null, vals), mx = Math.max.apply(null, vals), rng = mx - mn || 1;
   var pts = data.map(function(d, i) { return ((i / (data.length - 1)) * (w - 4) + 2).toFixed(1) + "," + (h - 2 - ((d.val - mn) / rng) * (h - 6)).toFixed(1); });
-  return React.createElement("svg", { width: w, height: h, style: { display: "block", marginTop: 6 } },
-    React.createElement("polyline", { points: pts.join(" "), fill: "none", stroke: color, strokeWidth: 1.5, strokeLinejoin: "round", strokeLinecap: "round" })
+  return (
+    <svg width={w} height={h} style={{ display: "block", marginTop: 6 }}>
+      <polyline
+        points={pts.join(" ")}
+        fill="none"
+        stroke={color}
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+        strokeLinecap="round" />
+    </svg>
   );
 }
 function BackBtn(props) {
-  return React.createElement("button", { onClick: props.onClick, style: { background: "transparent", border: "1px solid " + C.bdr, color: C.mut, fontSize: 12, borderRadius: 8, padding: "6px 14px", marginBottom: 12, cursor: "pointer" } }, "\u2190 Back");
+  return (
+    <button
+      onClick={props.onClick}
+      style={{ background: "transparent", border: "1px solid " + C.bdr, color: C.mut, fontSize: 12, borderRadius: 8, padding: "6px 14px", marginBottom: 12, cursor: "pointer" }}>
+      ← Back
+    </button>
+  );
 }
 function SessionDetailView(props) {
   var session = props.session, allSets = props.allSets;
@@ -2032,44 +2337,97 @@ function SessionDetailView(props) {
   var exOrder = [], byEx = {};
   sSets.forEach(function(s) { if (!byEx[s.exId]) { byEx[s.exId] = { name: s.exName, sets: [] }; exOrder.push(s.exId); } byEx[s.exId].sets.push(s); });
   var totalVol = sSets.reduce(function(sm, s) { return sm + s.weight * s.reps; }, 0);
-  return React.createElement("div", null,
-    React.createElement(BackBtn, { onClick: props.onBack }),
-    React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: 14, marginBottom: 10 } },
-      React.createElement("div", { style: { color: C.txt, fontSize: 15, fontWeight: 800, marginBottom: 4 } }, session.notes || fmtShortDate(session.date)),
-      React.createElement("div", { style: { color: C.mut, fontSize: 11, marginBottom: 10 } }, fmtShortDate(session.date) + (session.week_number != null ? " \u00b7 W" + session.week_number : "") + (session.rir != null ? " \u00b7 " + session.rir + " RIR" : "")),
-      React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 } },
-        React.createElement("div", { style: { background: C.c2, borderRadius: 8, padding: "6px 8px" } }, React.createElement("div", { style: { color: C.mut, fontSize: 9, textTransform: "uppercase" } }, "Exercises"), React.createElement("div", { style: { color: C.txt, fontSize: 15, fontWeight: 700, marginTop: 2 } }, exOrder.length)),
-        React.createElement("div", { style: { background: C.c2, borderRadius: 8, padding: "6px 8px" } }, React.createElement("div", { style: { color: C.mut, fontSize: 9, textTransform: "uppercase" } }, "Sets"), React.createElement("div", { style: { color: C.txt, fontSize: 15, fontWeight: 700, marginTop: 2 } }, sSets.length)),
-        React.createElement("div", { style: { background: C.c2, borderRadius: 8, padding: "6px 8px" } }, React.createElement("div", { style: { color: C.mut, fontSize: 9, textTransform: "uppercase" } }, "Volume"), React.createElement("div", { style: { color: C.gld, fontSize: 15, fontWeight: 700, marginTop: 2 } }, (totalVol / 1000).toFixed(1) + "k"))
-      )
-    ),
-    exOrder.map(function(exId) {
-      var ex = byEx[exId];
-      return React.createElement("div", { key: exId, style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 12, marginBottom: 8 } },
-        React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 700, marginBottom: 8 } }, ex.name),
-        React.createElement("table", { style: { width: "100%", fontSize: 11, borderCollapse: "collapse" } },
-          React.createElement("thead", null,
-            React.createElement("tr", { style: { color: C.mut, borderBottom: "1px solid " + C.bdr } },
-              React.createElement("th", { style: { padding: "3px 6px", textAlign: "center", fontWeight: 600 } }, "#"),
-              React.createElement("th", { style: { padding: "3px 6px", textAlign: "right", fontWeight: 600 } }, "Weight"),
-              React.createElement("th", { style: { padding: "3px 6px", textAlign: "right", fontWeight: 600 } }, "Reps"),
-              React.createElement("th", { style: { padding: "3px 6px", textAlign: "right", fontWeight: 600 } }, "e1RM")
-            )
-          ),
-          React.createElement("tbody", null,
-            ex.sets.map(function(s, si) {
-              var e1rm = s.weight * (1 + s.reps / 30);
-              return React.createElement("tr", { key: si, style: { borderBottom: "1px solid " + C.bdr } },
-                React.createElement("td", { style: { padding: "5px 6px", textAlign: "center", color: C.mut } }, si + 1),
-                React.createElement("td", { style: { padding: "5px 6px", textAlign: "right", color: C.txt, fontWeight: 600 } }, s.weight + " lb"),
-                React.createElement("td", { style: { padding: "5px 6px", textAlign: "right", color: C.grn } }, s.reps),
-                React.createElement("td", { style: { padding: "5px 6px", textAlign: "right", color: C.mut } }, e1rm.toFixed(0))
-              );
-            })
-          )
-        )
-      );
-    })
+  return (
+    <div>
+      <BackBtn onClick={props.onBack} />
+      <div
+        style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: 14, marginBottom: 10 }}>
+        <div style={{ color: C.txt, fontSize: 15, fontWeight: 800, marginBottom: 4 }}>
+          {session.notes || fmtShortDate(session.date)}
+        </div>
+        <div style={{ color: C.mut, fontSize: 11, marginBottom: 10 }}>
+          {fmtShortDate(session.date) + (session.week_number != null ? " \u00b7 W" + session.week_number : "") + (session.rir != null ? " \u00b7 " + session.rir + " RIR" : "")}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
+          <div style={{ background: C.c2, borderRadius: 8, padding: "6px 8px" }}>
+            <div style={{ color: C.mut, fontSize: 9, textTransform: "uppercase" }}>
+              Exercises
+            </div>
+            <div style={{ color: C.txt, fontSize: 15, fontWeight: 700, marginTop: 2 }}>
+              {exOrder.length}
+            </div>
+          </div>
+          <div style={{ background: C.c2, borderRadius: 8, padding: "6px 8px" }}>
+            <div style={{ color: C.mut, fontSize: 9, textTransform: "uppercase" }}>
+              Sets
+            </div>
+            <div style={{ color: C.txt, fontSize: 15, fontWeight: 700, marginTop: 2 }}>
+              {sSets.length}
+            </div>
+          </div>
+          <div style={{ background: C.c2, borderRadius: 8, padding: "6px 8px" }}>
+            <div style={{ color: C.mut, fontSize: 9, textTransform: "uppercase" }}>
+              Volume
+            </div>
+            <div style={{ color: C.gld, fontSize: 15, fontWeight: 700, marginTop: 2 }}>
+              {(totalVol / 1000).toFixed(1) + "k"}
+            </div>
+          </div>
+        </div>
+      </div>
+      {exOrder.map(function(exId) {
+        var ex = byEx[exId];
+        return (
+          <div
+            key={exId}
+            style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 12, marginBottom: 8 }}>
+            <div style={{ color: C.txt, fontSize: 12, fontWeight: 700, marginBottom: 8 }}>
+              {ex.name}
+            </div>
+            <table style={{ width: "100%", fontSize: 11, borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ color: C.mut, borderBottom: "1px solid " + C.bdr }}>
+                  <th style={{ padding: "3px 6px", textAlign: "center", fontWeight: 600 }}>
+                    #
+                  </th>
+                  <th style={{ padding: "3px 6px", textAlign: "right", fontWeight: 600 }}>
+                    Weight
+                  </th>
+                  <th style={{ padding: "3px 6px", textAlign: "right", fontWeight: 600 }}>
+                    Reps
+                  </th>
+                  <th style={{ padding: "3px 6px", textAlign: "right", fontWeight: 600 }}>
+                    e1RM
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {ex.sets.map(function(s, si) {
+                  var e1rm = s.weight * (1 + s.reps / 30);
+                  return (
+                    <tr key={si} style={{ borderBottom: "1px solid " + C.bdr }}>
+                      <td style={{ padding: "5px 6px", textAlign: "center", color: C.mut }}>
+                        {si + 1}
+                      </td>
+                      <td
+                        style={{ padding: "5px 6px", textAlign: "right", color: C.txt, fontWeight: 600 }}>
+                        {s.weight + " lb"}
+                      </td>
+                      <td style={{ padding: "5px 6px", textAlign: "right", color: C.grn }}>
+                        {s.reps}
+                      </td>
+                      <td style={{ padding: "5px 6px", textAlign: "right", color: C.mut }}>
+                        {e1rm.toFixed(0)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 function MuscleGroupDetailView(props) {
@@ -2097,45 +2455,81 @@ function MuscleGroupDetailView(props) {
   });
   exNames = exNames.sort(function(a, b) { return exMap[b].topE1rm - exMap[a].topE1rm; });
   function mini(label, val, color) {
-    return React.createElement("div", { style: { background: C.c2, borderRadius: 8, padding: "6px 8px" } },
-      React.createElement("div", { style: { color: C.mut, fontSize: 9, textTransform: "uppercase" } }, label),
-      React.createElement("div", { style: { color: color || C.txt, fontSize: 14, fontWeight: 700, marginTop: 2 } }, val != null ? String(val) : "\u2014")
+    return (
+      <div style={{ background: C.c2, borderRadius: 8, padding: "6px 8px" }}>
+        <div style={{ color: C.mut, fontSize: 9, textTransform: "uppercase" }}>
+          {label}
+        </div>
+        <div
+          style={{ color: color || C.txt, fontSize: 14, fontWeight: 700, marginTop: 2 }}>
+          {val != null ? String(val) : "\u2014"}
+        </div>
+      </div>
     );
   }
-  return React.createElement("div", null,
-    React.createElement(BackBtn, { onClick: props.onBack }),
-    React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: 14, marginBottom: 10 } },
-      React.createElement("div", { style: { color: C.txt, fontSize: 16, fontWeight: 800, marginBottom: lm ? 10 : 0 } }, mg),
-      lm ? React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 } },
-        mini("MEV", lm.mev_sets, C.red), mini("MAV", lm.mav_sets, C.grn), mini("MRV", lm.mrv_sets, C.gld)
-      ) : null
-    ),
-    wData.length ? React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10, marginBottom: 8 } },
-      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 } },
-        React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 700 } }, "Sets per Week"),
-        (function() {
-          if (wData.length < 2) return null;
-          var trend = wData[wData.length - 1].val - wData[0].val;
-          var label = trend > 0 ? "↑ Progressing" : trend < 0 ? "↓ Tapering" : "→ Stable";
-          var color = trend > 0 ? C.grn : trend < 0 ? C.gld : C.mut;
-          return React.createElement("div", { style: { color: color, fontSize: 10, fontWeight: 700 } }, label);
-        })()
-      ),
-      React.createElement(BarsChart, { data: wData })
-    ) : null,
-    exNames.length ? React.createElement("div", null,
-      React.createElement("div", { style: { color: C.mut, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 } }, "Exercises (" + exNames.length + ")"),
-      exNames.map(function(n) {
-        var ex = exMap[n];
-        return React.createElement("div", { key: n, style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 6px", borderBottom: "1px solid " + C.bdr } },
-          React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 600 } }, n),
-          React.createElement("div", { style: { textAlign: "right" } },
-            React.createElement("div", { style: { color: C.blu, fontSize: 12, fontWeight: 700 } }, ex.topE1rm.toFixed(0) + " lb e1RM"),
-            React.createElement("div", { style: { color: C.mut, fontSize: 10 } }, ex.count + " sets")
-          )
-        );
-      })
-    ) : null
+  return (
+    <div>
+      <BackBtn onClick={props.onBack} />
+      <div
+        style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: 14, marginBottom: 10 }}>
+        <div
+          style={{ color: C.txt, fontSize: 16, fontWeight: 800, marginBottom: lm ? 10 : 0 }}>
+          {mg}
+        </div>
+        {lm ? <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+          {mini("MEV", lm.mev_sets, C.red)}
+          {mini("MAV", lm.mav_sets, C.grn)}
+          {mini("MRV", lm.mrv_sets, C.gld)}
+        </div> : null}
+      </div>
+      {wData.length ? <div
+        style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10, marginBottom: 8 }}>
+        <div
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+          <div style={{ color: C.txt, fontSize: 12, fontWeight: 700 }}>
+            Sets per Week
+          </div>
+          {(function() {
+            if (wData.length < 2) return null;
+            var trend = wData[wData.length - 1].val - wData[0].val;
+            var label = trend > 0 ? "↑ Progressing" : trend < 0 ? "↓ Tapering" : "→ Stable";
+            var color = trend > 0 ? C.grn : trend < 0 ? C.gld : C.mut;
+            return (
+              <div style={{ color: color, fontSize: 10, fontWeight: 700 }}>
+                {label}
+              </div>
+            );
+          })()}
+        </div>
+        <BarsChart data={wData} />
+      </div> : null}
+      {exNames.length ? <div>
+        <div
+          style={{ color: C.mut, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+          {"Exercises (" + exNames.length + ")"}
+        </div>
+        {exNames.map(function(n) {
+          var ex = exMap[n];
+          return (
+            <div
+              key={n}
+              style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 6px", borderBottom: "1px solid " + C.bdr }}>
+              <div style={{ color: C.txt, fontSize: 12, fontWeight: 600 }}>
+                {n}
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ color: C.blu, fontSize: 12, fontWeight: 700 }}>
+                  {ex.topE1rm.toFixed(0) + " lb e1RM"}
+                </div>
+                <div style={{ color: C.mut, fontSize: 10 }}>
+                  {ex.count + " sets"}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div> : null}
+    </div>
   );
 }
 function ExerciseDetailView(props) {
@@ -2167,53 +2561,126 @@ function ExerciseDetailView(props) {
   var pct = first && latest && first.top.e1rm > 0 ? Math.round((latest.top.e1rm / first.top.e1rm - 1) * 100) : 0;
   var bestSet = exSets.reduce(function(m, s) { return (m == null || s.weight > m.weight || (s.weight === m.weight && s.reps > m.reps)) ? s : m; }, null);
   var avgSets = sessionTops.length ? (exSets.length / sessionTops.length).toFixed(1) : "—";
-  return React.createElement("div", null,
-    React.createElement(BackBtn, { onClick: props.onBack }),
-    React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: 14, marginBottom: 10 } },
-      React.createElement("div", { style: { color: C.txt, fontSize: 15, fontWeight: 800, marginBottom: 8 } }, exName),
-      latest ? React.createElement("div", { style: { display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 } },
-        React.createElement("div", { style: { color: C.blu, fontSize: 32, fontWeight: 800, lineHeight: 1 } }, latest.top.e1rm.toFixed(0)),
-        React.createElement("div", { style: { color: C.mut, fontSize: 13 } }, "lb e1RM"),
-        pct !== 0 ? React.createElement("div", { style: { color: pct > 0 ? C.grn : C.red, fontSize: 16, fontWeight: 700 } }, (pct > 0 ? "+" : "") + pct + "%") : null
-      ) : null,
-      React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 } },
-        React.createElement("div", { style: { background: C.c2, borderRadius: 8, padding: "6px 8px", textAlign: "center" } }, React.createElement("div", { style: { color: C.mut, fontSize: 9, textTransform: "uppercase" } }, "Sessions"), React.createElement("div", { style: { color: C.txt, fontSize: 15, fontWeight: 700 } }, sessionTops.length)),
-        React.createElement("div", { style: { background: C.c2, borderRadius: 8, padding: "6px 8px", textAlign: "center" } }, React.createElement("div", { style: { color: C.mut, fontSize: 9, textTransform: "uppercase" } }, "Total Sets"), React.createElement("div", { style: { color: C.txt, fontSize: 15, fontWeight: 700 } }, exSets.length)),
-        React.createElement("div", { style: { background: C.c2, borderRadius: 8, padding: "6px 8px", textAlign: "center" } }, React.createElement("div", { style: { color: C.mut, fontSize: 9, textTransform: "uppercase" } }, "Avg/Sess"), React.createElement("div", { style: { color: C.txt, fontSize: 15, fontWeight: 700 } }, avgSets))
-      ),
-      bestSet ? React.createElement("div", { style: { marginTop: 8, paddingTop: 8, borderTop: "1px solid " + C.bdr, display: "flex", justifyContent: "space-between", alignItems: "center" } },
-        React.createElement("div", { style: { color: C.mut, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 } }, "Best Set"),
-        React.createElement("div", { style: { color: C.gld, fontSize: 12, fontWeight: 700 } }, bestSet.weight + " lb × " + bestSet.reps + " · " + fmtShortDate(bestSet.date))
-      ) : null
-    ),
-    strengthSeries.length ? React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10, marginBottom: 8 } },
-      React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 700, marginBottom: 6 } }, "e1RM Trend"),
-      React.createElement(MultiSeriesChart, { series: strengthSeries, markerDate: META_MESO_START }),
-      strengthSeries.length > 1 ? React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 } },
-        strengthSeries.map(function(s, i) { return React.createElement("div", { key: i, style: { display: "flex", alignItems: "center", gap: 4 } }, React.createElement("div", { style: { width: 10, height: 2, background: s.color, borderRadius: 1 } }), React.createElement("div", { style: { color: C.mut, fontSize: 10 } }, s.label)); })
-      ) : null
-    ) : null,
-    volSeries.length > 1 ? React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10, marginBottom: 8 } },
-      React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 700, marginBottom: 6 } }, "Sets per Session"),
-      React.createElement(TrendChart, { data: volSeries, color: C.pur, unit: " sets", markerDate: META_MESO_START })
-    ) : null,
-    React.createElement("div", { style: { color: C.mut, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, marginTop: 4 } }, "Sessions (" + sessionTops.length + ")"),
-    sessionTops.slice().reverse().map(function(st, i) {
-      var sess = sessById[st.sessionId];
-      return React.createElement("div", { key: i, onClick: sess ? function() { props.onSession(sess); } : undefined, style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 6px", borderBottom: "1px solid " + C.bdr, cursor: sess ? "pointer" : "default" } },
-        React.createElement("div", null,
-          React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 600 } }, fmtShortDate(st.date)),
-          React.createElement("div", { style: { color: C.mut, fontSize: 10 } }, (st.mesoNote || "—") + (st.week != null ? " · W" + st.week : "") + " · " + st.setCount + " sets")
-        ),
-        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 8 } },
-          React.createElement("div", { style: { textAlign: "right" } },
-            React.createElement("div", { style: { color: C.txt, fontSize: 13, fontWeight: 700 } }, st.top.weight + " × " + st.top.reps),
-            React.createElement("div", { style: { color: mesoColor(st.mesoNote), fontSize: 10 } }, "e1RM " + st.top.e1rm.toFixed(0))
-          ),
-          sess ? React.createElement("div", { style: { color: C.mut, fontSize: 14 } }, "›") : null
-        )
-      );
-    })
+  return (
+    <div>
+      <BackBtn onClick={props.onBack} />
+      <div
+        style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: 14, marginBottom: 10 }}>
+        <div style={{ color: C.txt, fontSize: 15, fontWeight: 800, marginBottom: 8 }}>
+          {exName}
+        </div>
+        {latest ? <div
+          style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 10 }}>
+          <div style={{ color: C.blu, fontSize: 32, fontWeight: 800, lineHeight: 1 }}>
+            {latest.top.e1rm.toFixed(0)}
+          </div>
+          <div style={{ color: C.mut, fontSize: 13 }}>
+            lb e1RM
+          </div>
+          {pct !== 0 ? <div style={{ color: pct > 0 ? C.grn : C.red, fontSize: 16, fontWeight: 700 }}>
+            {(pct > 0 ? "+" : "") + pct + "%"}
+          </div> : null}
+        </div> : null}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+          <div
+            style={{ background: C.c2, borderRadius: 8, padding: "6px 8px", textAlign: "center" }}>
+            <div style={{ color: C.mut, fontSize: 9, textTransform: "uppercase" }}>
+              Sessions
+            </div>
+            <div style={{ color: C.txt, fontSize: 15, fontWeight: 700 }}>
+              {sessionTops.length}
+            </div>
+          </div>
+          <div
+            style={{ background: C.c2, borderRadius: 8, padding: "6px 8px", textAlign: "center" }}>
+            <div style={{ color: C.mut, fontSize: 9, textTransform: "uppercase" }}>
+              Total Sets
+            </div>
+            <div style={{ color: C.txt, fontSize: 15, fontWeight: 700 }}>
+              {exSets.length}
+            </div>
+          </div>
+          <div
+            style={{ background: C.c2, borderRadius: 8, padding: "6px 8px", textAlign: "center" }}>
+            <div style={{ color: C.mut, fontSize: 9, textTransform: "uppercase" }}>
+              Avg/Sess
+            </div>
+            <div style={{ color: C.txt, fontSize: 15, fontWeight: 700 }}>
+              {avgSets}
+            </div>
+          </div>
+        </div>
+        {bestSet ? <div
+          style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid " + C.bdr, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div
+            style={{ color: C.mut, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>
+            Best Set
+          </div>
+          <div style={{ color: C.gld, fontSize: 12, fontWeight: 700 }}>
+            {bestSet.weight + " lb × " + bestSet.reps + " · " + fmtShortDate(bestSet.date)}
+          </div>
+        </div> : null}
+      </div>
+      {strengthSeries.length ? <div
+        style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10, marginBottom: 8 }}>
+        <div style={{ color: C.txt, fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
+          e1RM Trend
+        </div>
+        <MultiSeriesChart series={strengthSeries} markerDate={META_MESO_START} />
+        {strengthSeries.length > 1 ? <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 }}>
+          {strengthSeries.map(function(s, i) { return (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <div style={{ width: 10, height: 2, background: s.color, borderRadius: 1 }} />
+              <div style={{ color: C.mut, fontSize: 10 }}>
+                {s.label}
+              </div>
+            </div>
+          ); })}
+        </div> : null}
+      </div> : null}
+      {volSeries.length > 1 ? <div
+        style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10, marginBottom: 8 }}>
+        <div style={{ color: C.txt, fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
+          Sets per Session
+        </div>
+        <TrendChart data={volSeries} color={C.pur} unit=" sets" markerDate={META_MESO_START} />
+      </div> : null}
+      <div
+        style={{ color: C.mut, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6, marginTop: 4 }}>
+        {"Sessions (" + sessionTops.length + ")"}
+      </div>
+      {sessionTops.slice().reverse().map(function(st, i) {
+        var sess = sessById[st.sessionId];
+        return (
+          <div
+            key={i}
+            onClick={sess ? function() { props.onSession(sess); } : undefined}
+            style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 6px", borderBottom: "1px solid " + C.bdr, cursor: sess ? "pointer" : "default" }}>
+            <div>
+              <div style={{ color: C.txt, fontSize: 12, fontWeight: 600 }}>
+                {fmtShortDate(st.date)}
+              </div>
+              <div style={{ color: C.mut, fontSize: 10 }}>
+                {(st.mesoNote || "—") + (st.week != null ? " · W" + st.week : "") + " · " + st.setCount + " sets"}
+              </div>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ textAlign: "right" }}>
+                <div style={{ color: C.txt, fontSize: 13, fontWeight: 700 }}>
+                  {st.top.weight + " × " + st.top.reps}
+                </div>
+                <div style={{ color: mesoColor(st.mesoNote), fontSize: 10 }}>
+                  {"e1RM " + st.top.e1rm.toFixed(0)}
+                </div>
+              </div>
+              {sess ? <div style={{ color: C.mut, fontSize: 14 }}>
+                ›
+              </div> : null}
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 function PerformanceView() {
@@ -2224,9 +2691,17 @@ function PerformanceView() {
       .then(function(arr) { setLoaded({ sessions: arr[0] || [], landmarks: arr[1] || [] }); })
       .catch(function() { setLoaded({ sessions: [], landmarks: [] }); });
   }, []);
-  if (!loaded) return React.createElement("div", { style: { padding: 32, textAlign: "center", color: C.mut } }, "Loading…");
+  if (!loaded) return (
+    <div style={{ padding: 32, textAlign: "center", color: C.mut }}>
+      Loading…
+    </div>
+  );
   var sessions = loaded.sessions, landmarks = loaded.landmarks;
-  if (sessions.length === 0) return React.createElement("div", { style: { padding: 32, textAlign: "center", color: C.mut } }, "No sessions logged yet.");
+  if (sessions.length === 0) return (
+    <div style={{ padding: 32, textAlign: "center", color: C.mut }}>
+      No sessions logged yet.
+    </div>
+  );
   var sessById = {}; sessions.forEach(function(s) { sessById[s.id] = s; });
   var lmByMG = {}; landmarks.forEach(function(l) { lmByMG[l.muscle_group] = l; });
   var annotatedSets = [];
@@ -2240,9 +2715,16 @@ function PerformanceView() {
   function push(page) { setNavStack(navStack.concat([page])); }
   function pop() { setNavStack(navStack.slice(0, -1)); }
   var cur = navStack.length ? navStack[navStack.length - 1] : null;
-  if (cur && cur.type === "session") return React.createElement(SessionDetailView, { session: cur.session, allSets: annotatedSets, onBack: pop });
-  if (cur && cur.type === "mg") return React.createElement(MuscleGroupDetailView, { mg: cur.mg, allSets: annotatedSets, lmByMG: lmByMG, onBack: pop });
-  if (cur && cur.type === "exercise") return React.createElement(ExerciseDetailView, { exName: cur.exName, allSets: annotatedSets, sessById: sessById, onBack: pop, onSession: function(sess) { push({ type: "session", session: sess }); } });
+  if (cur && cur.type === "session") return <SessionDetailView session={cur.session} allSets={annotatedSets} onBack={pop} />;
+  if (cur && cur.type === "mg") return <MuscleGroupDetailView mg={cur.mg} allSets={annotatedSets} lmByMG={lmByMG} onBack={pop} />;
+  if (cur && cur.type === "exercise") return (
+    <ExerciseDetailView
+      exName={cur.exName}
+      allSets={annotatedSets}
+      sessById={sessById}
+      onBack={pop}
+      onSession={function(sess) { push({ type: "session", session: sess }); }} />
+  );
   var lastSession = sessions.slice().sort(function(a, b) { return a.date < b.date ? 1 : -1; })[0];
   var curWeek = lastSession ? lastSession.week_number : null;
   var curMesoNote = lastSession ? ((lastSession.notes || "").match(/^(Meso \d+)/) || [])[1] || null : null;
@@ -2278,89 +2760,211 @@ function PerformanceView() {
     return { label: mg, val: v, color: color, unit: " sets" };
   }).filter(function(b) { return b.val > 0 || lmByMG[b.label]; });
   var recentSessions = sessions.slice().sort(function(a, b) { return a.date < b.date ? 1 : -1; });
-  return React.createElement("div", null,
-    curMesoNote ? React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: 14, marginBottom: 10 } },
-      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 } },
-        React.createElement("div", null,
-          React.createElement("div", { style: { color: C.txt, fontSize: 16, fontWeight: 800 } }, curMesoNote),
-          curWeek != null ? React.createElement("div", { style: { color: C.mut, fontSize: 11, marginTop: 2 } }, "Week " + curWeek) : null
-        ),
-        React.createElement("div", { style: { textAlign: "right" } },
-          React.createElement("div", { style: { color: C.gld, fontSize: 22, fontWeight: 800, lineHeight: 1 } }, (curMesoVolume / 1000).toFixed(1) + "k"),
-          React.createElement("div", { style: { color: C.mut, fontSize: 9, marginTop: 2 } }, "true volume")
-        )
-      ),
-      React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 } },
-        React.createElement("div", { style: { background: C.c2, borderRadius: 8, padding: "6px 8px", textAlign: "center" } }, React.createElement("div", { style: { color: C.mut, fontSize: 9, textTransform: "uppercase" } }, "Sessions"), React.createElement("div", { style: { color: C.txt, fontSize: 17, fontWeight: 700 } }, curMesoSessions.length)),
-        React.createElement("div", { style: { background: C.c2, borderRadius: 8, padding: "6px 8px", textAlign: "center" } }, React.createElement("div", { style: { color: C.mut, fontSize: 9, textTransform: "uppercase" } }, "Sets"), React.createElement("div", { style: { color: C.txt, fontSize: 17, fontWeight: 700 } }, curMesoSets.length)),
-        React.createElement("div", { style: { background: C.c2, borderRadius: 8, padding: "6px 8px", textAlign: "center" } }, React.createElement("div", { style: { color: C.mut, fontSize: 9, textTransform: "uppercase" } }, "Exercises"), React.createElement("div", { style: { color: C.txt, fontSize: 17, fontWeight: 700 } }, curMesoEx))
-      )
-    ) : null,
-    mgPills.length ? React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: "10px 12px", marginBottom: 10 } },
-      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 } },
-        React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 700 } }, "This Week"),
-        React.createElement("div", { style: { color: C.mut, fontSize: 10 } }, curWeek != null ? "W" + curWeek + (curMesoNote ? " · " + curMesoNote : "") : "—")
-      ),
-      React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 } },
-        mgPills.map(function(mg) {
-          return React.createElement("div", { key: mg.label, onClick: function() { push({ type: "mg", mg: mg.label }); }, style: { background: mg.color + "1a", border: "1px solid " + mg.color + "55", borderRadius: 20, padding: "4px 10px", display: "flex", alignItems: "center", gap: 5, cursor: "pointer" } },
-            React.createElement("span", { style: { color: mg.color, fontSize: 13, fontWeight: 800 } }, mg.val),
-            React.createElement("span", { style: { color: C.mut, fontSize: 10 } }, mg.label)
+  return (
+    <div>
+      {curMesoNote ? <div
+        style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: 14, marginBottom: 10 }}>
+        <div
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10 }}>
+          <div>
+            <div style={{ color: C.txt, fontSize: 16, fontWeight: 800 }}>
+              {curMesoNote}
+            </div>
+            {curWeek != null ? <div style={{ color: C.mut, fontSize: 11, marginTop: 2 }}>
+              {"Week " + curWeek}
+            </div> : null}
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ color: C.gld, fontSize: 22, fontWeight: 800, lineHeight: 1 }}>
+              {(curMesoVolume / 1000).toFixed(1) + "k"}
+            </div>
+            <div style={{ color: C.mut, fontSize: 9, marginTop: 2 }}>
+              true volume
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6 }}>
+          <div
+            style={{ background: C.c2, borderRadius: 8, padding: "6px 8px", textAlign: "center" }}>
+            <div style={{ color: C.mut, fontSize: 9, textTransform: "uppercase" }}>
+              Sessions
+            </div>
+            <div style={{ color: C.txt, fontSize: 17, fontWeight: 700 }}>
+              {curMesoSessions.length}
+            </div>
+          </div>
+          <div
+            style={{ background: C.c2, borderRadius: 8, padding: "6px 8px", textAlign: "center" }}>
+            <div style={{ color: C.mut, fontSize: 9, textTransform: "uppercase" }}>
+              Sets
+            </div>
+            <div style={{ color: C.txt, fontSize: 17, fontWeight: 700 }}>
+              {curMesoSets.length}
+            </div>
+          </div>
+          <div
+            style={{ background: C.c2, borderRadius: 8, padding: "6px 8px", textAlign: "center" }}>
+            <div style={{ color: C.mut, fontSize: 9, textTransform: "uppercase" }}>
+              Exercises
+            </div>
+            <div style={{ color: C.txt, fontSize: 17, fontWeight: 700 }}>
+              {curMesoEx}
+            </div>
+          </div>
+        </div>
+      </div> : null}
+      {mgPills.length ? <div
+        style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: "10px 12px", marginBottom: 10 }}>
+        <div
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+          <div style={{ color: C.txt, fontSize: 12, fontWeight: 700 }}>
+            This Week
+          </div>
+          <div style={{ color: C.mut, fontSize: 10 }}>
+            {curWeek != null ? "W" + curWeek + (curMesoNote ? " · " + curMesoNote : "") : "—"}
+          </div>
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
+          {mgPills.map(function(mg) {
+            return (
+              <div
+                key={mg.label}
+                onClick={function() { push({ type: "mg", mg: mg.label }); }}
+                style={{ background: mg.color + "1a", border: "1px solid " + mg.color + "55", borderRadius: 20, padding: "4px 10px", display: "flex", alignItems: "center", gap: 5, cursor: "pointer" }}>
+                <span style={{ color: mg.color, fontSize: 13, fontWeight: 800 }}>
+                  {mg.val}
+                </span>
+                <span style={{ color: C.mut, fontSize: 10 }}>
+                  {mg.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+            <div style={{ width: 7, height: 7, borderRadius: "50%", background: C.red }} />
+            <span style={{ color: C.mut, fontSize: 9 }}>
+              &lt; MEV
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+            <div style={{ width: 7, height: 7, borderRadius: "50%", background: C.grn }} />
+            <span style={{ color: C.mut, fontSize: 9 }}>
+              MEV–MAV
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 3 }}>
+            <div style={{ width: 7, height: 7, borderRadius: "50%", background: C.gld }} />
+            <span style={{ color: C.mut, fontSize: 9 }}>
+              MAV–MRV
+            </span>
+          </div>
+        </div>
+      </div> : null}
+      {topLifts.length ? <div style={{ marginBottom: 10 }}>
+        <div
+          style={{ color: C.mut, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+          Strength Progress
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          {topLifts.map(function(l) {
+            var sc = l.pct >= 0 ? C.grn : C.red;
+            return (
+              <div
+                key={l.name}
+                onClick={function() { push({ type: "exercise", exName: l.name }); }}
+                style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10, cursor: "pointer" }}>
+                <div
+                  style={{ color: C.txt, fontSize: 10, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 4 }}>
+                  {l.name}
+                </div>
+                <div style={{ color: C.blu, fontSize: 20, fontWeight: 800, lineHeight: 1 }}>
+                  {l.e1rm.toFixed(0)}
+                </div>
+                <div style={{ color: C.mut, fontSize: 9 }}>
+                  lb e1RM
+                </div>
+                {l.pct !== 0 ? <div style={{ color: sc, fontSize: 10, fontWeight: 700, marginTop: 2 }}>
+                  {(l.pct > 0 ? "+" : "") + l.pct + "% overall"}
+                </div> : <div style={{ height: 14 }} />}
+                <SparkLine data={l.spark} color={sc} width={100} height={28} />
+              </div>
+            );
+          })}
+        </div>
+      </div> : null}
+      <div
+        style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10, marginBottom: 10 }}>
+        <div
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+          <div style={{ color: C.txt, fontSize: 12, fontWeight: 700 }}>
+            Volume vs Targets
+          </div>
+          <div style={{ color: C.mut, fontSize: 10 }}>
+            Tap to drill in
+          </div>
+        </div>
+        <BarsChart data={volBars} onBar={function(d) { push({ type: "mg", mg: d.label }); }} />
+      </div>
+      <div>
+        <div
+          style={{ color: C.mut, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+          Recent Sessions
+        </div>
+        {recentSessions.map(function(sess) {
+          var sessSets = annotatedSets.filter(function(s) { return s.sessionId === sess.id; });
+          var vol = sessSets.reduce(function(sm, s) { return sm + (s.weight / (s.cableRatio || 1)) * s.reps; }, 0);
+          var exSeen = {}, exArr = [];
+          sessSets.forEach(function(s) { if (!exSeen[s.exName]) { exSeen[s.exName] = true; exArr.push(s.exName); } });
+          var sessWeek = sess.week_number;
+          return (
+            <div
+              key={sess.id}
+              onClick={function() { push({ type: "session", session: sess }); }}
+              style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 12, marginBottom: 6, cursor: "pointer" }}>
+              <div
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{ color: C.txt, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {sess.notes || fmtShortDate(sess.date)}
+                  </div>
+                  <div style={{ color: C.mut, fontSize: 10, marginTop: 1 }}>
+                    {fmtShortDate(sess.date) + (sessWeek != null ? " · W" + sessWeek : "")}
+                  </div>
+                </div>
+                <div style={{ color: C.mut, fontSize: 14, marginLeft: 8 }}>
+                  ›
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 7 }}>
+                <div>
+                  <span style={{ color: C.txt, fontWeight: 700, fontSize: 12 }}>
+                    {sessSets.length}
+                  </span>
+                  <span style={{ color: C.mut, fontSize: 10 }}>
+                    {" sets"}
+                  </span>
+                </div>
+                {vol > 0 ? <div>
+                  <span style={{ color: C.gld, fontWeight: 700, fontSize: 12 }}>
+                    {(vol / 1000).toFixed(1) + "k"}
+                  </span>
+                  <span style={{ color: C.mut, fontSize: 10 }}>
+                    {" vol"}
+                  </span>
+                </div> : null}
+                {exArr.length ? <div
+                  style={{ color: C.mut, fontSize: 10, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {exArr.slice(0, 3).join(" ·") + (exArr.length > 3 ? " +" + (exArr.length - 3) : "")}
+                </div> : null}
+              </div>
+            </div>
           );
-        })
-      ),
-      React.createElement("div", { style: { display: "flex", gap: 10, flexWrap: "wrap" } },
-        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 3 } }, React.createElement("div", { style: { width: 7, height: 7, borderRadius: "50%", background: C.red } }), React.createElement("span", { style: { color: C.mut, fontSize: 9 } }, "< MEV")),
-        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 3 } }, React.createElement("div", { style: { width: 7, height: 7, borderRadius: "50%", background: C.grn } }), React.createElement("span", { style: { color: C.mut, fontSize: 9 } }, "MEV–MAV")),
-        React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 3 } }, React.createElement("div", { style: { width: 7, height: 7, borderRadius: "50%", background: C.gld } }), React.createElement("span", { style: { color: C.mut, fontSize: 9 } }, "MAV–MRV"))
-      )
-    ) : null,
-    topLifts.length ? React.createElement("div", { style: { marginBottom: 10 } },
-      React.createElement("div", { style: { color: C.mut, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 } }, "Strength Progress"),
-      React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 } },
-        topLifts.map(function(l) {
-          var sc = l.pct >= 0 ? C.grn : C.red;
-          return React.createElement("div", { key: l.name, onClick: function() { push({ type: "exercise", exName: l.name }); }, style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10, cursor: "pointer" } },
-            React.createElement("div", { style: { color: C.txt, fontSize: 10, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 4 } }, l.name),
-            React.createElement("div", { style: { color: C.blu, fontSize: 20, fontWeight: 800, lineHeight: 1 } }, l.e1rm.toFixed(0)),
-            React.createElement("div", { style: { color: C.mut, fontSize: 9 } }, "lb e1RM"),
-            l.pct !== 0 ? React.createElement("div", { style: { color: sc, fontSize: 10, fontWeight: 700, marginTop: 2 } }, (l.pct > 0 ? "+" : "") + l.pct + "% overall") : React.createElement("div", { style: { height: 14 } }),
-            React.createElement(SparkLine, { data: l.spark, color: sc, width: 100, height: 28 })
-          );
-        })
-      )
-    ) : null,
-    React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10, marginBottom: 10 } },
-      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 } },
-        React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 700 } }, "Volume vs Targets"),
-        React.createElement("div", { style: { color: C.mut, fontSize: 10 } }, "Tap to drill in")
-      ),
-      React.createElement(BarsChart, { data: volBars, onBar: function(d) { push({ type: "mg", mg: d.label }); } })
-    ),
-    React.createElement("div", null,
-      React.createElement("div", { style: { color: C.mut, fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 } }, "Recent Sessions"),
-      recentSessions.map(function(sess) {
-        var sessSets = annotatedSets.filter(function(s) { return s.sessionId === sess.id; });
-        var vol = sessSets.reduce(function(sm, s) { return sm + (s.weight / (s.cableRatio || 1)) * s.reps; }, 0);
-        var exSeen = {}, exArr = [];
-        sessSets.forEach(function(s) { if (!exSeen[s.exName]) { exSeen[s.exName] = true; exArr.push(s.exName); } });
-        var sessWeek = sess.week_number;
-        return React.createElement("div", { key: sess.id, onClick: function() { push({ type: "session", session: sess }); }, style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 12, marginBottom: 6, cursor: "pointer" } },
-          React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "flex-start" } },
-            React.createElement("div", { style: { flex: 1, minWidth: 0 } },
-              React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" } }, sess.notes || fmtShortDate(sess.date)),
-              React.createElement("div", { style: { color: C.mut, fontSize: 10, marginTop: 1 } }, fmtShortDate(sess.date) + (sessWeek != null ? " · W" + sessWeek : ""))
-            ),
-            React.createElement("div", { style: { color: C.mut, fontSize: 14, marginLeft: 8 } }, "›")
-          ),
-          React.createElement("div", { style: { display: "flex", alignItems: "center", gap: 12, marginTop: 7 } },
-            React.createElement("div", null, React.createElement("span", { style: { color: C.txt, fontWeight: 700, fontSize: 12 } }, sessSets.length), React.createElement("span", { style: { color: C.mut, fontSize: 10 } }, " sets")),
-            vol > 0 ? React.createElement("div", null, React.createElement("span", { style: { color: C.gld, fontWeight: 700, fontSize: 12 } }, (vol / 1000).toFixed(1) + "k"), React.createElement("span", { style: { color: C.mut, fontSize: 10 } }, " vol")) : null,
-            exArr.length ? React.createElement("div", { style: { color: C.mut, fontSize: 10, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, exArr.slice(0, 3).join(" ·") + (exArr.length > 3 ? " +" + (exArr.length - 3) : "")) : null
-          )
-        );
-      })
-    )
+        })}
+      </div>
+    </div>
   );
 }
 function RecoveryView() {
@@ -2368,18 +2972,39 @@ function RecoveryView() {
   React.useEffect(function() {
     Promise.all([db.getHealthDaily(800), db.getAllSessions()]).then(function(arr) { setLoaded({ health: arr[0], sessions: arr[1] || [] }); }).catch(function() { setLoaded({ health: null, sessions: [] }); });
   }, []);
-  if (!loaded) return React.createElement("div", { style: { padding: 32, textAlign: "center", color: C.mut } }, "Loading…");
+  if (!loaded) return (
+    <div style={{ padding: 32, textAlign: "center", color: C.mut }}>
+      Loading…
+    </div>
+  );
   if (loaded.health == null) {
-    return React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: 20 } },
-      React.createElement("div", { style: { color: C.txt, fontSize: 14, fontWeight: 700, marginBottom: 8 } }, "Health Data Required"),
-      React.createElement("div", { style: { color: C.mut, fontSize: 12, lineHeight: 1.4 } }, "Recovery analytics require the health_daily Supabase table.", React.createElement("br"), React.createElement("br"), "Run setup_health_daily.sql in the Supabase SQL editor to create the table, then seed it with Apple Health exports.")
+    return (
+      <div
+        style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: 20 }}>
+        <div style={{ color: C.txt, fontSize: 14, fontWeight: 700, marginBottom: 8 }}>
+          Health Data Required
+        </div>
+        <div style={{ color: C.mut, fontSize: 12, lineHeight: 1.4 }}>
+          Recovery analytics require the health_daily Supabase table.
+          <br />
+          <br />
+          Run setup_health_daily.sql in the Supabase SQL editor to create the table, then seed it with Apple Health exports.
+        </div>
+      </div>
     );
   }
   var health = loaded.health;
   if (health.length === 0) {
-    return React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: 20 } },
-      React.createElement("div", { style: { color: C.txt, fontSize: 14, fontWeight: 700, marginBottom: 8 } }, "No Health Data"),
-      React.createElement("div", { style: { color: C.mut, fontSize: 12 } }, "Seed health_daily with Apple Health exports.")
+    return (
+      <div
+        style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: 20 }}>
+        <div style={{ color: C.txt, fontSize: 14, fontWeight: 700, marginBottom: 8 }}>
+          No Health Data
+        </div>
+        <div style={{ color: C.mut, fontSize: 12 }}>
+          Seed health_daily with Apple Health exports.
+        </div>
+      </div>
     );
   }
   var cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 120);
@@ -2393,10 +3018,24 @@ function RecoveryView() {
     var prevSma = smaArr.length > 7 ? smaArr[smaArr.length - 8].val : null;
     var trend = latestSma != null && prevSma != null ? latestSma - prevSma : null;
     var trendColor = trend == null ? C.mut : (betterDir === "up" ? (trend > 0 ? C.grn : C.red) : (betterDir === "down" ? (trend < 0 ? C.grn : C.red) : C.mut));
-    return React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: "8px 10px" } },
-      React.createElement("div", { style: { color: C.mut, fontSize: 9, textTransform: "uppercase", letterSpacing: 0.5 } }, label),
-      React.createElement("div", { style: { color: color, fontSize: 20, fontWeight: 800, margin: "4px 0 2px" } }, latestSma != null ? latestSma.toFixed(dp == null ? 0 : dp) : "—", React.createElement("span", { style: { color: C.mut, fontSize: 10, fontWeight: 600, marginLeft: 3 } }, unit)),
-      trend != null ? React.createElement("div", { style: { color: trendColor, fontSize: 10, fontWeight: 600 } }, fmtSignedNum(trend, dp == null ? 0 : dp) + " 7d") : null
+    return (
+      <div
+        style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: "8px 10px" }}>
+        <div
+          style={{ color: C.mut, fontSize: 9, textTransform: "uppercase", letterSpacing: 0.5 }}>
+          {label}
+        </div>
+        <div
+          style={{ color: color, fontSize: 20, fontWeight: 800, margin: "4px 0 2px" }}>
+          {latestSma != null ? latestSma.toFixed(dp == null ? 0 : dp) : "—"}
+          <span style={{ color: C.mut, fontSize: 10, fontWeight: 600, marginLeft: 3 }}>
+            {unit}
+          </span>
+        </div>
+        {trend != null ? <div style={{ color: trendColor, fontSize: 10, fontWeight: 600 }}>
+          {fmtSignedNum(trend, dp == null ? 0 : dp) + " 7d"}
+        </div> : null}
+      </div>
     );
   }
   function makeSeries(key, color) {
@@ -2405,42 +3044,68 @@ function RecoveryView() {
     return [{ label: "raw", color: color, points: raw, opacity: 0.35, showPoints: false }, { label: "7d avg", color: color, points: sma, opacity: 1, showPoints: false }];
   }
   function chartCard(title, key, unit, color) {
-    return React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10, marginBottom: 8 } },
-      React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 } },
-        React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 700 } }, title),
-        React.createElement("div", { style: { color: color, fontSize: 12, fontWeight: 700 } }, hLast[key] != null ? parseFloat(hLast[key]).toFixed(unit === "ms" ? 1 : 0) + " " + unit : "—")
-      ),
-      React.createElement(MultiSeriesChart, { series: makeSeries(key, color), markerDate: META_MESO_START })
+    return (
+      <div
+        style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10, marginBottom: 8 }}>
+        <div
+          style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+          <div style={{ color: C.txt, fontSize: 12, fontWeight: 700 }}>
+            {title}
+          </div>
+          <div style={{ color: color, fontSize: 12, fontWeight: 700 }}>
+            {hLast[key] != null ? parseFloat(hLast[key]).toFixed(unit === "ms" ? 1 : 0) + " " + unit : "—"}
+          </div>
+        </div>
+        <MultiSeriesChart series={makeSeries(key, color)} markerDate={META_MESO_START} />
+      </div>
     );
   }
   var totalSessions = Object.keys(trainingDays).filter(function(d) { return d >= cutoffStr; }).length;
-  return React.createElement("div", null,
-    React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 } },
-      statCard("HRV (7d)", "hrv_sdnn", "ms", C.grn, 1, "up"),
-      statCard("RHR (7d)", "resting_hr", "bpm", C.blu, 0, "down"),
-      statCard("Steps (7d)", "steps", "/d", C.gld, 0, "up")
-    ),
-    chartCard("HRV SDNN", "hrv_sdnn", "ms", C.grn),
-    chartCard("Resting HR", "resting_hr", "bpm", C.blu),
-    chartCard("Active Calories", "active_cal", "kcal", C.org),
-    chartCard("Exercise Minutes", "exercise_min", "min", C.teal),
-    React.createElement("div", { style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10, marginBottom: 8 } },
-      React.createElement("div", { style: { color: C.txt, fontSize: 12, fontWeight: 700, marginBottom: 8 } }, "Recovery Summary (120d)"),
-      React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 } },
-        React.createElement("div", { style: { color: C.mut } }, "Training sessions"),
-        React.createElement("div", { style: { color: C.txt, fontWeight: 700, textAlign: "right" } }, totalSessions),
-        React.createElement("div", { style: { color: C.mut } }, "Days w/ HRV"),
-        React.createElement("div", { style: { color: C.txt, fontWeight: 700, textAlign: "right" } }, recent.filter(function(h) { return h.hrv_sdnn != null; }).length),
-        React.createElement("div", { style: { color: C.mut } }, "Avg HRV"),
-        React.createElement("div", { style: { color: C.grn, fontWeight: 700, textAlign: "right" } },
-          (function() { var arr = recent.filter(function(h) { return h.hrv_sdnn != null; }).map(function(h) { return parseFloat(h.hrv_sdnn); }); return arr.length ? (arr.reduce(function(a, b) { return a + b; }, 0) / arr.length).toFixed(1) + " ms" : "—"; })()
-        ),
-        React.createElement("div", { style: { color: C.mut } }, "Avg RHR"),
-        React.createElement("div", { style: { color: C.blu, fontWeight: 700, textAlign: "right" } },
-          (function() { var arr = recent.filter(function(h) { return h.resting_hr != null; }).map(function(h) { return parseFloat(h.resting_hr); }); return arr.length ? (arr.reduce(function(a, b) { return a + b; }, 0) / arr.length).toFixed(0) + " bpm" : "—"; })()
-        )
-      )
-    )
+  return (
+    <div>
+      <div
+        style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+        {statCard("HRV (7d)", "hrv_sdnn", "ms", C.grn, 1, "up")}
+        {statCard("RHR (7d)", "resting_hr", "bpm", C.blu, 0, "down")}
+        {statCard("Steps (7d)", "steps", "/d", C.gld, 0, "up")}
+      </div>
+      {chartCard("HRV SDNN", "hrv_sdnn", "ms", C.grn)}
+      {chartCard("Resting HR", "resting_hr", "bpm", C.blu)}
+      {chartCard("Active Calories", "active_cal", "kcal", C.org)}
+      {chartCard("Exercise Minutes", "exercise_min", "min", C.teal)}
+      <div
+        style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10, marginBottom: 8 }}>
+        <div style={{ color: C.txt, fontSize: 12, fontWeight: 700, marginBottom: 8 }}>
+          Recovery Summary (120d)
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
+          <div style={{ color: C.mut }}>
+            Training sessions
+          </div>
+          <div style={{ color: C.txt, fontWeight: 700, textAlign: "right" }}>
+            {totalSessions}
+          </div>
+          <div style={{ color: C.mut }}>
+            Days w/ HRV
+          </div>
+          <div style={{ color: C.txt, fontWeight: 700, textAlign: "right" }}>
+            {recent.filter(function(h) { return h.hrv_sdnn != null; }).length}
+          </div>
+          <div style={{ color: C.mut }}>
+            Avg HRV
+          </div>
+          <div style={{ color: C.grn, fontWeight: 700, textAlign: "right" }}>
+            {(function() { var arr = recent.filter(function(h) { return h.hrv_sdnn != null; }).map(function(h) { return parseFloat(h.hrv_sdnn); }); return arr.length ? (arr.reduce(function(a, b) { return a + b; }, 0) / arr.length).toFixed(1) + " ms" : "—"; })()}
+          </div>
+          <div style={{ color: C.mut }}>
+            Avg RHR
+          </div>
+          <div style={{ color: C.blu, fontWeight: 700, textAlign: "right" }}>
+            {(function() { var arr = recent.filter(function(h) { return h.resting_hr != null; }).map(function(h) { return parseFloat(h.resting_hr); }); return arr.length ? (arr.reduce(function(a, b) { return a + b; }, 0) / arr.length).toFixed(0) + " bpm" : "—"; })()}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 function CompareView() {
@@ -2450,7 +3115,11 @@ function CompareView() {
       .then(function(arr) { setLoaded({ sessions: arr[0] || [], body: arr[1] || [] }); })
       .catch(function() { setLoaded({ sessions: [], body: [] }); });
   }, []);
-  if (!loaded) return React.createElement("div", { style: { padding: 32, textAlign: "center", color: C.mut } }, "Loading…");
+  if (!loaded) return (
+    <div style={{ padding: 32, textAlign: "center", color: C.mut }}>
+      Loading…
+    </div>
+  );
   var mesoOrderMap = {}, mesoSessionsMap = {};
   loaded.sessions.forEach(function(s) {
     var mn = ((s.notes || "").match(/^(Meso \d+)/) || [])[1] || "Other";
@@ -2461,7 +3130,11 @@ function CompareView() {
     if (a === "Other") return 1; if (b === "Other") return -1;
     return parseInt((a.match(/\d+/) || [0])[0]) - parseInt((b.match(/\d+/) || [0])[0]);
   });
-  if (mesoKeys.length === 0) return React.createElement("div", { style: { padding: 32, textAlign: "center", color: C.mut } }, "No sessions yet.");
+  if (mesoKeys.length === 0) return (
+    <div style={{ padding: 32, textAlign: "center", color: C.mut }}>
+      No sessions yet.
+    </div>
+  );
   var ascBody = loaded.body.filter(function(r) { return r.weight_kg != null || r.body_fat_pct != null; }).slice().sort(function(a, b) { return a.date < b.date ? -1 : 1; });
   var perMeso = mesoKeys.map(function(mn) {
     var mSessions = mesoSessionsMap[mn].slice().sort(function(a, b) { return a.date < b.date ? -1 : 1; });
@@ -2486,49 +3159,127 @@ function CompareView() {
   function deltaCell(curV, prevV, unit, dp, betterDir) {
     var d = curV != null && prevV != null ? curV - prevV : null, dpx = dp == null ? 1 : dp, color = C.mut;
     if (d != null && Math.abs(d) > 0.001) color = betterDir === "up" ? (d > 0 ? C.grn : C.red) : betterDir === "down" ? (d < 0 ? C.grn : C.red) : C.mut;
-    return React.createElement("div", { style: { textAlign: "right" } },
-      React.createElement("div", { style: { color: C.txt, fontSize: 13, fontWeight: 700 } }, curV != null ? curV.toFixed(dpx) + (unit ? " " + unit : "") : "—"),
-      d != null ? React.createElement("div", { style: { color: color, fontSize: 10 } }, fmtSignedNum(d, dpx) + (unit ? " " + unit : "")) : null
+    return (
+      <div style={{ textAlign: "right" }}>
+        <div style={{ color: C.txt, fontSize: 13, fontWeight: 700 }}>
+          {curV != null ? curV.toFixed(dpx) + (unit ? " " + unit : "") : "—"}
+        </div>
+        {d != null ? <div style={{ color: color, fontSize: 10 }}>
+          {fmtSignedNum(d, dpx) + (unit ? " " + unit : "")}
+        </div> : null}
+      </div>
     );
   }
-  return React.createElement("div", null,
-    perMeso.map(function(pm, idx) {
-      var prev = idx > 0 ? perMeso[idx - 1] : null, prevTopByEx = prev ? prev.topByEx : {};
-      var topExNames = Object.keys(pm.topByEx).sort(function(a, b) { return (pm.topByEx[b].e1rm || 0) - (pm.topByEx[a].e1rm || 0); }).slice(0, 6);
-      return React.createElement("div", { key: pm.mesoNote, style: { background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: 14, marginBottom: 10 } },
-        React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 } },
-          React.createElement("div", { style: { color: C.txt, fontSize: 13, fontWeight: 800 } }, pm.mesoNote),
-          React.createElement("div", { style: { color: C.mut, fontSize: 10 } }, pm.startDate + " → " + pm.endDate)
-        ),
-        React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 } },
-          React.createElement("div", null, React.createElement("div", { style: { color: C.mut, fontSize: 9 } }, "Sessions"), React.createElement("div", { style: { color: C.txt, fontSize: 14, fontWeight: 700 } }, pm.sessions)),
-          React.createElement("div", null, React.createElement("div", { style: { color: C.mut, fontSize: 9 } }, "Sets"), React.createElement("div", { style: { color: C.txt, fontSize: 14, fontWeight: 700 } }, pm.sets)),
-          React.createElement("div", null, React.createElement("div", { style: { color: C.mut, fontSize: 9 } }, "Volume (lb·r)"), React.createElement("div", { style: { color: C.txt, fontSize: 14, fontWeight: 700 } }, (pm.totalVolume / 1000).toFixed(1) + "k"))
-        ),
-        pm.startBC && pm.endBC ? React.createElement("div", { style: { borderTop: "1px solid " + C.bdr, paddingTop: 8, marginTop: 4, marginBottom: 8 } },
-          React.createElement("div", { style: { color: C.mut, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 } }, "Body Comp"),
-          React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 4 } },
-            React.createElement("div", null, React.createElement("div", { style: { color: C.mut, fontSize: 9 } }, "Weight"), deltaCell(pm.endBC.weight, pm.startBC.weight, "lb", 1, "down")),
-            React.createElement("div", null, React.createElement("div", { style: { color: C.mut, fontSize: 9 } }, "BF%"), deltaCell(pm.endBC.bf, pm.startBC.bf, "%", 1, "down")),
-            React.createElement("div", null, React.createElement("div", { style: { color: C.mut, fontSize: 9 } }, "Lean"), deltaCell(pm.endBC.lean, pm.startBC.lean, "lb", 1, "up")),
-            React.createElement("div", null, React.createElement("div", { style: { color: C.mut, fontSize: 9 } }, "Fat"), deltaCell(pm.endBC.fat, pm.startBC.fat, "lb", 1, "down"))
-          )
-        ) : null,
-        topExNames.length ? React.createElement("div", { style: { borderTop: "1px solid " + C.bdr, paddingTop: 8 } },
-          React.createElement("div", { style: { color: C.mut, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 } }, "Top Lifts (e1RM)"),
-          topExNames.map(function(n) {
-            var cur = pm.topByEx[n], prv = prevTopByEx[n];
-            return React.createElement("div", { key: n, style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: "1px solid " + C.bdr } },
-              React.createElement("div", { style: { color: C.txt, flex: 1, marginRight: 8 } }, n),
-              React.createElement("div", { style: { textAlign: "right" } },
-                React.createElement("span", { style: { color: C.txt, fontWeight: 700 } }, cur.e1rm.toFixed(0) + " lb"),
-                prv ? React.createElement("span", { style: { color: cur.e1rm >= prv.e1rm ? C.grn : C.red, fontSize: 10, marginLeft: 6 } }, fmtSignedNum(cur.e1rm - prv.e1rm, 0)) : null
-              )
-            );
-          })
-        ) : null
-      );
-    })
+  return (
+    <div>
+      {perMeso.map(function(pm, idx) {
+        var prev = idx > 0 ? perMeso[idx - 1] : null, prevTopByEx = prev ? prev.topByEx : {};
+        var topExNames = Object.keys(pm.topByEx).sort(function(a, b) { return (pm.topByEx[b].e1rm || 0) - (pm.topByEx[a].e1rm || 0); }).slice(0, 6);
+        return (
+          <div
+            key={pm.mesoNote}
+            style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: 14, marginBottom: 10 }}>
+            <div
+              style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+              <div style={{ color: C.txt, fontSize: 13, fontWeight: 800 }}>
+                {pm.mesoNote}
+              </div>
+              <div style={{ color: C.mut, fontSize: 10 }}>
+                {pm.startDate + " → " + pm.endDate}
+              </div>
+            </div>
+            <div
+              style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+              <div>
+                <div style={{ color: C.mut, fontSize: 9 }}>
+                  Sessions
+                </div>
+                <div style={{ color: C.txt, fontSize: 14, fontWeight: 700 }}>
+                  {pm.sessions}
+                </div>
+              </div>
+              <div>
+                <div style={{ color: C.mut, fontSize: 9 }}>
+                  Sets
+                </div>
+                <div style={{ color: C.txt, fontSize: 14, fontWeight: 700 }}>
+                  {pm.sets}
+                </div>
+              </div>
+              <div>
+                <div style={{ color: C.mut, fontSize: 9 }}>
+                  Volume (lb·r)
+                </div>
+                <div style={{ color: C.txt, fontSize: 14, fontWeight: 700 }}>
+                  {(pm.totalVolume / 1000).toFixed(1) + "k"}
+                </div>
+              </div>
+            </div>
+            {pm.startBC && pm.endBC ? <div
+              style={{ borderTop: "1px solid " + C.bdr, paddingTop: 8, marginTop: 4, marginBottom: 8 }}>
+              <div
+                style={{ color: C.mut, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+                Body Comp
+              </div>
+              <div
+                style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 4 }}>
+                <div>
+                  <div style={{ color: C.mut, fontSize: 9 }}>
+                    Weight
+                  </div>
+                  {deltaCell(pm.endBC.weight, pm.startBC.weight, "lb", 1, "down")}
+                </div>
+                <div>
+                  <div style={{ color: C.mut, fontSize: 9 }}>
+                    BF%
+                  </div>
+                  {deltaCell(pm.endBC.bf, pm.startBC.bf, "%", 1, "down")}
+                </div>
+                <div>
+                  <div style={{ color: C.mut, fontSize: 9 }}>
+                    Lean
+                  </div>
+                  {deltaCell(pm.endBC.lean, pm.startBC.lean, "lb", 1, "up")}
+                </div>
+                <div>
+                  <div style={{ color: C.mut, fontSize: 9 }}>
+                    Fat
+                  </div>
+                  {deltaCell(pm.endBC.fat, pm.startBC.fat, "lb", 1, "down")}
+                </div>
+              </div>
+            </div> : null}
+            {topExNames.length ? <div style={{ borderTop: "1px solid " + C.bdr, paddingTop: 8 }}>
+              <div
+                style={{ color: C.mut, fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>
+                Top Lifts (e1RM)
+              </div>
+              {topExNames.map(function(n) {
+                var cur = pm.topByEx[n], prv = prevTopByEx[n];
+                return (
+                  <div
+                    key={n}
+                    style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: "1px solid " + C.bdr }}>
+                    <div style={{ color: C.txt, flex: 1, marginRight: 8 }}>
+                      {n}
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <span style={{ color: C.txt, fontWeight: 700 }}>
+                        {cur.e1rm.toFixed(0) + " lb"}
+                      </span>
+                      {prv ? <span
+                        style={{ color: cur.e1rm >= prv.e1rm ? C.grn : C.red, fontSize: 10, marginLeft: 6 }}>
+                        {fmtSignedNum(cur.e1rm - prv.e1rm, 0)}
+                      </span> : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div> : null}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 function AnalyticsView() {
@@ -2539,17 +3290,27 @@ function AnalyticsView() {
     { k: "rec", label: "Recovery", color: C.grn },
     { k: "cmp", label: "Compare", color: C.pur }
   ];
-  return React.createElement("div", { style: { padding: "10px 12px 40px" } },
-    React.createElement("div", { style: { display: "flex", gap: 4, marginBottom: 12, position: "sticky", top: 0, background: C.bg, zIndex: 4, paddingBottom: 4 } },
-      TABS.map(function(t) {
-        var sel = sub === t.k;
-        return React.createElement("button", { key: t.k, onClick: function() { setSub(t.k); }, style: { flex: 1, padding: "7px 4px", borderRadius: 8, border: "1px solid " + (sel ? t.color : C.bdr), background: sel ? t.color + "22" : "transparent", color: sel ? t.color : C.mut, fontSize: 11, fontWeight: 700, cursor: "pointer" } }, t.label);
-      })
-    ),
-    sub === "body" ? React.createElement(BodyCompView, null) :
-    sub === "perf" ? React.createElement(PerformanceView, null) :
-    sub === "rec" ? React.createElement(RecoveryView, null) :
-    React.createElement(CompareView, null)
+  return (
+    <div style={{ padding: "10px 12px 40px" }}>
+      <div
+        style={{ display: "flex", gap: 4, marginBottom: 12, position: "sticky", top: 0, background: C.bg, zIndex: 4, paddingBottom: 4 }}>
+        {TABS.map(function(t) {
+          var sel = sub === t.k;
+          return (
+            <button
+              key={t.k}
+              onClick={function() { setSub(t.k); }}
+              style={{ flex: 1, padding: "7px 4px", borderRadius: 8, border: "1px solid " + (sel ? t.color : C.bdr), background: sel ? t.color + "22" : "transparent", color: sel ? t.color : C.mut, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+      {sub === "body" ? <BodyCompView /> :
+      sub === "perf" ? <PerformanceView /> :
+      sub === "rec" ? <RecoveryView /> :
+      <CompareView />}
+    </div>
   );
 }
 
