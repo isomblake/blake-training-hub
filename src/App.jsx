@@ -2390,12 +2390,11 @@ function RecoveryView() {
 function CompareView() {
   var s1 = React.useState(null); var loaded = s1[0]; var setLoaded = s1[1];
   React.useEffect(function() {
-    Promise.all([db.getAllSets(), db.getAllSessions(), db.getAllExercises(), db.getHealthDaily(800)])
-      .then(function(arr) { setLoaded({ sets: arr[0] || [], sessions: arr[1] || [], exercises: arr[2] || [], body: arr[3] || [] }); })
-      .catch(function() { setLoaded({ sets: [], sessions: [], exercises: [], body: [] }); });
+    Promise.all([db.getRecentSessions(1000), db.getHealthDaily(800)])
+      .then(function(arr) { setLoaded({ sessions: arr[0] || [], body: arr[1] || [] }); })
+      .catch(function() { setLoaded({ sessions: [], body: [] }); });
   }, []);
   if (!loaded) return React.createElement("div", { style: { padding: 32, textAlign: "center", color: C.mut } }, "Loading…");
-  var exById = {}; loaded.exercises.forEach(function(e) { exById[e.id] = e; });
   var mesoOrderMap = {}, mesoSessionsMap = {};
   loaded.sessions.forEach(function(s) {
     var mn = ((s.notes || "").match(/^(Meso \d+)/) || [])[1] || "Other";
@@ -2410,17 +2409,17 @@ function CompareView() {
   var ascBody = loaded.body.filter(function(r) { return r.weight_kg != null || r.body_fat_pct != null; }).slice().sort(function(a, b) { return a.date < b.date ? -1 : 1; });
   var perMeso = mesoKeys.map(function(mn) {
     var mSessions = mesoSessionsMap[mn].slice().sort(function(a, b) { return a.date < b.date ? -1 : 1; });
-    var mSessIds = {}; mSessions.forEach(function(s) { mSessIds[s.id] = true; });
-    var mSets = loaded.sets.filter(function(s) { return mSessIds[s.session_id]; });
+    var mSets = [];
+    mSessions.forEach(function(s) { (s.sets || []).forEach(function(st) { mSets.push(st); }); });
     var totalVolume = 0, topByEx = {}, mgVol = {};
     mSets.forEach(function(st) {
       var w = parseFloat(st.weight) || 0, r = parseInt(st.reps) || 0;
       totalVolume += w * r;
-      var ex = exById[st.exercise_id]; if (!ex) return;
-      var cableRatio = parseFloat(ex.cable_ratio) || 1;
+      var e = st.exercises || {}; if (!e.name) return;
+      var cableRatio = parseFloat(e.cable_ratio) || 1;
       var e1rm = (w / cableRatio) * (1 + r / 30);
-      if (!topByEx[ex.name] || e1rm > topByEx[ex.name].e1rm) topByEx[ex.name] = { e1rm: e1rm, weight: w, reps: r };
-      if (ex.muscle_group) mgVol[ex.muscle_group] = (mgVol[ex.muscle_group] || 0) + 1;
+      if (!topByEx[e.name] || e1rm > topByEx[e.name].e1rm) topByEx[e.name] = { e1rm: e1rm, weight: w, reps: r };
+      if (e.muscle_group) mgVol[e.muscle_group] = (mgVol[e.muscle_group] || 0) + 1;
     });
     var startDate = mSessions[0].date, endDate = mSessions[mSessions.length - 1].date;
     var startBC = null, endBC = null;
