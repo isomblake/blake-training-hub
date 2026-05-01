@@ -1309,21 +1309,12 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
       : Math.round((ex.wt + weeklyAdd) / minStep) * minStep
     : null;
 
-  // Set Progression Algorithm: read last session's performance from localStorage (written at session finish)
-  const { smartTarget, progressNote, smartTargetReps } = useMemo(() => {
-    if (!ex.wt || wkData.deload) return { smartTarget: null, progressNote: null, smartTargetReps: null };
-    const perfKey = 'training-hub-perf-' + mesoPrefix.replace(/\s+/g, '-');
-    let perf = {};
-    try { perf = JSON.parse(localStorage.getItem(perfKey) || '{}'); } catch(e) {}
-    const last = perf[ex.name];
-    if (!last || last.avgWt == null) return { smartTarget: null, progressNote: null, smartTargetReps: null };
+  // Helper: run the progression computation given raw perf data
+  function computeAdjustment(avgWt, avgReps, lastWk, lastRir) {
+    if (lastWk >= (week + 1)) return {};
     const repRange = ex.reps.split("-").map(Number);
-    const minReps = repRange[0];
-    const maxReps = repRange[1] || repRange[0];
-    const { avgWt, avgReps, rir: lastRir = "" } = last;
-    const lastWk = last.weekNumber || 0;
-    if (lastWk >= (week + 1)) return { smartTarget: null, progressNote: null, smartTargetReps: null };
-    let adjusted, note, smartTargetReps = null;
+    const minReps = repRange[0], maxReps = repRange[1] || repRange[0];
+    let adjusted, note, repsAdj = null;
     if (avgReps < minReps) {
       adjusted = Math.round(avgWt / minStep) * minStep;
       note = `⏸ Holding @ ${Math.round(avgWt)} lb — only ${Math.round(avgReps)} reps last session (min ${minReps})`;
@@ -1333,19 +1324,55 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
     } else {
       adjusted = Math.round((avgWt + weeklyAdd) / minStep) * minStep;
       const rirTag = lastRir ? ` (${lastRir})` : "";
-      if (avgWt < ex.wt - minStep / 2) {
-        note = `↓ ${Math.round(avgWt)} lb used last${rirTag} → ${adjusted} lb this week`;
-      } else if (avgWt > ex.wt + minStep / 2) {
-        note = `↑ ${Math.round(avgWt)} lb used last${rirTag} → ${adjusted} lb this week`;
-      }
-      const roundedLastWt = Math.round(avgWt / minStep) * minStep;
-      if (adjusted === roundedLastWt) { smartTargetReps = maxReps; }
+      if (avgWt < ex.wt - minStep / 2) note = `↓ ${Math.round(avgWt)} lb used last${rirTag} → ${adjusted} lb this week`;
+      else if (avgWt > ex.wt + minStep / 2) note = `↑ ${Math.round(avgWt)} lb used last${rirTag} → ${adjusted} lb this week`;
+      if (adjusted === Math.round(avgWt / minStep) * minStep) repsAdj = maxReps;
     }
-    if (adjusted !== undefined && adjusted !== baseTarget) {
-      return { smartTarget: adjusted, progressNote: note || null, smartTargetReps };
-    }
-    return { smartTarget: null, progressNote: null, smartTargetReps };
+    if (adjusted !== undefined && adjusted !== baseTarget) return { smartTarget: adjusted, progressNote: note || null, smartTargetReps: repsAdj };
+    return {};
+  }
+
+  // Fast path: read from localStorage (written at session finish)
+  const lsResult = useMemo(() => {
+    if (!ex.wt || wkData.deload) return null;
+    const perfKey = 'training-hub-perf-' + mesoPrefix.replace(/\s+/g, '-');
+    let perf = {};
+    try { perf = JSON.parse(localStorage.getItem(perfKey) || '{}'); } catch(e) {}
+    const last = perf[ex.name];
+    if (!last || last.avgWt == null) return null;
+    return computeAdjustment(last.avgWt, last.avgReps, last.weekNumber || 0, last.rir || "");
   }, [ex.name, ex.wt, ex.reps, week, mesoPrefix, baseTarget, weeklyAdd, minStep, wkData.deload]);
+
+  // Async DB fallback: only fires when localStorage has no data for this exercise
+  const [dbResult, setDbResult] = useState(null);
+  useEffect(() => {
+    if (!ex.wt || wkData.deload) return;
+    const perfKey = 'training-hub-perf-' + mesoPrefix.replace(/\s+/g, '-');
+    let perf = {};
+    try { perf = JSON.parse(localStorage.getItem(perfKey) || '{}'); } catch(e) {}
+    if (perf[ex.name]) { setDbResult(null); return; } // localStorage has it — no DB needed
+    setDbResult(null);
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    db.getLastSessionForExercise(ex.name, tomorrow, mesoPrefix).then(last => {
+      if (!last || !last.sets || last.sets.length === 0) return;
+      const avgWt = last.sets.reduce((a, s) => a + s.weight, 0) / last.sets.length;
+      const avgReps = last.sets.reduce((a, s) => a + s.reps, 0) / last.sets.length;
+      const lastWk = last.weekNumber || 0;
+      const lastRir = last.rir || "";
+      // Cache in localStorage so future loads are instant
+      try {
+        const stored = JSON.parse(localStorage.getItem(perfKey) || '{}');
+        stored[ex.name] = { avgWt, avgReps, weekNumber: lastWk, rir: lastRir };
+        localStorage.setItem(perfKey, JSON.stringify(stored));
+      } catch(e) {}
+      setDbResult(computeAdjustment(avgWt, avgReps, lastWk, lastRir));
+    }).catch(() => {});
+  }, [ex.name, week]);
+
+  const merged = lsResult || dbResult || {};
+  const smartTarget = merged.smartTarget || null;
+  const progressNote = merged.progressNote || null;
+  const smartTargetReps = merged.smartTargetReps || null;
 
   const targetWt = smartTarget || baseTarget;
 
