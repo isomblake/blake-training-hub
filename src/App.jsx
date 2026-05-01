@@ -901,13 +901,14 @@ const localDate = () => {
 
 const BAND_COLORS = { Green: "#22c55e", Purple: "#a78bfa", Black: "#888", Red: "#ff5c5c", None: "#00e5a0" };
 
-const SetRow = React.memo(function SetRow({ setNum, targetReps, targetWt, lastWeight, isBW, bands, onLog, onDelete, logged }) {
+const SetRow = React.memo(function SetRow({ setNum, targetReps, targetWt, lastWeight, isBW, bands, onLog, onDelete, onRir, logged }) {
   // Local state ONLY used when actively editing or entering new data
   const initWt = lastWeight != null ? lastWeight.toString() : (targetWt?.toString() || (isBW ? "0" : ""));
   const [editReps, setEditReps] = useState(targetReps || "");
   const [editWt, setEditWt] = useState(initWt);
   const [band, setBand] = useState(bands ? bands[0] : null);
   const [editing, setEditing] = useState(false);
+  const [showRirPicker, setShowRirPicker] = useState(false);
   const isDone = logged != null && !editing;
   const userEditedReps = useRef(false);
   const userEditedWt = useRef(false);
@@ -954,8 +955,10 @@ const SetRow = React.memo(function SetRow({ setNum, targetReps, targetWt, lastWe
     if (editReps && (isBW || editWt)) {
       const data = { reps: parseInt(editReps), wt: weight };
       if (band) data.band = band;
+      const wasEditing = editing;
       onLog(setNum, data);
       setEditing(false);
+      if (!wasEditing) setShowRirPicker(true);
     }
   };
 
@@ -984,11 +987,13 @@ const SetRow = React.memo(function SetRow({ setNum, targetReps, targetWt, lastWe
       if (band) data.band = band;
       onLog(setNum, data);
       setEditing(false);
+      setShowRirPicker(true);
     }
   };
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+    <>
+    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: showRirPicker ? 2 : 4 }}>
       <div onClick={handleQuickLog} style={{ width: 28, height: 28, borderRadius: "50%", background: isDone ? C.grn : C.c2, border: `1px solid ${isDone ? C.grn : C.bdr}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: isDone ? C.bg : C.mut, cursor: "pointer", flexShrink: 0 }}>
         {isDone ? "✓" : setNum}
       </div>
@@ -1000,6 +1005,7 @@ const SetRow = React.memo(function SetRow({ setNum, targetReps, targetWt, lastWe
             <span style={{ color: C.gld }}>{isBW ? "BW" : logged.wt}</span>
             {!isBW && <span style={{ color: C.mut, fontSize: 9 }}> lb</span>}
             {logged.band && <span style={{ fontSize: 9, color: BAND_COLORS[logged.band] || C.mut, marginLeft: 4, fontWeight: 600 }}>{logged.band} band</span>}
+            {logged.rir != null && <span style={{ fontSize: 9, color: C.pur, fontWeight: 700, marginLeft: 6 }}>{logged.rir}RIR</span>}
           </div>
           <button onClick={handleEdit} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${C.bdr}`, background: C.c2, color: C.mut, fontSize: 10, cursor: "pointer" }}>Edit</button>
           <button onClick={handleDelete} style={{ padding: "3px 8px", borderRadius: 5, border: `1px solid ${C.red}22`, background: C.red + "11", color: C.red, fontSize: 10, cursor: "pointer" }}>✕</button>
@@ -1041,9 +1047,21 @@ const SetRow = React.memo(function SetRow({ setNum, targetReps, targetWt, lastWe
         </>
       )}
     </div>
+    {showRirPicker && (
+      <div style={{ display: "flex", alignItems: "center", gap: 4, marginLeft: 34, marginBottom: 6 }}>
+        <span style={{ fontSize: 9, color: C.mut, marginRight: 2 }}>RIR:</span>
+        {[0, 1, 2, 3, "4+"].map(r => (
+          <button key={r} onClick={() => { if (onRir) onRir(setNum, typeof r === "string" ? 4 : r); setShowRirPicker(false); }}
+            style={{ width: 30, height: 24, borderRadius: 5, border: `1px solid ${C.pur}55`, background: C.pur + "22", color: C.pur, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+            {r}
+          </button>
+        ))}
+        <button onClick={() => setShowRirPicker(false)} style={{ padding: "2px 6px", borderRadius: 5, border: `1px solid ${C.bdr}`, background: "transparent", color: C.mut, fontSize: 10, cursor: "pointer" }}>✕</button>
+      </div>
+    )}
+    </>
   );
 }, (prev, next) => {
-  // Only re-render if these specific values actually changed
   return prev.setNum === next.setNum
     && prev.targetWt === next.targetWt
     && prev.targetReps === next.targetReps
@@ -1051,6 +1069,7 @@ const SetRow = React.memo(function SetRow({ setNum, targetReps, targetWt, lastWe
     && prev.logged?.reps === next.logged?.reps
     && prev.logged?.wt === next.logged?.wt
     && prev.logged?.band === next.logged?.band
+    && prev.logged?.rir === next.logged?.rir
     && prev.lastWeight === next.lastWeight
     && (prev.logged == null) === (next.logged == null);
 });
@@ -1176,12 +1195,27 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone, nextSetInfo, on
           )}
         </div>
 
+        <div style={{ fontSize: 10, color: C.mut, marginBottom: 8, textAlign: "center", letterSpacing: 0.5 }}>REPS IN RESERVE — tap to log set {nsi.nextSetNum}</div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 16, width: "100%" }}>
+          {[0, 1, 2, 3, "4+"].map(r => {
+            const rirVal = typeof r === "string" ? 4 : r;
+            return (
+              <button key={r} onClick={() => {
+                  const reps = parseInt(logReps); const w = nsi.isBW ? 0 : parseFloat(logWt);
+                  if (reps && (nsi.isBW || w >= 0)) { onLogFromTimer(nsi.exName, nsi.nextSetNum, { reps, wt: w, rir: rirVal }, nsi); }
+                }}
+                style={{ flex: 1, padding: "18px 0", borderRadius: 14, border: `1px solid ${C.pur}55`, background: C.pur + "22", color: C.pur, fontSize: 20, fontWeight: 800, cursor: "pointer" }}>
+                {r}
+              </button>
+            );
+          })}
+        </div>
         <button onClick={() => {
             const r = parseInt(logReps); const w = nsi.isBW ? 0 : parseFloat(logWt);
             if (r && (nsi.isBW || w >= 0)) { onLogFromTimer(nsi.exName, nsi.nextSetNum, { reps: r, wt: w }, nsi); }
           }}
-          style={{ padding: "16px 60px", borderRadius: 14, border: "none", background: C.grn, color: C.bg, fontSize: 16, fontWeight: 800, cursor: "pointer", marginBottom: 12 }}>
-          Log Set {nsi.nextSetNum} ✓
+          style={{ padding: "10px 32px", borderRadius: 10, border: `1px solid ${C.grn}44`, background: C.grn + "11", color: C.grn, fontSize: 12, fontWeight: 700, cursor: "pointer", marginBottom: 8 }}>
+          Log without RIR ✓
         </button>
         <button onClick={() => onDone()}
           style={{ padding: "8px 20px", borderRadius: 8, border: `1px solid ${C.bdr}`, background: "transparent", color: C.mut, fontSize: 11, cursor: "pointer" }}>
@@ -1285,7 +1319,9 @@ function saveSessionPerformance(allSets, sessionKey, weekNumber, rir, mesoPrefix
     if (setArr.length === 0) return;
     const avgWt = setArr.reduce((a, s) => a + (parseFloat(s.wt) || 0), 0) / setArr.length;
     const avgReps = setArr.reduce((a, s) => a + (parseInt(s.reps) || 0), 0) / setArr.length;
-    perf[exName] = { avgWt, avgReps, weekNumber, rir };
+    const rirVals = setArr.filter(s => s.rir != null).map(s => s.rir);
+    const avgRir = rirVals.length > 0 ? rirVals.reduce((a, v) => a + v, 0) / rirVals.length : null;
+    perf[exName] = { avgWt, avgReps, weekNumber, rir, avgRir };
   });
   try { localStorage.setItem(perfKey, JSON.stringify(perf)); } catch(e) {}
 }
@@ -1310,7 +1346,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
     : null;
 
   // Helper: run the progression computation given raw perf data
-  function computeAdjustment(avgWt, avgReps, lastWk, lastRir) {
+  function computeAdjustment(avgWt, avgReps, lastWk, lastRir, lastAvgRir) {
     if (lastWk >= (week + 1)) return {};
     const repRange = ex.reps.split("-").map(Number);
     const minReps = repRange[0], maxReps = repRange[1] || repRange[0];
@@ -1322,10 +1358,27 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
       adjusted = Math.round((avgWt + weeklyAdd + minStep) / minStep) * minStep;
       note = `↑ Bumped — ${Math.round(avgReps)} reps @ ${Math.round(avgWt)} lb last session (exceeded range)`;
     } else {
-      adjusted = Math.round((avgWt + weeklyAdd) / minStep) * minStep;
-      const rirTag = lastRir ? ` (${lastRir})` : "";
-      if (avgWt < ex.wt - minStep / 2) note = `↓ ${Math.round(avgWt)} lb used last${rirTag} → ${adjusted} lb this week`;
-      else if (avgWt > ex.wt + minStep / 2) note = `↑ ${Math.round(avgWt)} lb used last${rirTag} → ${adjusted} lb this week`;
+      // RIR-aware progression: compare logged RIR to the session's target RIR
+      const targetRirLow = lastRir ? parseInt(lastRir) : null;
+      let add = weeklyAdd;
+      if (lastAvgRir != null && targetRirLow != null) {
+        const rirDiff = lastAvgRir - targetRirLow;
+        if (rirDiff >= 2) {
+          add = weeklyAdd + minStep;
+          note = `↑↑ Extra bump — ${Math.round(lastAvgRir)} RIR logged vs ${targetRirLow} target`;
+        } else if (rirDiff <= -2) {
+          adjusted = Math.round(avgWt / minStep) * minStep;
+          note = `⏸ Holding — ${Math.round(lastAvgRir)} RIR logged (grinding past target)`;
+        }
+      }
+      if (adjusted === undefined) {
+        adjusted = Math.round((avgWt + add) / minStep) * minStep;
+        const rirTag = lastRir ? ` (${lastRir})` : "";
+        if (!note) {
+          if (avgWt < ex.wt - minStep / 2) note = `↓ ${Math.round(avgWt)} lb used last${rirTag} → ${adjusted} lb this week`;
+          else if (avgWt > ex.wt + minStep / 2) note = `↑ ${Math.round(avgWt)} lb used last${rirTag} → ${adjusted} lb this week`;
+        }
+      }
       if (adjusted === Math.round(avgWt / minStep) * minStep) repsAdj = maxReps;
     }
     if (adjusted !== undefined && adjusted !== baseTarget) return { smartTarget: adjusted, progressNote: note || null, smartTargetReps: repsAdj };
@@ -1340,7 +1393,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
     try { perf = JSON.parse(localStorage.getItem(perfKey) || '{}'); } catch(e) {}
     const last = perf[ex.name];
     if (!last || last.avgWt == null) return null;
-    return computeAdjustment(last.avgWt, last.avgReps, last.weekNumber || 0, last.rir || "");
+    return computeAdjustment(last.avgWt, last.avgReps, last.weekNumber || 0, last.rir || "", last.avgRir ?? null);
   }, [ex.name, ex.wt, ex.reps, week, mesoPrefix, baseTarget, weeklyAdd, minStep, wkData.deload]);
 
   // Async DB fallback: only fires when localStorage has no data for this exercise
@@ -1365,7 +1418,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
         stored[ex.name] = { avgWt, avgReps, weekNumber: lastWk, rir: lastRir };
         localStorage.setItem(perfKey, JSON.stringify(stored));
       } catch(e) {}
-      setDbResult(computeAdjustment(avgWt, avgReps, lastWk, lastRir));
+      setDbResult(computeAdjustment(avgWt, avgReps, lastWk, lastRir, null));
     }).catch(() => {});
   }, [ex.name, week]);
 
@@ -1405,6 +1458,15 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
       return { ...prev, [exKey]: prevEx };
     });
     if (onDeleteFromDb) onDeleteFromDb(ex.name, setNum);
+  };
+
+  const handleRir = (setNum, rir) => {
+    setAllSets(prev => {
+      const prevEx = prev[exKey] || {};
+      const prevSet = prevEx[setNum];
+      if (!prevSet) return prev;
+      return { ...prev, [exKey]: { ...prevEx, [setNum]: { ...prevSet, rir } } };
+    });
   };
 
   return (
@@ -1456,7 +1518,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
           )}
 
           {Array.from({ length: totalSets }, (_, i) => (
-            <SetRow key={i} setNum={i + 1} targetReps={smartTargetReps ? String(smartTargetReps) : ex.reps.split("-")[0]} targetWt={targetWt} lastWeight={lastWeightRef.current} isBW={!!ex.bodyweight} bands={ex.bands} logged={logged[i + 1]} onLog={logSet} onDelete={deleteSet} />
+            <SetRow key={i} setNum={i + 1} targetReps={smartTargetReps ? String(smartTargetReps) : ex.reps.split("-")[0]} targetWt={targetWt} lastWeight={lastWeightRef.current} isBW={!!ex.bodyweight} bands={ex.bands} logged={logged[i + 1]} onLog={logSet} onDelete={deleteSet} onRir={handleRir} />
           ))}
         </div>
       )}
