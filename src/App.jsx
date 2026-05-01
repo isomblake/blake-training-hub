@@ -3749,11 +3749,11 @@ export default function App() {
         setTimerKey(k => k + 1);
         setTimer({ seconds: cappedRest, exName, setNum, totalSets: currentEx?.sets || nextSetInfo.totalSets });
       } else {
-        // Final set of session — dismiss the timer without starting a new one
-        if (dismissTimer) dismissTimer();
+        // Final set of session — dismiss the timer overlay
+        setTimer(null);
       }
     } else {
-      if (dismissTimer) dismissTimer();
+      setTimer(null);
     }
   }, [sessionKey, syncToDb, r, activeWeeks, week]);
 
