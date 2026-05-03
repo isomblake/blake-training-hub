@@ -1629,7 +1629,7 @@ function HistoryView() {
     const seen = new Set();
     const result = [];
     Object.values(MESOCYCLES).forEach(meso => {
-      (meso.routines || []).forEach(r => {
+      Object.values(meso.routines || {}).forEach(r => {
         (r.sections || []).forEach(sec => {
           (sec.exercises || []).forEach(ex => {
             if (!seen.has(ex.name)) { seen.add(ex.name); result.push({ name: ex.name, muscles: ex.muscles || '' }); }
