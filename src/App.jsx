@@ -901,7 +901,7 @@ const localDate = () => {
 
 const BAND_COLORS = { Green: "#22c55e", Purple: "#a78bfa", Black: "#888", Red: "#ff5c5c", None: "#00e5a0" };
 
-const SetRow = React.memo(function SetRow({ setNum, targetReps, targetWt, lastWeight, isBW, bands, onLog, onDelete, onRir, logged }) {
+const SetRow = React.memo(function SetRow({ setNum, isLastSet, targetReps, targetWt, lastWeight, isBW, bands, onLog, onDelete, onRir, logged }) {
   // Local state ONLY used when actively editing or entering new data
   const initWt = lastWeight != null ? lastWeight.toString() : (targetWt?.toString() || (isBW ? "0" : ""));
   const [editReps, setEditReps] = useState(targetReps || "");
@@ -958,7 +958,7 @@ const SetRow = React.memo(function SetRow({ setNum, targetReps, targetWt, lastWe
       const wasEditing = editing;
       onLog(setNum, data);
       setEditing(false);
-      if (!wasEditing) setShowRirPicker(true);
+      if (!wasEditing && isLastSet) setShowRirPicker(true);
     }
   };
 
@@ -987,7 +987,7 @@ const SetRow = React.memo(function SetRow({ setNum, targetReps, targetWt, lastWe
       if (band) data.band = band;
       onLog(setNum, data);
       setEditing(false);
-      setShowRirPicker(true);
+      if (isLastSet) setShowRirPicker(true);
     }
   };
 
@@ -1195,28 +1195,40 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone, nextSetInfo, on
           )}
         </div>
 
-        <div style={{ fontSize: 10, color: C.mut, marginBottom: 8, textAlign: "center", letterSpacing: 0.5 }}>REPS IN RESERVE — tap to log set {nsi.nextSetNum}</div>
-        <div style={{ display: "flex", gap: 8, marginBottom: 16, width: "100%" }}>
-          {[0, 1, 2, 3, "4+"].map(r => {
-            const rirVal = typeof r === "string" ? 4 : r;
-            return (
-              <button key={r} onClick={() => {
-                  const reps = parseInt(logReps); const w = nsi.isBW ? 0 : parseFloat(logWt);
-                  if (reps && (nsi.isBW || w >= 0)) { onLogFromTimer(nsi.exName, nsi.nextSetNum, { reps, wt: w, rir: rirVal }, nsi); }
-                }}
-                style={{ flex: 1, padding: "18px 0", borderRadius: 14, border: `1px solid ${C.pur}55`, background: C.pur + "22", color: C.pur, fontSize: 20, fontWeight: 800, cursor: "pointer" }}>
-                {r}
-              </button>
-            );
-          })}
-        </div>
-        <button onClick={() => {
-            const r = parseInt(logReps); const w = nsi.isBW ? 0 : parseFloat(logWt);
-            if (r && (nsi.isBW || w >= 0)) { onLogFromTimer(nsi.exName, nsi.nextSetNum, { reps: r, wt: w }, nsi); }
-          }}
-          style={{ padding: "10px 32px", borderRadius: 10, border: `1px solid ${C.grn}44`, background: C.grn + "11", color: C.grn, fontSize: 12, fontWeight: 700, cursor: "pointer", marginBottom: 8 }}>
-          Log without RIR ✓
-        </button>
+        {nsi.nextSetNum === nsi.totalSets ? (
+          <>
+            <div style={{ fontSize: 10, color: C.mut, marginBottom: 8, textAlign: "center", letterSpacing: 0.5 }}>REPS IN RESERVE — tap to log final set</div>
+            <div style={{ display: "flex", gap: 8, marginBottom: 16, width: "100%" }}>
+              {[0, 1, 2, 3, "4+"].map(r => {
+                const rirVal = typeof r === "string" ? 4 : r;
+                return (
+                  <button key={r} onClick={() => {
+                      const reps = parseInt(logReps); const w = nsi.isBW ? 0 : parseFloat(logWt);
+                      if (reps && (nsi.isBW || w >= 0)) { onLogFromTimer(nsi.exName, nsi.nextSetNum, { reps, wt: w, rir: rirVal }, nsi); }
+                    }}
+                    style={{ flex: 1, padding: "18px 0", borderRadius: 14, border: `1px solid ${C.pur}55`, background: C.pur + "22", color: C.pur, fontSize: 20, fontWeight: 800, cursor: "pointer" }}>
+                    {r}
+                  </button>
+                );
+              })}
+            </div>
+            <button onClick={() => {
+                const r = parseInt(logReps); const w = nsi.isBW ? 0 : parseFloat(logWt);
+                if (r && (nsi.isBW || w >= 0)) { onLogFromTimer(nsi.exName, nsi.nextSetNum, { reps: r, wt: w }, nsi); }
+              }}
+              style={{ padding: "10px 32px", borderRadius: 10, border: `1px solid ${C.grn}44`, background: C.grn + "11", color: C.grn, fontSize: 12, fontWeight: 700, cursor: "pointer", marginBottom: 8 }}>
+              Log without RIR ✓
+            </button>
+          </>
+        ) : (
+          <button onClick={() => {
+              const r = parseInt(logReps); const w = nsi.isBW ? 0 : parseFloat(logWt);
+              if (r && (nsi.isBW || w >= 0)) { onLogFromTimer(nsi.exName, nsi.nextSetNum, { reps: r, wt: w }, nsi); }
+            }}
+            style={{ padding: "16px 60px", borderRadius: 14, border: "none", background: C.grn, color: C.bg, fontSize: 16, fontWeight: 800, cursor: "pointer", marginBottom: 12 }}>
+            Log Set {nsi.nextSetNum} ✓
+          </button>
+        )}
         <button onClick={() => onDone()}
           style={{ padding: "8px 20px", borderRadius: 8, border: `1px solid ${C.bdr}`, background: "transparent", color: C.mut, fontSize: 11, cursor: "pointer" }}>
           Skip — log manually
@@ -1519,7 +1531,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
           )}
 
           {Array.from({ length: totalSets }, (_, i) => (
-            <SetRow key={i} setNum={i + 1} targetReps={smartTargetReps ? String(smartTargetReps) : ex.reps.split("-")[0]} targetWt={targetWt} lastWeight={lastWeightRef.current} isBW={!!ex.bodyweight} bands={ex.bands} logged={logged[i + 1]} onLog={logSet} onDelete={deleteSet} onRir={handleRir} />
+            <SetRow key={i} setNum={i + 1} isLastSet={i + 1 === totalSets} targetReps={smartTargetReps ? String(smartTargetReps) : ex.reps.split("-")[0]} targetWt={targetWt} lastWeight={lastWeightRef.current} isBW={!!ex.bodyweight} bands={ex.bands} logged={logged[i + 1]} onLog={logSet} onDelete={deleteSet} onRir={handleRir} />
           ))}
         </div>
       )}
