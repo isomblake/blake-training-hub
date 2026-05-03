@@ -1319,9 +1319,10 @@ function saveSessionPerformance(allSets, sessionKey, weekNumber, rir, mesoPrefix
     if (setArr.length === 0) return;
     const avgWt = setArr.reduce((a, s) => a + (parseFloat(s.wt) || 0), 0) / setArr.length;
     const avgReps = setArr.reduce((a, s) => a + (parseInt(s.reps) || 0), 0) / setArr.length;
-    const rirVals = setArr.filter(s => s.rir != null).map(s => s.rir);
-    const avgRir = rirVals.length > 0 ? rirVals.reduce((a, v) => a + v, 0) / rirVals.length : null;
-    perf[exName] = { avgWt, avgReps, weekNumber, rir, avgRir };
+    // Use last set's RIR — the only set performed under full accumulated fatigue
+    const setsWithRir = setArr.filter(s => s.rir != null);
+    const lastRir = setsWithRir.length > 0 ? setsWithRir[setsWithRir.length - 1].rir : null;
+    perf[exName] = { avgWt, avgReps, weekNumber, rir, avgRir: lastRir };
   });
   try { localStorage.setItem(perfKey, JSON.stringify(perf)); } catch(e) {}
 }
