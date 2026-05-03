@@ -1553,6 +1553,8 @@ function HistoryView() {
   const [editSetFields, setEditSetFields] = useState({ reps: '', weight: '' });
   const [addingSet, setAddingSet] = useState(null); // { sessionId, exName, muscles, nextNum }
   const [addSetFields, setAddSetFields] = useState({ reps: '', weight: '' });
+  const [addingExercise, setAddingExercise] = useState(null); // { sessionId, exName, muscles }
+  const [addExFields, setAddExFields] = useState({ reps: '', weight: '' });
 
   useEffect(() => {
     db.getRecentSessions(200).then(data => {
@@ -1621,6 +1623,22 @@ function HistoryView() {
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     return `${days[dt.getDay()]} ${months[dt.getMonth()]} ${dt.getDate()}`;
   };
+
+  // All exercises from all mesocycles, deduplicated and sorted
+  const allProgrammedExercises = (() => {
+    const seen = new Set();
+    const result = [];
+    Object.values(MESOCYCLES).forEach(meso => {
+      (meso.routines || []).forEach(r => {
+        (r.sections || []).forEach(sec => {
+          (sec.exercises || []).forEach(ex => {
+            if (!seen.has(ex.name)) { seen.add(ex.name); result.push({ name: ex.name, muscles: ex.muscles || '' }); }
+          });
+        });
+      });
+    });
+    return result.sort((a, b) => a.name.localeCompare(b.name));
+  })();
 
   return (
     <div>
@@ -1764,6 +1782,59 @@ function HistoryView() {
                     )}
                   </div>
                 ))}
+                {/* Add a missing exercise to this session */}
+                {addingExercise && addingExercise.sessionId === session.id ? (
+                  <div style={{ marginTop: 10, background: C.c2, borderRadius: 8, padding: 10 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: C.txt, marginBottom: 8 }}>Add Exercise</div>
+                    <select value={addingExercise.exName}
+                      onChange={e => {
+                        const found = allProgrammedExercises.find(ex => ex.name === e.target.value);
+                        setAddingExercise(prev => ({ ...prev, exName: e.target.value, muscles: found?.muscles || '' }));
+                      }}
+                      style={{ width: "100%", padding: "6px", borderRadius: 6, border: `1px solid ${C.bdr}`, background: C.card, color: C.txt, fontSize: 12, marginBottom: 8 }}>
+                      <option value="">— pick an exercise —</option>
+                      {allProgrammedExercises.map(ex => <option key={ex.name} value={ex.name}>{ex.name}</option>)}
+                    </select>
+                    {addingExercise.exName && (
+                      <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                        <input type="number" inputMode="numeric" placeholder="reps" value={addExFields.reps}
+                          onChange={e => setAddExFields(f => ({...f, reps: e.target.value}))}
+                          onFocus={e => e.target.select()}
+                          style={{ width: 48, padding: "4px", borderRadius: 5, border: `1px solid ${C.grn}55`, background: C.card, color: C.txt, fontSize: 12, textAlign: "center" }} />
+                        <span style={{ color: C.mut }}>×</span>
+                        <input type="number" inputMode="decimal" placeholder="lb" value={addExFields.weight}
+                          onChange={e => setAddExFields(f => ({...f, weight: e.target.value}))}
+                          onFocus={e => e.target.select()}
+                          style={{ width: 56, padding: "4px", borderRadius: 5, border: `1px solid ${C.grn}55`, background: C.card, color: C.txt, fontSize: 12, textAlign: "center" }} />
+                        <span style={{ color: C.mut, fontSize: 10 }}>lb</span>
+                        <button onClick={async () => {
+                            const reps = parseInt(addExFields.reps);
+                            const weight = parseFloat(addExFields.weight) || 0;
+                            if (!reps) return;
+                            const existingSetsForEx = (session.sets || []).filter(s => s.exercises?.name === addingExercise.exName);
+                            const nextSetNum = existingSetsForEx.length > 0 ? Math.max(...existingSetsForEx.map(s => s.set_number)) + 1 : 1;
+                            await db.logSet(session.id, addingExercise.exName, nextSetNum, reps, weight, null, addingExercise.muscles);
+                            const { data: fresh } = await supabase.from('sets').select('*, exercises(name, muscles, muscle_group, cable_ratio)').eq('session_id', session.id).order('set_number', { ascending: true });
+                            setSessions(prev => prev.map(s => s.id === session.id ? { ...s, sets: fresh || s.sets } : s));
+                            setAddingExercise(null); setAddExFields({ reps: '', weight: '' });
+                          }}
+                          style={{ padding: "4px 12px", borderRadius: 5, border: "none", background: C.grn, color: C.bg, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                          ✓ Add
+                        </button>
+                        <button onClick={() => { setAddingExercise(null); setAddExFields({ reps: '', weight: '' }); }}
+                          style={{ padding: "4px 8px", borderRadius: 5, border: `1px solid ${C.bdr}`, background: "transparent", color: C.mut, fontSize: 10, cursor: "pointer" }}>
+                          Cancel
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <button onClick={() => { setAddingExercise({ sessionId: session.id, exName: '', muscles: '' }); setAddExFields({ reps: '', weight: '' }); }}
+                    style={{ marginTop: 10, padding: "4px 12px", borderRadius: 6, border: `1px solid ${C.bdr}`, background: "transparent", color: C.mut, fontSize: 10, cursor: "pointer" }}>
+                    + add exercise
+                  </button>
+                )}
+
                 {totalVolume > 0 && (
                   <div style={{ marginTop: 10, padding: "6px 8px", background: C.c2, borderRadius: 6, fontSize: 10, color: C.mut, display: "flex", justifyContent: "space-between" }}>
                     <span>Total volume: <span style={{ color: C.gld, fontWeight: 600 }}>{totalVolume.toLocaleString()} lb</span></span>
