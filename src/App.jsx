@@ -803,8 +803,8 @@ const MESO1_ROUTINES = {
   "Lower B": {
     day: "D4", sections: [
       { name: "Quads", exercises: [
-        { name: "Smith Hack Squat (Feet Fwd)", muscles: "Quads", sets: 3, reps: "10-12", rest: 120, wt: 95,
-          vid: "https://www.muscleandstrength.com/exercises/feet-forward-smith-machine-squat.html", src: "M&S" },
+        { name: "Smith Back Squat", muscles: "Quads · Glutes", sets: 3, reps: "8-10", rest: 150, wt: 115,
+          vid: "https://www.muscleandstrength.com/exercises/smith-machine-squat.html", src: "M&S" },
       ]},
       { name: "Hamstrings", exercises: [
         { name: "Smith Good Morning", muscles: "Hams · Glutes", sets: 3, reps: "10-12", rest: 120, wt: 75,
@@ -839,7 +839,7 @@ const DELOAD_WEIGHTS = {
   "Cable Lat Pulldown (Close)": 90, "Landmine Row (Per Arm)": 10,
   "Cable Cross-Body Lateral": 5, "Cable Rear Delt Fly": 5,
   "Cable Bayesian Curl": 10, "Cable Pushdown (Bar)": 35,
-  "Smith Hack Squat (Feet Fwd)": 50, "Smith Good Morning": 40,
+  "Smith Back Squat": 60, "Smith Good Morning": 40,
   "Smith Lunge (Front Elevated)": 20, "Hanging Knee Raise": null,
 };
 
