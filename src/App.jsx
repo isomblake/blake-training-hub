@@ -3972,7 +3972,7 @@ export default function App() {
             {sec.exercises.map((ex, ei) => {
               const isLastSec = si === r.sections.length - 1;
               const isLastEx = isLastSec && ei === sec.exercises.length - 1;
-              return <ExerciseCard key={ei} ex={ex} week={week} weeksConfig={activeWeeks} sessionKey={sessionKey} allSets={allSets} setAllSets={setAllSets} onStartRest={startRest} onSave={saveToStorage} onSync={syncToDb} onDeleteFromDb={deleteFromDb} mesoPrefix={activeMeso.shortName} isLastExercise={isLastEx} />;
+              return <ExerciseCard key={`${sessionKey}-${ei}`} ex={ex} week={week} weeksConfig={activeWeeks} sessionKey={sessionKey} allSets={allSets} setAllSets={setAllSets} onStartRest={startRest} onSave={saveToStorage} onSync={syncToDb} onDeleteFromDb={deleteFromDb} mesoPrefix={activeMeso.shortName} isLastExercise={isLastEx} />;
             })}
           </div>
         ))}
