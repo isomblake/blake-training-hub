@@ -3855,7 +3855,7 @@ export default function App() {
     setAllSets(prev => ({ ...prev, [exKey]: { ...(prev[exKey] || {}), [setNum]: data } }));
     const allExercisesForSync = r.sections.flatMap(sec => sec.exercises);
     const curExForSync = allExercisesForSync.find(ex => ex.name === exName);
-    syncToDb(exName, setNum, data.reps, data.wt, data.band, curExForSync ? curExForSync.muscles : null);
+    syncToDb(exName, setNum, data.reps, data.wt, data.band, data.rir ?? null, curExForSync ? curExForSync.muscles : null);
 
     // Start rest timer for next set — unless this is the final set of the session
     if (nextSetInfo) {
