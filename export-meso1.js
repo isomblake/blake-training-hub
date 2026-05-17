@@ -1,11 +1,37 @@
 // Export Meso 1 actual performance data for Meso 2 planning
-// Usage: node export-meso1.js <SUPABASE_URL> <ANON_KEY>
+// Usage (any of these work):
+//   node export-meso1.js                          (reads .env.local automatically)
+//   node export-meso1.js <SUPABASE_URL> <ANON_KEY>
+//   REACT_APP_SUPABASE_URL=x REACT_APP_SUPABASE_ANON_KEY=y node export-meso1.js
 const { createClient } = require('@supabase/supabase-js');
+const fs = require('fs');
+const path = require('path');
+
+// Auto-load .env.local if it exists (same file the React app uses)
+const envPath = path.join(__dirname, '.env.local');
+if (fs.existsSync(envPath)) {
+  fs.readFileSync(envPath, 'utf8').split('\n').forEach(line => {
+    const [k, ...v] = line.trim().split('=');
+    if (k && v.length && !process.env[k]) process.env[k] = v.join('=');
+  });
+}
 
 const url = process.env.REACT_APP_SUPABASE_URL || process.argv[2];
 const key = process.env.REACT_APP_SUPABASE_ANON_KEY || process.argv[3];
-if (!url || !key || url === 'YOUR_PROJECT_URL') {
-  console.error('Usage: node export-meso1.js <SUPABASE_URL> <ANON_KEY>');
+if (!url || !key || url.includes('your-project')) {
+  console.error('');
+  console.error('Could not find Supabase credentials. Do one of:');
+  console.error('');
+  console.error('  Option A — create .env.local in the project folder:');
+  console.error('    REACT_APP_SUPABASE_URL=https://xxxx.supabase.co');
+  console.error('    REACT_APP_SUPABASE_ANON_KEY=eyJh...');
+  console.error('  Then just run: node export-meso1.js');
+  console.error('');
+  console.error('  Option B — pass directly:');
+  console.error('    node export-meso1.js https://xxxx.supabase.co eyJh...');
+  console.error('');
+  console.error('  Find your keys at: Supabase dashboard → project → Settings → API');
+  console.error('');
   process.exit(1);
 }
 
