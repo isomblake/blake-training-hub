@@ -3848,6 +3848,28 @@ export default function App() {
     const deloadSets = 2;
     const currentTotalSets = wkData.deload ? deloadSets : currentEx.sets;
 
+    // Smart target helper: mirrors ExerciseCard's computeAdjustment using localStorage perf data
+    const getSmartWt = (ex, exCat, minStep, weeklyAdd, baseTarget) => {
+      if (!ex.wt || wkData.deload) return baseTarget;
+      const perfKey = 'training-hub-perf-' + activeMeso.shortName.replace(/\s+/g, '-');
+      let perf = {};
+      try { perf = JSON.parse(localStorage.getItem(perfKey) || '{}'); } catch(e) {}
+      const last = perf[ex.name];
+      if (!last || last.avgWt == null) return baseTarget;
+      const lastWk = last.weekNumber || 0;
+      const curWk = week + 1;
+      if (lastWk > curWk) return baseTarget;
+      if (lastWk === curWk) {
+        const hold = Math.round(last.avgWt / minStep) * minStep;
+        return hold !== baseTarget ? hold : baseTarget;
+      }
+      const repRange = ex.reps.split("-").map(Number);
+      const min = repRange[0], max = repRange[1] || repRange[0];
+      if (last.avgReps < min) return Math.round(last.avgWt / minStep) * minStep;
+      if (last.avgReps > max) return Math.round((last.avgWt + weeklyAdd + minStep) / minStep) * minStep;
+      return Math.round((last.avgWt + weeklyAdd) / minStep) * minStep;
+    };
+
     // Deload weight helper: actual last-week avgWt × 0.5 from localStorage, fallback to programmed × 0.5
     const getDeloadWt = (ex) => {
       const step = ex.name.toLowerCase().startsWith("smith") ? 5 : 2.5;
@@ -3867,7 +3889,7 @@ export default function App() {
       const weeklyAdd = wkData[exCat];
       const baseTarget = wkData.deload ? getDeloadWt(currentEx) : (currentEx.wt ? Math.round((currentEx.wt + weeklyAdd) / minStep) * minStep : null);
       const lastLogged = logged[timer.setNum];
-      const targetWt = lastLogged ? lastLogged.wt : baseTarget;
+      const targetWt = lastLogged ? lastLogged.wt : getSmartWt(currentEx, exCat, minStep, weeklyAdd, baseTarget);
       const targetReps = currentEx.reps.split("-")[0];
       return { exName: currentEx.name, muscles: currentEx.muscles, nextSetNum, totalSets: currentTotalSets, targetReps, targetWt, isBW: !currentEx.wt && currentEx.wt !== 0, restSeconds: currentEx.rest, isLastExInSession: false };
     }
@@ -3881,9 +3903,10 @@ export default function App() {
     const minStep = exCat === "smith" ? 5 : 2.5;
     const weeklyAdd = wkData[exCat];
     const baseTarget = wkData.deload ? getDeloadWt(nextEx) : (nextEx.wt ? Math.round((nextEx.wt + weeklyAdd) / minStep) * minStep : null);
+    const targetWt = getSmartWt(nextEx, exCat, minStep, weeklyAdd, baseTarget);
     const targetReps = nextEx.reps.split("-")[0];
     const isLastEx = currentIdx + 1 === allExercises.length - 1;
-    return { exName: nextEx.name, muscles: nextEx.muscles, nextSetNum: 1, totalSets: wkData.deload ? deloadSets : nextEx.sets, targetReps, targetWt: baseTarget, isBW: !nextEx.wt && nextEx.wt !== 0, restSeconds: nextEx.rest, isLastExInSession: isLastEx, isNewExercise: true };
+    return { exName: nextEx.name, muscles: nextEx.muscles, nextSetNum: 1, totalSets: wkData.deload ? deloadSets : nextEx.sets, targetReps, targetWt, isBW: !nextEx.wt && nextEx.wt !== 0, restSeconds: nextEx.rest, isLastExInSession: isLastEx, isNewExercise: true };
   }, [timer, r, sessionKey, allSets, activeWeeks, week]);
 
   // Handle logging a set from the timer's NextSetCard
