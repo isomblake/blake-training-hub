@@ -998,7 +998,7 @@ const MESOCYCLES = [
     id: "rp-meso-2",
     name: "RP Meso 2",
     shortName: "Meso 2",
-    startDate: "2026-05-26",
+    startDate: "2026-05-24",
     endDate: "2026-07-05",
     weeks: WEEKS,
     routines: MESO2_ROUTINES,
