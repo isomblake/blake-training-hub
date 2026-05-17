@@ -366,7 +366,7 @@ const db = {
   },
 
   // Log a set to the database
-  async logSet(sessionId, exerciseName, setNumber, reps, weight, band, muscles) {
+  async logSet(sessionId, exerciseName, setNumber, reps, weight, band, rir, muscles) {
     // Find exercise, auto-creating if missing so new meso exercises are never lost
     let { data: ex } = await supabase
       .from('exercises')
@@ -390,7 +390,10 @@ const db = {
       return null;
     }
 
-    const notes = band && band !== 'None' ? `band:${band}` : null;
+    const parts = [];
+    if (band && band !== 'None') parts.push(`band:${band}`);
+    if (rir != null) parts.push(`rir:${rir}`);
+    const notes = parts.length > 0 ? parts.join('|') : null;
 
     // Upsert the set (update if exists, insert if not)
     const { data: existingSets } = await supabase
@@ -1457,7 +1460,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
     });
     // Store the latest weight so unlogged SetRows can pick it up
     if (data.wt !== undefined) lastWeightRef.current = data.wt;
-    onSync(ex.name, setNum, data.reps, data.wt, data.band, ex.muscles);
+    onSync(ex.name, setNum, data.reps, data.wt, data.band, data.rir ?? null, ex.muscles);
     const isLastSet = setNum >= totalSets;
     if (!(isLastExercise && isLastSet)) {
       onStartRest(wkData.deload ? Math.min(ex.rest, 75) : ex.rest, ex.name, setNum, totalSets);
@@ -1474,12 +1477,16 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
   };
 
   const handleRir = (setNum, rir) => {
+    const currentSet = logged[setNum];
     setAllSets(prev => {
       const prevEx = prev[exKey] || {};
       const prevSet = prevEx[setNum];
       if (!prevSet) return prev;
       return { ...prev, [exKey]: { ...prevEx, [setNum]: { ...prevSet, rir } } };
     });
+    if (currentSet) {
+      onSync(ex.name, setNum, currentSet.reps, currentSet.wt, currentSet.band, rir, ex.muscles);
+    }
   };
 
   return (
@@ -1760,7 +1767,7 @@ function HistoryView() {
                             const reps = parseInt(addSetFields.reps);
                             const weight = parseFloat(addSetFields.weight) || 0;
                             if (!reps) return;
-                            await db.logSet(session.id, ex.name, addingSet.nextNum, reps, weight, null, ex.muscles);
+                            await db.logSet(session.id, ex.name, addingSet.nextNum, reps, weight, null, null, ex.muscles);
                             const { data: fresh } = await supabase.from('sets').select('*, exercises(name, muscles, muscle_group, cable_ratio)').eq('session_id', session.id).order('set_number', { ascending: true });
                             setSessions(prev => prev.map(sess => sess.id === session.id ? { ...sess, sets: fresh || sess.sets } : sess));
                             setAddingSet(null);
@@ -1813,7 +1820,7 @@ function HistoryView() {
                             if (!reps) return;
                             const existingSetsForEx = (session.sets || []).filter(s => s.exercises?.name === addingExercise.exName);
                             const nextSetNum = existingSetsForEx.length > 0 ? Math.max(...existingSetsForEx.map(s => s.set_number)) + 1 : 1;
-                            await db.logSet(session.id, addingExercise.exName, nextSetNum, reps, weight, null, addingExercise.muscles);
+                            await db.logSet(session.id, addingExercise.exName, nextSetNum, reps, weight, null, null, addingExercise.muscles);
                             const { data: fresh } = await supabase.from('sets').select('*, exercises(name, muscles, muscle_group, cable_ratio)').eq('session_id', session.id).order('set_number', { ascending: true });
                             setSessions(prev => prev.map(s => s.id === session.id ? { ...s, sets: fresh || s.sets } : s));
                             setAddingExercise(null); setAddExFields({ reps: '', weight: '' });
@@ -3666,6 +3673,39 @@ export default function App() {
     supabase.from('exercises').update({ name: 'Smith Incline Press' }).eq('name', 'Smith Incline Press (30°)').then(() => {});
   }, []);
 
+  // One-time: back-fill W5 RIR from localStorage into Supabase sets.notes
+  useEffect(() => {
+    if (localStorage.getItem('training-hub-rir-migrated-v1')) return;
+    let perf = {};
+    try { perf = JSON.parse(localStorage.getItem('training-hub-perf-Meso-1') || '{}'); } catch(e) {}
+    const w5entries = Object.entries(perf).filter(([, v]) => v.avgRir != null && v.weekNumber === 5);
+    if (w5entries.length === 0) return;
+    (async () => {
+      const { data: sessions } = await supabase
+        .from('sessions').select('id')
+        .ilike('notes', 'Meso 1-W5%');
+      if (!sessions || sessions.length === 0) return;
+      const sessionIds = sessions.map(s => s.id);
+      for (const [exName, data] of w5entries) {
+        const { data: ex } = await supabase.from('exercises').select('id').eq('name', exName).single();
+        if (!ex) continue;
+        const { data: sets } = await supabase
+          .from('sets').select('id, notes')
+          .eq('exercise_id', ex.id)
+          .in('session_id', sessionIds)
+          .order('set_number', { ascending: false })
+          .limit(1);
+        if (!sets || sets.length === 0) continue;
+        const existing = sets[0].notes || '';
+        if (existing.includes('rir:')) continue;
+        const newNotes = existing ? `${existing}|rir:${data.avgRir}` : `rir:${data.avgRir}`;
+        await supabase.from('sets').update({ notes: newNotes }).eq('id', sets[0].id);
+      }
+      localStorage.setItem('training-hub-rir-migrated-v1', '1');
+      console.log('RIR migration complete:', w5entries.length, 'exercises updated');
+    })().catch(console.error);
+  }, []);
+
   // Load session from Supabase on mount or when routine/week changes
   useEffect(() => {
     let cancelled = false;
@@ -3708,11 +3748,11 @@ export default function App() {
   }, [today, rKey, week, sessionKey]);
 
   // Sync a set to Supabase
-  const syncToDb = useCallback(async (exercise, setNum, reps, weight, band, muscles) => {
+  const syncToDb = useCallback(async (exercise, setNum, reps, weight, band, rir, muscles) => {
     if (!currentSession) return;
     try {
       setSyncStatus("saving...");
-      await db.logSet(currentSession.id, exercise, setNum, reps, weight, band, muscles);
+      await db.logSet(currentSession.id, exercise, setNum, reps, weight, band, rir, muscles);
       setSyncStatus("saved ✓");
       setTimeout(() => setSyncStatus(""), 2000);
     } catch (e) {
