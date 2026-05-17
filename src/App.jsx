@@ -688,7 +688,7 @@ const WEEKS = [
   { rir: "2 RIR", note: "Getting harder · hold reps stable", smith: 5, cable: 5, iso: 2.5, deload: false },
   { rir: "2 RIR", note: "Sustained effort · stay consistent", smith: 10, cable: 7.5, iso: 2.5, deload: false },
   { rir: "0-1 RIR", note: "PEAK · push near failure · max volume", smith: 10, cable: 10, iso: 5, deload: false },
-  { rir: "4 RIR", note: "DELOAD · 50% weight · 50% sets · recover", smith: 0, cable: 0, iso: 0, deload: true },
+  { rir: "4+ RIR", note: "DELOAD · 50% weight · 50% sets · recover", smith: 0, cable: 0, iso: 0, deload: true },
 ];
 
 // Determine exercise category from name for weight progression
