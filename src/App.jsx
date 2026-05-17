@@ -468,7 +468,12 @@ const db = {
       // We'll use a placeholder key that gets resolved in the component
       if (!result[exName]) result[exName] = {};
       const setData = { reps: s.reps, wt: s.weight };
-      if (s.notes && s.notes.startsWith('band:')) setData.band = s.notes.replace('band:', '');
+      if (s.notes) {
+        s.notes.split('|').forEach(part => {
+          if (part.startsWith('band:')) setData.band = part.slice(5);
+          else if (part.startsWith('rir:')) setData.rir = parseInt(part.slice(4));
+        });
+      }
       result[exName][s.set_number] = setData;
     });
     return result;
@@ -1363,7 +1368,12 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
 
   // Helper: run the progression computation given raw perf data
   function computeAdjustment(avgWt, avgReps, lastWk, lastRir, lastAvgRir) {
-    if (lastWk >= (week + 1)) return {};
+    if (lastWk > (week + 1)) return {};
+    if (lastWk === (week + 1)) {
+      // Same week: don't add progression, but show actual weight rather than programmed base
+      const holdWt = Math.round(avgWt / minStep) * minStep;
+      return holdWt !== baseTarget ? { smartTarget: holdWt } : {};
+    }
     const repRange = ex.reps.split("-").map(Number);
     const minReps = repRange[0], maxReps = repRange[1] || repRange[0];
     let adjusted, note, repsAdj = null;
