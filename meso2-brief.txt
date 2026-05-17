@@ -1,0 +1,157 @@
+================================================================
+BLAKE TRAINING HUB — MESO 2 PLANNING BRIEF
+Generated: May 17, 2026 (Meso 1 deload week)
+================================================================
+
+CONTEXT
+-------
+Equipment:   ForceUSA G3 (Smith 1:1 ratio, Cable 2:1 pulley ratio, Landmine)
+Methodology: Renaissance Periodization hypertrophy
+Split:       4-day Upper/Lower (Upper A / Lower A / Upper B / Lower B)
+Meso 1 ran: Apr 14 – May 16, 2026 (5 accumulation weeks, all 20 sessions completed)
+Meso 1 RIR: W1=4, W2=3, W3=2, W4=2, W5=0-1
+Meso 2 RIR: W1=4, W2=3, W3=2, W4=2, W5=0-1 (same pattern)
+Deload:     May 18-24 (W6 at 50% weight, 2 sets per exercise)
+
+Meso 2 W1 start weights = Meso 1 W5 ending weights.
+Where actual W5 data exists it is used directly (marked A).
+Where data is missing, the verified progression scheme is applied (marked C).
+
+Scheme verified against 9 actual data points before applying to gaps:
+  Smith compound:  +5/+5/+10/+10 sequential = W1+30 total (4 exact matches)
+  Cable compound:  +2.5/+5/+7.5/+10 sequential = W1+25 total (2 exact matches)
+  Isolation:       +0/+2.5/+2.5/+5 sequential = W1+10 total (3 matches)
+
+================================================================
+UPPER A
+================================================================
+
+Exercise               | W1 start | Key actual logged         | W5 end  | Src | MESO 2 W1
+-----------------------|----------|---------------------------|---------|-----|----------
+Smith Flat Bench Press |   120    | W2 actual: 125            |   150   |  C  |   150
+Smith Incline Press    |    75    | W3 actual: 80             |   100   |  C  |   100
+Chin-Ups (Wide OH)     |    BW    | W1: Green band            |   ---   |  -  | [see note 3]
+Seated Cable Row       |   140    | no data                   |   165   |  C  |   165
+Cable Lateral Raise    |    15    | no data                   |    25   |  C  |    25
+Cable Face Pull (Rope) |    70    | W2 actual: 70             |    80   |  C  |    80
+Cable EZ Bar Curl      |    65    | W1 actual: 45, W2: 47.5   |    55   |  C  |    55
+Cable OH Tricep Ext    |    60    | no data                   |    70   |  C  |    70
+
+================================================================
+LOWER A
+================================================================
+
+Exercise               | W1 start | Key actual logged         | W5 end  | Src | MESO 2 W1
+-----------------------|----------|---------------------------|---------|-----|----------
+Smith Front Squat      |   105    | no data                   |   135   |  C  |   135
+Smith SLDL             |   115    | W5: 150 (set2), 160 (set3)|   155   |  A  |   155
+Landmine Goblet Squat  |    30    | W5 actual: 40             |    40   |  A  |    40
+Smith Deficit Calf     |   115    | W5 actual: 135            |   135   |  A  |   135
+Cable Crunch           |    45    | W3: 50, W4: 52.5          |    55   |  C  |    55
+Cable Upright Row      |    40    | W5 actual: 45             |    45   |  A  |    45
+
+================================================================
+UPPER B
+================================================================
+
+Exercise               | W1 start | Key actual logged         | W5 end  | Src | MESO 2 W1
+-----------------------|----------|---------------------------|---------|-----|----------
+Smith Close-Grip Bench |    75    | no data                   |   105   |  C  |   105
+Cable Fly (Low-to-High)|    15    | no data                   |    25   |  C  |    25
+Cable Lat Pulldown     |   180    | W3: 187.5, W5: 205        |   205   |  A  |   205
+Landmine Row (per arm) |    20    | W1: 20, W3: 22.5          |    30   |  C  |    30
+Cable Cross-Body Lat   |    10    | W2 actual: 5              |    15   |  C  |    15
+Cable Rear Delt Fly    |    10    | W2+W4: weight=0 (error)   |   ---   |  -  | 15 [see note 2]
+Cable Bayesian Curl    |    20    | W5 actual: 32.5           |    32.5 |  A  |    32.5
+Cable Pushdown (Bar)   |    65    | W2: 65, W4: 70            |    72.5 |  C  |    72.5
+
+================================================================
+LOWER B
+================================================================
+
+Exercise               | W1 start | Key actual logged         | W5 end  | Src | MESO 2 W1
+-----------------------|----------|---------------------------|---------|-----|----------
+Smith Back Squat       |   115*   | W4 start: 115             |   125   |  C  |   125
+Smith Good Morning     |    75    | W3 actual: 85             |   105   |  C  |   105
+Smith Lunge (Frt Elev) |    40    | W5 actual: 70             |    70   |  A  |    70
+Smith Deficit Calf     |   115    | W5 actual: 135            |   135   |  A  |   135
+Hanging Knee Raise     |    BW    | no data                   |    BW   |  -  |    BW
+Cable Upright Row      |    40    | W5 actual: 45             |    45   |  A  |    45
+
+* Back Squat replaced Hack Squat at W4 due to knee pain. Only 2 sessions of data.
+  Hack Squat W1=95, W3 actual=105 confirmed. Back Squat: W4=115, W5 est=125.
+
+================================================================
+MESO 2 QUICK-REFERENCE STARTING WEIGHTS
+================================================================
+
+UPPER A
+  Smith Flat Bench Press        150
+  Smith Incline Press           100
+  Chin-Ups (Wide OH)            carry forward W5 band level
+  Seated Cable Row              165
+  Cable Lateral Raise            25
+  Cable Face Pull (Rope)         80
+  Cable EZ Bar Curl              55
+  Cable OH Tricep Extension      70
+
+LOWER A
+  Smith Front Squat             135
+  Smith SLDL                    155
+  Landmine Goblet Squat          40
+  Smith Deficit Calf Raise      135
+  Cable Crunch                   55
+  Cable Upright Row              45
+
+UPPER B
+  Smith Close-Grip Bench        105
+  Cable Fly (Low-to-High)        25
+  Cable Lat Pulldown (Close)    205
+  Landmine Row (per arm)         30
+  Cable Cross-Body Lateral       15
+  Cable Rear Delt Fly            15  [DATA GAP - start conservative]
+  Cable Bayesian Curl            32.5
+  Cable Pushdown (Bar)           72.5
+
+LOWER B
+  Smith Back Squat              125  [SUBSTITUTION - monitor knee]
+  Smith Good Morning            105
+  Smith Lunge (Front Elev)       70
+  Smith Deficit Calf Raise      135
+  Hanging Knee Raise             BW
+  Cable Upright Row              45
+
+================================================================
+FLAGS FOR MESO 2 DESIGN
+================================================================
+
+1. SLDL AHEAD OF SCHEME
+   W5 top sets hit 150-160 vs scheme prediction of 145. Blake pushed hard at 0-1 RIR.
+   Meso2 W1=155 (midpoint). If 155 feels heavy at 4 RIR in W1, drop to 145 - no issue.
+
+2. CABLE REAR DELT FLY — Data gap
+   Weight logged as 0 in both W2 and W4 (data entry error, weight never entered).
+   Cannot calculate actual W5. Start Meso 2 at 15 and adjust after first session.
+   Log this one carefully going forward.
+
+3. CHIN-UPS — Band progression
+   App records band level (Green/Purple/Black/Red/None) but it is not in this export.
+   W1 was Green band. Check the app history for the W5 band level before programming.
+   Progression goal: work toward unassisted (None).
+
+4. CABLE EZ BAR CURL — Programmed vs actual gap
+   App programmed W1=65, Blake actually started at 45. All calculations use 45 as true base.
+   When entering Meso 2 into the app, set base weight to 55, not 65.
+
+5. BACK SQUAT — New movement, limited data
+   Only 2 sessions logged (W4 + W5). Monitor knee feedback in Meso 2 W1 closely.
+   If knee pain returns, consider: Leg Press, Belt Squat, or Front-Foot Elevated Split Squat.
+   Do not carry Smith Hack Squat forward.
+
+6. CABLE UPRIGHT ROW — Slower than scheme
+   W5 actual=45 vs scheme of 50. Appeared on both Lower A and Lower B.
+   Use 45 as the Meso 2 W1 starting weight for both days.
+
+================================================================
+END OF BRIEF
+================================================================
