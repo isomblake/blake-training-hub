@@ -1400,6 +1400,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
     if (avgReps < minReps) {
       adjusted = Math.round(avgWt / minStep) * minStep;
       note = `⏸ Holding @ ${Math.round(avgWt)} lb — only ${Math.round(avgReps)} reps last session (min ${minReps})`;
+      repsAdj = maxReps; // build reps before weight increases
     } else if (avgReps > maxReps) {
       adjusted = Math.round((avgWt + weeklyAdd + minStep) / minStep) * minStep;
       note = `↑ Bumped — ${Math.round(avgReps)} reps @ ${Math.round(avgWt)} lb last session (exceeded range)`;
@@ -1425,10 +1426,17 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
           else if (avgWt > ex.wt + minStep / 2) note = `↑ ${Math.round(avgWt)} lb used last${rirTag} → ${adjusted} lb this week`;
         }
       }
-      if (adjusted === Math.round(avgWt / minStep) * minStep) repsAdj = maxReps;
+      // Weight holding and not grinding → push reps to max
+      if (adjusted === Math.round(avgWt / minStep) * minStep) {
+        const targetRirLow2 = lastRir ? parseInt(lastRir) : null;
+        const notGrinding = lastAvgRir == null || targetRirLow2 == null || lastAvgRir >= targetRirLow2;
+        if (notGrinding) repsAdj = maxReps;
+      }
     }
-    if (adjusted !== undefined && adjusted !== baseTarget) return { smartTarget: adjusted, progressNote: note || null, smartTargetReps: repsAdj };
-    return {};
+    if (adjusted === undefined) return {};
+    // Return even when adjusted === baseTarget so smartTargetReps can still surface
+    if (adjusted === baseTarget && repsAdj == null) return {};
+    return { smartTarget: adjusted !== baseTarget ? adjusted : null, progressNote: note || null, smartTargetReps: repsAdj };
   }
 
   // Fast path: read from localStorage (written at session finish)
