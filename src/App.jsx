@@ -3864,6 +3864,29 @@ export default function App() {
     })().catch(console.error);
   }, []);
 
+  // One-time: ensure Meso 2 exercises and mesocycle row exist in Supabase
+  useEffect(() => {
+    if (localStorage.getItem('training-hub-meso2-db-setup-v1')) return;
+    (async () => {
+      const newExercises = [
+        { name: 'Cable Leg Extension',  muscles: 'Quads',               muscle_group: 'Quads',      cable_ratio: 2 },
+        { name: 'DB Lateral Raise',     muscles: 'Side Delts',          muscle_group: 'Side Delts', cable_ratio: 1 },
+        { name: 'DB Rear Delt Fly',     muscles: 'Rear Delts',          muscle_group: 'Rear Delts', cable_ratio: 1 },
+        { name: 'Barbell RDL',          muscles: 'Hamstrings · Glutes', muscle_group: 'Hamstrings', cable_ratio: 1 },
+      ];
+      for (const ex of newExercises) {
+        const { data } = await supabase.from('exercises').select('id').eq('name', ex.name).maybeSingle();
+        if (!data) await supabase.from('exercises').insert(ex);
+      }
+      const { data: existing } = await supabase.from('mesocycles').select('id').eq('name', 'RP Hypertrophy Meso 2').maybeSingle();
+      if (!existing) {
+        await supabase.from('mesocycles').insert({ name: 'RP Hypertrophy Meso 2', start_date: '2026-05-24', end_date: '2026-07-05', status: 'planned' });
+      }
+      localStorage.setItem('training-hub-meso2-db-setup-v1', '1');
+      console.log('Meso 2 DB setup complete');
+    })().catch(console.error);
+  }, []);
+
   // Load session from Supabase on mount or when routine/week changes
   useEffect(() => {
     let cancelled = false;
