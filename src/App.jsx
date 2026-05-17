@@ -983,6 +983,7 @@ const MESOCYCLES = [
     endDate: "2026-04-12",
     weeks: SCULPTED_DELOAD_WEEKS, // Only W9 deload is active in app (W1-W8 data is in history)
     routines: DELOAD_ROUTINES,
+    hideInWorkout: true,
     note: "8 weeks completed (Feb 9 – Apr 4) · W9 Deload (Apr 6–12)",
   },
   {
@@ -4161,6 +4162,7 @@ export default function App() {
       {MESOCYCLES.length > 1 && view === "workout" && (
         <div style={{ display: "flex", gap: 4, marginBottom: 6 }}>
           {MESOCYCLES.map((m, i) => {
+            if (m.hideInWorkout) return null;
             const isActive = i === mesoIdx;
             const isCurrent = i === getActiveMeso(localDate());
             return (
