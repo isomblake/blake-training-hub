@@ -1353,16 +1353,28 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
   const exKey = `${sessionKey}|${ex.name}`;
   const logged = allSets[exKey] || {};
   const numDone = Object.keys(logged).length;
-  const totalSets = ex.sets;
+  const wkData = (weeksConfig || WEEKS)[week];
+  const totalSets = wkData.deload ? 2 : ex.sets;
   const allDone = numDone >= totalSets;
 
-  const wkData = (weeksConfig || WEEKS)[week];
   const exCat = getExCategory(ex.name, ex.rest);
   const weeklyAdd = wkData[exCat]; // smith, cable, or iso
   const minStep = exCat === "smith" ? 5 : 2.5; // rounding step
+
+  // For deload: use actual W5 performance × 0.5 rather than programmed base × 0.5
+  const deloadActualTarget = useMemo(() => {
+    if (!wkData.deload || wkData.preDeloaded) return null;
+    const perfKey = 'training-hub-perf-' + mesoPrefix.replace(/\s+/g, '-');
+    let perf = {};
+    try { perf = JSON.parse(localStorage.getItem(perfKey) || '{}'); } catch(e) {}
+    const last = perf[ex.name];
+    if (!last || last.avgWt == null) return null;
+    return Math.round(last.avgWt * 0.5 / minStep) * minStep;
+  }, [ex.name, mesoPrefix, wkData.deload, wkData.preDeloaded, minStep]);
+
   const baseTarget = ex.wt
     ? wkData.deload
-      ? (wkData.preDeloaded ? ex.wt : Math.round(ex.wt * 0.5 / minStep) * minStep)
+      ? (wkData.preDeloaded ? ex.wt : (deloadActualTarget ?? Math.round(ex.wt * 0.5 / minStep) * minStep))
       : Math.round((ex.wt + weeklyAdd) / minStep) * minStep
     : null;
 
@@ -3833,16 +3845,31 @@ export default function App() {
     const logged = allSets[exKey] || {};
     const nextSetNum = timer.setNum + 1;
 
-    if (nextSetNum <= currentEx.sets) {
+    const deloadSets = 2;
+    const currentTotalSets = wkData.deload ? deloadSets : currentEx.sets;
+
+    // Deload weight helper: actual last-week avgWt × 0.5 from localStorage, fallback to programmed × 0.5
+    const getDeloadWt = (ex) => {
+      const step = ex.name.toLowerCase().startsWith("smith") ? 5 : 2.5;
+      if (wkData.preDeloaded) return ex.wt || null; // ex.wt already deloaded by makeDeloadRoutines
+      const perfKey = 'training-hub-perf-' + activeMeso.shortName.replace(/\s+/g, '-');
+      let perf = {};
+      try { perf = JSON.parse(localStorage.getItem(perfKey) || '{}'); } catch(e) {}
+      const last = perf[ex.name];
+      const baseWt = (last && last.avgWt != null) ? last.avgWt : ex.wt;
+      return baseWt ? Math.round(baseWt * 0.5 / step) * step : null;
+    };
+
+    if (nextSetNum <= currentTotalSets) {
       // Next set of SAME exercise
       const exCat = getExCategory(currentEx.name, currentEx.rest);
       const minStep = exCat === "smith" ? 5 : 2.5;
       const weeklyAdd = wkData[exCat];
-      const baseTarget = currentEx.wt ? (wkData.deload ? (wkData.preDeloaded ? currentEx.wt : Math.round(currentEx.wt * 0.5 / minStep) * minStep) : Math.round((currentEx.wt + weeklyAdd) / minStep) * minStep) : null;
+      const baseTarget = wkData.deload ? getDeloadWt(currentEx) : (currentEx.wt ? Math.round((currentEx.wt + weeklyAdd) / minStep) * minStep : null);
       const lastLogged = logged[timer.setNum];
       const targetWt = lastLogged ? lastLogged.wt : baseTarget;
       const targetReps = currentEx.reps.split("-")[0];
-      return { exName: currentEx.name, muscles: currentEx.muscles, nextSetNum, totalSets: currentEx.sets, targetReps, targetWt, isBW: !currentEx.wt && currentEx.wt !== 0, restSeconds: currentEx.rest, isLastExInSession: false };
+      return { exName: currentEx.name, muscles: currentEx.muscles, nextSetNum, totalSets: currentTotalSets, targetReps, targetWt, isBW: !currentEx.wt && currentEx.wt !== 0, restSeconds: currentEx.rest, isLastExInSession: false };
     }
 
     // Current exercise is done — find next exercise
@@ -3853,10 +3880,10 @@ export default function App() {
     const exCat = getExCategory(nextEx.name, nextEx.rest);
     const minStep = exCat === "smith" ? 5 : 2.5;
     const weeklyAdd = wkData[exCat];
-    const baseTarget = nextEx.wt ? (wkData.deload ? (wkData.preDeloaded ? nextEx.wt : Math.round(nextEx.wt * 0.5 / minStep) * minStep) : Math.round((nextEx.wt + weeklyAdd) / minStep) * minStep) : null;
+    const baseTarget = wkData.deload ? getDeloadWt(nextEx) : (nextEx.wt ? Math.round((nextEx.wt + weeklyAdd) / minStep) * minStep : null);
     const targetReps = nextEx.reps.split("-")[0];
     const isLastEx = currentIdx + 1 === allExercises.length - 1;
-    return { exName: nextEx.name, muscles: nextEx.muscles, nextSetNum: 1, totalSets: nextEx.sets, targetReps, targetWt: baseTarget, isBW: !nextEx.wt && nextEx.wt !== 0, restSeconds: nextEx.rest, isLastExInSession: isLastEx, isNewExercise: true };
+    return { exName: nextEx.name, muscles: nextEx.muscles, nextSetNum: 1, totalSets: wkData.deload ? deloadSets : nextEx.sets, targetReps, targetWt: baseTarget, isBW: !nextEx.wt && nextEx.wt !== 0, restSeconds: nextEx.rest, isLastExInSession: isLastEx, isNewExercise: true };
   }, [timer, r, sessionKey, allSets, activeWeeks, week]);
 
   // Handle logging a set from the timer's NextSetCard
