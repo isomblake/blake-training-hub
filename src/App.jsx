@@ -826,115 +826,6 @@ const MESO1_ROUTINES = {
   },
 };
 
-// Meso 2 routines — W1 starting weights from actual Meso 1 W5 data
-const MESO2_ROUTINES = {
-  "Upper A": {
-    day: "D1", sections: [
-      { name: "Chest", exercises: [
-        { name: "Smith Flat Bench Press", muscles: "Chest", sets: 3, reps: "8-10", rest: 150, wt: 145,
-          vid: "https://www.muscleandstrength.com/exercises/smith-machine-bench-press.html", src: "M&S" },
-        { name: "Smith Incline Press", muscles: "Upper Chest", sets: 3, reps: "10-12", rest: 120, wt: 105,
-          vid: "https://www.muscleandstrength.com/exercises/incline-smith-machine-bench-press.html", src: "M&S" },
-      ]},
-      { name: "Back", exercises: [
-        { name: "Chin-Ups (Wide Overhand)", muscles: "Lats · Upper Back", sets: 3, reps: "6-10", rest: 150, wt: null, bodyweight: true,
-          bands: ["Green", "Purple", "Black", "Red", "None"],
-          vid: "https://www.muscleandstrength.com/exercises/wide-grip-pull-up.html", src: "M&S" },
-        { name: "Seated Cable Row (Neutral)", muscles: "Upper Back · Lats", sets: 3, reps: "10-12", rest: 120, wt: 180,
-          vid: "https://www.muscleandstrength.com/exercises/seated-row.html", src: "M&S" },
-      ]},
-      { name: "Shoulders", exercises: [
-        { name: "Cable Lateral Raise", muscles: "Side Delts", sets: 3, reps: "12-15", rest: 60, wt: 7.5,
-          vid: "https://www.muscleandstrength.com/exercises/two-arm-cable-lateral-raise.html", src: "M&S" },
-        { name: "Cable Face Pull (Rope)", muscles: "Rear Delts", sets: 3, reps: "15-20", rest: 60, wt: 80,
-          vid: "https://www.muscleandstrength.com/exercises/cable-face-pull", src: "M&S" },
-      ]},
-      { name: "Arms", exercises: [
-        { name: "Cable EZ Bar Curl", muscles: "Biceps", sets: 3, reps: "10-12", rest: 90, wt: 57.5,
-          vid: "https://www.muscleandstrength.com/exercises/cable-curl.html", src: "M&S" },
-        { name: "Cable OH Tricep Extension", muscles: "Triceps", sets: 3, reps: "10-12", rest: 90, wt: 65,
-          vid: "https://www.muscleandstrength.com/exercises/standing-low-pulley-overhead-tricep-extension-(rope-extension).html", src: "M&S" },
-      ]},
-    ]
-  },
-  "Lower A": {
-    day: "D2", sections: [
-      { name: "Quads", exercises: [
-        { name: "Smith Front Squat", muscles: "Quads · Glutes", sets: 3, reps: "8-10", rest: 150, wt: 135,
-          vid: "https://www.muscleandstrength.com/exercises/smith-machine-front-squat.html", src: "M&S" },
-      ]},
-      { name: "Hamstrings", exercises: [
-        { name: "Smith Stiff-Leg Deadlift", muscles: "Hams · Glutes", sets: 3, reps: "8-10", rest: 150, wt: 155,
-          vid: "https://www.muscleandstrength.com/exercises/smith-machine-stiff-leg-deadlift.html", src: "M&S" },
-      ]},
-      { name: "Quads (Volume)", exercises: [
-        { name: "Landmine Goblet Squat", muscles: "Quads · Glutes", sets: 3, reps: "12-15", rest: 90, wt: 40,
-          vid: "https://www.muscleandstrength.com/exercises/landmine-goblet-squat", src: "M&S" },
-      ]},
-      { name: "Calves + Core + Delts", exercises: [
-        { name: "Smith Deficit Calf Raise", muscles: "Calves", sets: 3, reps: "12-15", rest: 60, wt: 135,
-          vid: "https://www.muscleandstrength.com/exercises/smith-machine-calf-raise.html", src: "M&S" },
-        { name: "Cable Crunch (Kneeling)", muscles: "Abs", sets: 3, reps: "12-15", rest: 60, wt: 60,
-          vid: "https://www.muscleandstrength.com/exercises/cable-crunch.html", src: "M&S" },
-        { name: "Cable Upright Row", muscles: "Side Delts", sets: 2, reps: "12-15", rest: 60, wt: 47.5,
-          vid: "https://www.muscleandstrength.com/exercises/cable-upright-row.html", src: "M&S" },
-      ]},
-    ]
-  },
-  "Upper B": {
-    day: "D3", sections: [
-      { name: "Chest", exercises: [
-        { name: "Smith Close-Grip Bench", muscles: "Chest · Triceps", sets: 3, reps: "8-10", rest: 150, wt: 125,
-          vid: "https://www.muscleandstrength.com/exercises/smith-machine-close-grip-bench-press.html", src: "M&S" },
-        { name: "Cable Fly (Low-to-High)", muscles: "Chest", sets: 2, reps: "12-15", rest: 90, wt: 25,
-          vid: "https://www.muscleandstrength.com/exercises/cable-lower-chest-raise.html", src: "M&S" },
-      ]},
-      { name: "Back", exercises: [
-        { name: "Cable Lat Pulldown (Close)", muscles: "Lats", sets: 3, reps: "10-12", rest: 120, wt: 205,
-          vid: "https://www.muscleandstrength.com/exercises/close-grip-pull-down.html", src: "M&S" },
-        { name: "Landmine Row (Per Arm)", muscles: "Upper Back · Lats", sets: 3, reps: "10-12", rest: 90, wt: 30,
-          vid: "https://www.muscleandstrength.com/exercises/one-arm-bent-over-row.html", src: "M&S" },
-      ]},
-      { name: "Shoulders", exercises: [
-        { name: "Cable Cross-Body Lateral", muscles: "Side Delts", sets: 3, reps: "15-20", rest: 60, wt: 7.5,
-          vid: "https://www.muscleandstrength.com/exercises/one-arm-cable-lateral-raise.html", src: "M&S" },
-        { name: "Cable Rear Delt Fly", muscles: "Rear Delts", sets: 3, reps: "15-20", rest: 60, wt: 2.5,
-          vid: "https://www.muscleandstrength.com/exercises/standing-cable-flys.html", src: "M&S" },
-      ]},
-      { name: "Arms", exercises: [
-        { name: "Cable Bayesian Curl", muscles: "Biceps", sets: 3, reps: "10-12", rest: 90, wt: 32.5,
-          vid: "https://barbend.com/bayesian-curl/", src: "BarBend" },
-        { name: "Cable Pushdown (Bar)", muscles: "Triceps", sets: 3, reps: "10-12", rest: 90, wt: 80,
-          vid: "https://www.muscleandstrength.com/exercises/tricep-extension.html", src: "M&S" },
-      ]},
-    ]
-  },
-  "Lower B": {
-    day: "D4", sections: [
-      { name: "Quads", exercises: [
-        { name: "Smith Back Squat", muscles: "Quads · Glutes", sets: 3, reps: "8-10", rest: 150, wt: 135,
-          vid: "https://www.muscleandstrength.com/exercises/smith-machine-squat.html", src: "M&S" },
-      ]},
-      { name: "Hamstrings", exercises: [
-        { name: "Smith Good Morning", muscles: "Hams · Glutes", sets: 3, reps: "10-12", rest: 120, wt: 105,
-          vid: "https://www.tiktok.com/@drmikeisraetel/video/7340302191909031211", src: "Dr. Mike" },
-      ]},
-      { name: "Glutes", exercises: [
-        { name: "Smith Lunge (Front Elevated)", muscles: "Glutes · Quads", sets: 2, reps: "12-15", rest: 90, wt: 70,
-          vid: "https://www.muscleandstrength.com/exercises/front-foot-elevated-smith-machine-split-squat", src: "M&S" },
-      ]},
-      { name: "Calves + Core + Delts", exercises: [
-        { name: "Smith Deficit Calf Raise", muscles: "Calves", sets: 3, reps: "12-15", rest: 60, wt: 125,
-          vid: "https://www.muscleandstrength.com/exercises/smith-machine-calf-raise.html", src: "M&S" },
-        { name: "Hanging Knee Raise", muscles: "Abs", sets: 3, reps: "12-15", rest: 60, wt: null, bodyweight: true,
-          vid: "https://www.muscleandstrength.com/exercises/hanging-knee-raise.html", src: "M&S" },
-        { name: "Cable Upright Row", muscles: "Side Delts", sets: 2, reps: "12-15", rest: 60, wt: 45,
-          vid: "https://www.muscleandstrength.com/exercises/cable-upright-row.html", src: "M&S" },
-      ]},
-    ]
-  },
-};
-
 // Deload weights from master brief (50% of Meso 1 W1, rounded)
 const DELOAD_WEIGHTS = {
   "Smith Flat Bench Press": 60, "Smith Incline Press": 40,
@@ -984,15 +875,6 @@ const MESOCYCLES = [
     endDate: "2026-05-24",
     weeks: WEEKS,
     routines: MESO1_ROUTINES,
-  },
-  {
-    id: "rp-meso-2",
-    name: "RP Meso 2",
-    shortName: "Meso 2",
-    startDate: "2026-05-25",
-    endDate: "2026-07-05",
-    weeks: WEEKS,
-    routines: MESO2_ROUTINES,
   },
 ];
 
