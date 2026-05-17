@@ -868,7 +868,7 @@ const MESO2_ROUTINES = {
       { name: "Back", exercises: [
         { name: "Chin-Ups (Wide Overhand)", muscles: "Lats · Upper Back", sets: 3, reps: "6-10", rest: 150, wt: null, bodyweight: true,
           vid: "https://www.muscleandstrength.com/exercises/wide-grip-pull-up.html", src: "M&S" },
-        { name: "Seated Cable Row (Neutral)", muscles: "Upper Back · Lats", sets: 3, reps: "8-12", rest: 120, wt: 145,
+        { name: "Seated Cable Row (Neutral)", muscles: "Upper Back · Lats", sets: 3, reps: "8-12", rest: 120, wt: 160,
           vid: "https://www.muscleandstrength.com/exercises/seated-row.html", src: "M&S" },
       ]},
       { name: "Shoulders", exercises: [
