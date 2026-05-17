@@ -909,7 +909,7 @@ const localDate = () => {
 
 const BAND_COLORS = { Green: "#22c55e", Purple: "#a78bfa", Black: "#888", Red: "#ff5c5c", None: "#00e5a0" };
 
-const SetRow = React.memo(function SetRow({ setNum, isLastSet, targetReps, targetWt, lastWeight, isBW, bands, onLog, onDelete, onRir, logged }) {
+const SetRow = React.memo(function SetRow({ setNum, isLastSet, targetReps, targetWt, lastWeight, lastReps, isBW, bands, onLog, onDelete, onRir, logged }) {
   // Local state ONLY used when actively editing or entering new data
   const initWt = lastWeight != null ? lastWeight.toString() : (targetWt?.toString() || (isBW ? "0" : ""));
   const [editReps, setEditReps] = useState(targetReps || "");
@@ -957,6 +957,13 @@ const SetRow = React.memo(function SetRow({ setNum, isLastSet, targetReps, targe
       setEditWt(lastWeight.toString());
     }
   }, [lastWeight]);
+
+  // When lastReps changes from a previous set, cascade to unlogged sets
+  useEffect(() => {
+    if (!logged && !editing && lastReps != null && !userEditedReps.current) {
+      setEditReps(lastReps.toString());
+    }
+  }, [lastReps]);
 
   const handleLog = () => {
     const weight = isBW ? 0 : parseFloat(editWt);
@@ -1350,6 +1357,7 @@ function saveSessionPerformance(allSets, sessionKey, weekNumber, rir, mesoPrefix
 function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, onStartRest, onSave, onSync, onDeleteFromDb, mesoPrefix, isLastExercise }) {
   const [expanded, setExpanded] = useState(false);
   const lastWeightRef = useRef(null);
+  const lastRepsRef = useRef(null);
   const exKey = `${sessionKey}|${ex.name}`;
   const logged = allSets[exKey] || {};
   const numDone = Object.keys(logged).length;
@@ -1480,8 +1488,9 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
       }
       return { ...prev, [exKey]: updatedEx };
     });
-    // Store the latest weight so unlogged SetRows can pick it up
+    // Store the latest weight/reps so unlogged SetRows can pick them up
     if (data.wt !== undefined) lastWeightRef.current = data.wt;
+    if (data.reps !== undefined) lastRepsRef.current = data.reps;
     onSync(ex.name, setNum, data.reps, data.wt, data.band, data.rir ?? null, ex.muscles);
     const isLastSet = setNum >= totalSets;
     if (!(isLastExercise && isLastSet)) {
@@ -1560,7 +1569,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
           )}
 
           {Array.from({ length: totalSets }, (_, i) => (
-            <SetRow key={i} setNum={i + 1} isLastSet={i + 1 === totalSets} targetReps={smartTargetReps ? String(smartTargetReps) : ex.reps.split("-")[0]} targetWt={targetWt} lastWeight={lastWeightRef.current} isBW={!!ex.bodyweight} bands={ex.bands} logged={logged[i + 1]} onLog={logSet} onDelete={deleteSet} onRir={handleRir} />
+            <SetRow key={i} setNum={i + 1} isLastSet={i + 1 === totalSets} targetReps={smartTargetReps ? String(smartTargetReps) : ex.reps.split("-")[0]} targetWt={targetWt} lastWeight={lastWeightRef.current} lastReps={lastRepsRef.current} isBW={!!ex.bodyweight} bands={ex.bands} logged={logged[i + 1]} onLog={logSet} onDelete={deleteSet} onRir={handleRir} />
           ))}
         </div>
       )}
