@@ -896,7 +896,7 @@ const MESO2_ROUTINES = {
           vid: "https://www.muscleandstrength.com/exercises/smith-machine-stiff-leg-deadlift.html", src: "M&S" },
       ]},
       { name: "Quads (Volume)", exercises: [
-        { name: "Leg Extension", muscles: "Quads", sets: 3, reps: "12-15", rest: 60, wt: 50,
+        { name: "Leg Extension", muscles: "Quads", sets: 3, reps: "12-15", rest: 60, wt: 75,
           vid: "https://www.muscleandstrength.com/exercises/leg-extension.html", src: "M&S" },
       ]},
       { name: "Calves + Core + Delts", exercises: [
