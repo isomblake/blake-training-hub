@@ -896,8 +896,8 @@ const MESO2_ROUTINES = {
           vid: "https://www.muscleandstrength.com/exercises/smith-machine-stiff-leg-deadlift.html", src: "M&S" },
       ]},
       { name: "Quads (Volume)", exercises: [
-        { name: "Cable Leg Extension", muscles: "Quads", sets: 3, reps: "12-15", rest: 60, wt: 30,
-          vid: "https://www.youtube.com/watch?v=arEMtyU054g", src: "YouTube" },
+        { name: "Leg Extension", muscles: "Quads", sets: 3, reps: "12-15", rest: 60, wt: 50,
+          vid: "https://www.muscleandstrength.com/exercises/leg-extension.html", src: "M&S" },
       ]},
       { name: "Calves + Core + Delts", exercises: [
         { name: "Smith Deficit Calf Raise", muscles: "Calves", sets: 4, reps: "12-15", rest: 30, wt: 120,
@@ -3870,7 +3870,7 @@ export default function App() {
     if (localStorage.getItem('training-hub-meso2-db-setup-v1')) return;
     (async () => {
       const newExercises = [
-        { name: 'Cable Leg Extension',  muscles: 'Quads',               muscle_group: 'Quads',      cable_ratio: 2 },
+        { name: 'Leg Extension',         muscles: 'Quads',               muscle_group: 'Quads',      cable_ratio: 1 },
         { name: 'DB Lateral Raise',     muscles: 'Side Delts',          muscle_group: 'Side Delts', cable_ratio: 1 },
         { name: 'DB Rear Delt Fly',     muscles: 'Rear Delts',          muscle_group: 'Rear Delts', cable_ratio: 1 },
         { name: 'Barbell RDL',          muscles: 'Hamstrings · Glutes', muscle_group: 'Hamstrings', cable_ratio: 1 },

@@ -10,7 +10,7 @@
 
   // 1. Insert new exercises (ignore if already exists)
   const exercises = [
-    { name: 'Cable Leg Extension', muscles: 'Quads', muscle_group: 'Quads', cable_ratio: 2, vid_url: 'https://www.youtube.com/watch?v=arEMtyU054g' },
+    { name: 'Leg Extension', muscles: 'Quads', muscle_group: 'Quads', cable_ratio: 1, vid_url: 'https://www.muscleandstrength.com/exercises/leg-extension.html' },
     { name: 'DB Lateral Raise',    muscles: 'Side Delts', muscle_group: 'Side Delts', cable_ratio: 1 , vid_url: 'https://www.youtube.com/watch?v=4hTUCDUQaNA' },
     { name: 'DB Rear Delt Fly',    muscles: 'Rear Delts', muscle_group: 'Rear Delts', cable_ratio: 1, vid_url: 'https://www.youtube.com/shorts/LsT-bR_zxLo' },
     { name: 'Barbell RDL',         muscles: 'Hamstrings · Glutes', muscle_group: 'Hamstrings', cable_ratio: 1, vid_url: 'https://www.youtube.com/watch?v=_oyxCn2iSjU' },
