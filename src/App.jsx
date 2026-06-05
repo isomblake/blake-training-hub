@@ -1524,7 +1524,10 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
     } else if (avgReps > maxReps) {
       adjusted = Math.round((avgWt + weeklyAdd + minStep) / minStep) * minStep;
       note = `↑ Bumped — ${Math.round(avgReps)} reps @ ${Math.round(avgWt)} lb last session (exceeded range)`;
+      repsAdj = maxReps; // weight bumped hard; target top of range
     } else {
+      // Within range: default to last week's actual reps as starting point
+      repsAdj = Math.round(avgReps);
       // RIR-aware progression: compare logged RIR to the session's target RIR
       const targetRirLow = lastRir ? parseInt(lastRir) : null;
       let add = weeklyAdd;
