@@ -743,7 +743,7 @@ const MESO1_ROUTINES = {
           vid: "https://www.muscleandstrength.com/exercises/seated-row.html", src: "M&S" },
       ]},
       { name: "Shoulders", exercises: [
-        { name: "Cable Lateral Raise", muscles: "Side Delts", sets: 3, reps: "12-15", rest: 60, wt: 15,
+        { name: "Cable Lateral Raise", muscles: "Side Delts", sets: 3, reps: "15-20", rest: 60, wt: 15,
           vid: "https://www.muscleandstrength.com/exercises/two-arm-cable-lateral-raise.html", src: "M&S" },
         { name: "Cable Face Pull (Rope)", muscles: "Rear Delts", sets: 3, reps: "15-20", rest: 60, wt: 70,
           vid: "https://www.muscleandstrength.com/exercises/cable-face-pull", src: "M&S" },
@@ -785,7 +785,7 @@ const MESO1_ROUTINES = {
       { name: "Chest", exercises: [
         { name: "Smith Close-Grip Bench", muscles: "Chest · Triceps", sets: 3, reps: "8-10", rest: 150, wt: 75,
           vid: "https://www.muscleandstrength.com/exercises/smith-machine-close-grip-bench-press.html", src: "M&S" },
-        { name: "Cable Fly (Low-to-High)", muscles: "Chest", sets: 2, reps: "12-15", rest: 90, wt: 15,
+        { name: "Cable Fly (Low-to-High)", muscles: "Chest", sets: 2, reps: "15-20", rest: 90, wt: 15,
           vid: "https://www.muscleandstrength.com/exercises/cable-lower-chest-raise.html", src: "M&S" },
       ]},
       { name: "Back", exercises: [
@@ -872,9 +872,9 @@ const MESO2_ROUTINES = {
           vid: "https://www.muscleandstrength.com/exercises/seated-row.html", src: "M&S" },
       ]},
       { name: "Shoulders", exercises: [
-        { name: "Cable Lateral Raise", muscles: "Side Delts", sets: 3, reps: "12-15", rest: 60, wt: 5,
+        { name: "Cable Lateral Raise", muscles: "Side Delts", sets: 3, reps: "15-20", rest: 60, wt: 5,
           vid: "https://www.muscleandstrength.com/exercises/two-arm-cable-lateral-raise.html", src: "M&S" },
-        { name: "Cable Face Pull (Rope)", muscles: "Rear Delts", sets: 4, reps: "12-15", rest: 60, wt: 72.5,
+        { name: "Cable Face Pull (Rope)", muscles: "Rear Delts", sets: 4, reps: "15-20", rest: 60, wt: 72.5,
           vid: "https://www.muscleandstrength.com/exercises/cable-face-pull", src: "M&S" },
       ]},
       { name: "Arms", exercises: [
@@ -914,7 +914,7 @@ const MESO2_ROUTINES = {
       { name: "Chest", exercises: [
         { name: "Smith Close-Grip Bench", muscles: "Chest · Triceps", sets: 3, reps: "8-10", rest: 150, wt: 100,
           vid: "https://www.muscleandstrength.com/exercises/smith-machine-close-grip-bench-press.html", src: "M&S" },
-        { name: "Cable Fly (Low-to-High)", muscles: "Chest", sets: 3, reps: "12-15", rest: 60, wt: 17.5,
+        { name: "Cable Fly (Low-to-High)", muscles: "Chest", sets: 3, reps: "15-20", rest: 60, wt: 17.5,
           vid: "https://www.muscleandstrength.com/exercises/cable-lower-chest-raise.html", src: "M&S" },
       ]},
       { name: "Back", exercises: [
@@ -924,9 +924,9 @@ const MESO2_ROUTINES = {
           vid: "https://www.muscleandstrength.com/exercises/one-arm-bent-over-row.html", src: "M&S" },
       ]},
       { name: "Shoulders", exercises: [
-        { name: "DB Lateral Raise", muscles: "Side Delts", sets: 3, reps: "12-15", rest: 60, wt: 10,
+        { name: "DB Lateral Raise", muscles: "Side Delts", sets: 3, reps: "15-20", rest: 60, wt: 10,
           vid: "https://www.youtube.com/watch?v=4hTUCDUQaNA", src: "YouTube" },
-        { name: "DB Rear Delt Fly", muscles: "Rear Delts", sets: 4, reps: "12-15", rest: 60, wt: 10,
+        { name: "DB Rear Delt Fly", muscles: "Rear Delts", sets: 4, reps: "15-20", rest: 60, wt: 10,
           vid: "https://www.youtube.com/shorts/LsT-bR_zxLo", src: "YouTube" },
       ]},
       { name: "Arms", exercises: [
