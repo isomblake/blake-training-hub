@@ -1517,23 +1517,34 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
     const repRange = ex.reps.split("-").map(Number);
     const minReps = repRange[0], maxReps = repRange[1] || repRange[0];
     let adjusted, note, repsAdj = null;
+    const targetRirLow = lastRir ? parseInt(lastRir) : null;
+    const rirDiff = (lastAvgRir != null && targetRirLow != null) ? lastAvgRir - targetRirLow : null;
     if (avgReps < minReps) {
-      adjusted = Math.round(avgWt / minStep) * minStep;
-      note = `⏸ Holding @ ${Math.round(avgWt)} lb — only ${Math.round(avgReps)} reps last session (min ${minReps})`;
+      // Below rep floor: reduce weight if also grinding, otherwise hold and build reps
+      if (rirDiff != null && rirDiff <= -2) {
+        adjusted = Math.round((avgWt - minStep) / minStep) * minStep;
+        note = `↓ Reduced — only ${Math.round(avgReps)} reps at ${Math.round(lastAvgRir)} RIR (weight too heavy for rep range)`;
+      } else {
+        adjusted = Math.round(avgWt / minStep) * minStep;
+        note = `⏸ Holding @ ${Math.round(avgWt)} lb — only ${Math.round(avgReps)} reps last session (min ${minReps})`;
+      }
       repsAdj = maxReps; // build reps before weight increases
     } else if (avgReps > maxReps) {
       adjusted = Math.round((avgWt + weeklyAdd + minStep) / minStep) * minStep;
       note = `↑ Bumped — ${Math.round(avgReps)} reps @ ${Math.round(avgWt)} lb last session (exceeded range)`;
     } else {
       // RIR-aware progression: compare logged RIR to the session's target RIR
-      const targetRirLow = lastRir ? parseInt(lastRir) : null;
       let add = weeklyAdd;
-      if (lastAvgRir != null && targetRirLow != null) {
-        const rirDiff = lastAvgRir - targetRirLow;
+      if (rirDiff != null) {
         if (rirDiff >= 2) {
           add = weeklyAdd + minStep;
           note = `↑↑ Extra bump — ${Math.round(lastAvgRir)} RIR logged vs ${targetRirLow} target`;
+        } else if (rirDiff <= -3) {
+          // Severely grinding — reduce weight
+          adjusted = Math.round((avgWt - minStep) / minStep) * minStep;
+          note = `↓ Reduced — ${Math.round(lastAvgRir)} RIR logged (too far below ${targetRirLow} target)`;
         } else if (rirDiff <= -2) {
+          // Moderately grinding — hold
           adjusted = Math.round(avgWt / minStep) * minStep;
           note = `⏸ Holding — ${Math.round(lastAvgRir)} RIR logged (grinding past target)`;
         }
@@ -1548,8 +1559,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
       }
       // Weight holding and not grinding → push reps to max
       if (adjusted === Math.round(avgWt / minStep) * minStep) {
-        const targetRirLow2 = lastRir ? parseInt(lastRir) : null;
-        const notGrinding = lastAvgRir == null || targetRirLow2 == null || lastAvgRir >= targetRirLow2;
+        const notGrinding = rirDiff == null || rirDiff >= 0;
         if (notGrinding) repsAdj = maxReps;
       }
     }
