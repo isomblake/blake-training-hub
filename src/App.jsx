@@ -1697,7 +1697,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
           )}
 
           {Array.from({ length: totalSets }, (_, i) => (
-            <SetRow key={i} setNum={i + 1} isLastSet={i + 1 === totalSets} targetReps={smartTargetReps ? String(smartTargetReps) : ex.reps.split("-")[0]} targetWt={targetWt} lastWeight={lastWeightRef.current} lastReps={lastRepsRef.current} isBW={!!ex.bodyweight} bands={ex.bands} logged={logged[i + 1]} onLog={logSet} onDelete={deleteSet} onRir={handleRir} />
+            <SetRow key={i} setNum={i + 1} isLastSet={i + 1 === totalSets} targetReps={smartTargetReps ? String(smartTargetReps) : ex.reps.split("-").at(-1)} targetWt={targetWt} lastWeight={lastWeightRef.current} lastReps={lastRepsRef.current} isBW={!!ex.bodyweight} bands={ex.bands} logged={logged[i + 1]} onLog={logSet} onDelete={deleteSet} onRir={handleRir} />
           ))}
         </div>
       )}
