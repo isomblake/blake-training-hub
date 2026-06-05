@@ -1520,13 +1520,17 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
     const targetRirLow = lastRir ? parseInt(lastRir) : null;
     const rirDiff = (lastAvgRir != null && targetRirLow != null) ? lastAvgRir - targetRirLow : null;
     if (avgReps < minReps) {
-      // Below rep floor: reduce weight if also grinding, otherwise hold and build reps
-      if (rirDiff != null && rirDiff <= -2) {
-        adjusted = Math.round((avgWt - minStep) / minStep) * minStep;
-        note = `↓ Reduced — only ${Math.round(avgReps)} reps at ${Math.round(lastAvgRir)} RIR (weight too heavy for rep range)`;
+      // Below rep floor — reduce weight proportional to shortfall so the new rep target is reachable
+      const gap = minReps - avgReps;
+      const stepsDown = (rirDiff != null && rirDiff <= -2)
+        ? Math.max(1, Math.ceil(gap / 2))   // grinding too: reduce more aggressively
+        : Math.floor(gap / 2);               // no grind signal: gentle reduction (1 step per 2-rep gap)
+      if (stepsDown > 0) {
+        adjusted = Math.round((avgWt - stepsDown * minStep) / minStep) * minStep;
+        note = `↓ Reduced ${stepsDown > 1 ? `${stepsDown}× ` : ""}— only ${Math.round(avgReps)} reps last session (min ${minReps}), recalibrating for new range`;
       } else {
         adjusted = Math.round(avgWt / minStep) * minStep;
-        note = `⏸ Holding @ ${Math.round(avgWt)} lb — only ${Math.round(avgReps)} reps last session (min ${minReps})`;
+        note = `⏸ Holding @ ${Math.round(avgWt)} lb — ${Math.round(avgReps)} reps, 1 below floor, should resolve next session`;
       }
       repsAdj = maxReps; // build reps before weight increases
     } else if (avgReps > maxReps) {
