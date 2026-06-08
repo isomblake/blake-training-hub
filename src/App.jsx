@@ -4064,7 +4064,7 @@ export default function App() {
       const baseTarget = wkData.deload ? getDeloadWt(currentEx) : (currentEx.wt ? Math.round((currentEx.wt + weeklyAdd) / minStep) * minStep : null);
       const lastLogged = logged[timer.setNum];
       const targetWt = lastLogged ? lastLogged.wt : getSmartWt(currentEx, exCat, minStep, weeklyAdd, baseTarget);
-      const targetReps = currentEx.reps.split("-")[0];
+      const targetReps = currentEx.reps.split("-").at(-1);
       return { exName: currentEx.name, muscles: currentEx.muscles, nextSetNum, totalSets: currentTotalSets, targetReps, targetWt, isBW: !currentEx.wt && currentEx.wt !== 0, restSeconds: currentEx.rest, isLastExInSession: false };
     }
 
@@ -4078,7 +4078,7 @@ export default function App() {
     const weeklyAdd = wkData[exCat];
     const baseTarget = wkData.deload ? getDeloadWt(nextEx) : (nextEx.wt ? Math.round((nextEx.wt + weeklyAdd) / minStep) * minStep : null);
     const targetWt = getSmartWt(nextEx, exCat, minStep, weeklyAdd, baseTarget);
-    const targetReps = nextEx.reps.split("-")[0];
+    const targetReps = nextEx.reps.split("-").at(-1);
     const isLastEx = currentIdx + 1 === allExercises.length - 1;
     return { exName: nextEx.name, muscles: nextEx.muscles, nextSetNum: 1, totalSets: wkData.deload ? deloadSets : nextEx.sets, targetReps, targetWt, isBW: !nextEx.wt && nextEx.wt !== 0, restSeconds: nextEx.rest, isLastExInSession: isLastEx, isNewExercise: true };
   }, [timer, r, sessionKey, allSets, activeWeeks, week]);
