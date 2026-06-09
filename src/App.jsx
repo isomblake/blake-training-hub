@@ -4064,7 +4064,7 @@ export default function App() {
       const baseTarget = wkData.deload ? getDeloadWt(currentEx) : (currentEx.wt ? Math.round((currentEx.wt + weeklyAdd) / minStep) * minStep : null);
       const lastLogged = logged[timer.setNum];
       const targetWt = lastLogged ? lastLogged.wt : getSmartWt(currentEx, exCat, minStep, weeklyAdd, baseTarget);
-      const targetReps = currentEx.reps.split("-").at(-1);
+      const targetReps = lastLogged ? String(lastLogged.reps) : currentEx.reps.split("-").at(-1);
       return { exName: currentEx.name, muscles: currentEx.muscles, nextSetNum, totalSets: currentTotalSets, targetReps, targetWt, isBW: !currentEx.wt && currentEx.wt !== 0, restSeconds: currentEx.rest, isLastExInSession: false };
     }
 
