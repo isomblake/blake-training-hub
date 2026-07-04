@@ -963,6 +963,130 @@ const MESO2_ROUTINES = {
   },
 };
 
+// ============================================================
+// MESO 3 ROUTINES
+// W1 loads sourced from M2 W1–2 effort levels (3–4 RIR), not M2 peak.
+// This is automatic: M3 uses a fresh localStorage key so M2 peak data
+// never pollutes M3 W1 suggestions — W1 uses config wt directly.
+// Pressing exercises carry rirCap:2 (eye-issue guardrail — no Valsalva).
+// ============================================================
+const MESO3_ROUTINES = {
+  "Upper A": {
+    day: "D1", sections: [
+      { name: "Chest", exercises: [
+        { name: "Smith Flat Bench Press", muscles: "Chest", sets: 3, reps: "10-15", rest: 150, wt: 110,
+          rirCap: 2, note: "Exhale through press · 2+ RIR minimum · no Valsalva",
+          vid: "https://www.muscleandstrength.com/exercises/smith-machine-bench-press.html", src: "M&S" },
+        { name: "Smith Incline Press", muscles: "Upper Chest", sets: 3, reps: "10-15", rest: 150, wt: 70,
+          rirCap: 2, note: "Exhale through press · 2+ RIR minimum · no Valsalva",
+          vid: "https://www.muscleandstrength.com/exercises/incline-smith-machine-bench-press.html", src: "M&S" },
+      ]},
+      { name: "Back", exercises: [
+        { name: "Chin-Ups (Wide Overhand)", muscles: "Lats · Upper Back", sets: 3, reps: "6-10", rest: 150, wt: null, bodyweight: true,
+          bands: ["Green", "Purple", "Black", "Red", "None"],
+          vid: "https://www.muscleandstrength.com/exercises/wide-grip-pull-up.html", src: "M&S" },
+        { name: "Seated Cable Row (Neutral)", muscles: "Upper Back · Lats", sets: 3, reps: "8-12", rest: 120, wt: 165,
+          vid: "https://www.muscleandstrength.com/exercises/seated-row.html", src: "M&S" },
+      ]},
+      { name: "Shoulders", exercises: [
+        { name: "Cable Lateral Raise", muscles: "Side Delts", sets: 3, reps: "15-20", rest: 60, wt: 7.5,
+          vid: "https://www.muscleandstrength.com/exercises/two-arm-cable-lateral-raise.html", src: "M&S" },
+        { name: "Cable Face Pull (Rope)", muscles: "Rear Delts", sets: 4, reps: "15-20", rest: 60, wt: 77.5,
+          vid: "https://www.muscleandstrength.com/exercises/cable-face-pull", src: "M&S" },
+      ]},
+      { name: "Arms", exercises: [
+        { name: "Cable EZ Bar Curl", muscles: "Biceps", sets: 4, reps: "8-12", rest: 90, wt: 52.5,
+          vid: "https://www.muscleandstrength.com/exercises/cable-curl.html", src: "M&S" },
+        { name: "Cable OH Tricep Extension", muscles: "Triceps", sets: 3, reps: "8-12", rest: 90, wt: 60,
+          calibration: true,
+          vid: "https://www.muscleandstrength.com/exercises/standing-low-pulley-overhead-tricep-extension-(rope-extension).html", src: "M&S" },
+      ]},
+    ]
+  },
+  "Lower A": {
+    day: "D2", sections: [
+      { name: "Quads", exercises: [
+        { name: "Smith Front Squat", muscles: "Quads · Glutes", sets: 3, reps: "8-10", rest: 150, wt: 120,
+          vid: "https://www.muscleandstrength.com/exercises/smith-machine-front-squat.html", src: "M&S" },
+      ]},
+      { name: "Hamstrings", exercises: [
+        { name: "Smith Stiff-Leg Deadlift", muscles: "Hams · Glutes", sets: 3, reps: "8-10", rest: 120, wt: 130,
+          vid: "https://www.muscleandstrength.com/exercises/smith-machine-stiff-leg-deadlift.html", src: "M&S" },
+      ]},
+      { name: "Quads (Volume)", exercises: [
+        { name: "Leg Extension", muscles: "Quads", sets: 3, reps: "15-20", rest: 60, wt: 80,
+          calibration: true,
+          vid: "https://www.muscleandstrength.com/exercises/leg-extension.html", src: "M&S" },
+      ]},
+      { name: "Calves + Core + Delts", exercises: [
+        { name: "Smith Deficit Calf Raise", muscles: "Calves", sets: 4, reps: "15-20", rest: 30, wt: 130,
+          vid: "https://www.muscleandstrength.com/exercises/smith-machine-calf-raise.html", src: "M&S" },
+        { name: "Cable Crunch (Kneeling)", muscles: "Abs", sets: 3, reps: "12-15", rest: 60, wt: 57.5,
+          vid: "https://www.muscleandstrength.com/exercises/cable-crunch.html", src: "M&S" },
+        { name: "Cable Upright Row", muscles: "Side Delts", sets: 2, reps: "15-20", rest: 60, wt: 47.5,
+          vid: "https://www.muscleandstrength.com/exercises/cable-upright-row.html", src: "M&S" },
+      ]},
+    ]
+  },
+  "Upper B": {
+    day: "D3", sections: [
+      { name: "Chest", exercises: [
+        { name: "Smith Close-Grip Bench", muscles: "Chest · Triceps", sets: 3, reps: "10-15", rest: 150, wt: 90,
+          rirCap: 2, note: "Exhale through press · 2+ RIR minimum · no Valsalva",
+          vid: "https://www.muscleandstrength.com/exercises/smith-machine-close-grip-bench-press.html", src: "M&S" },
+        { name: "Cable Fly (Low-to-High)", muscles: "Chest", sets: 3, reps: "15-20", rest: 60, wt: 22.5,
+          vid: "https://www.muscleandstrength.com/exercises/cable-lower-chest-raise.html", src: "M&S" },
+      ]},
+      { name: "Back", exercises: [
+        { name: "Cable Lat Pulldown (Close)", muscles: "Lats", sets: 3, reps: "8-12", rest: 120, wt: 187.5,
+          vid: "https://www.muscleandstrength.com/exercises/close-grip-pull-down.html", src: "M&S" },
+        { name: "Landmine Row (Per Arm)", muscles: "Upper Back · Lats", sets: 3, reps: "8-12", rest: 120, wt: 27.5,
+          vid: "https://www.muscleandstrength.com/exercises/one-arm-bent-over-row.html", src: "M&S" },
+      ]},
+      { name: "Shoulders", exercises: [
+        { name: "DB Lateral Raise", muscles: "Side Delts", sets: 3, reps: "15-20", rest: 60, wt: 10,
+          vid: "https://www.youtube.com/watch?v=4hTUCDUQaNA", src: "YouTube" },
+        { name: "DB Rear Delt Fly", muscles: "Rear Delts", sets: 4, reps: "15-20", rest: 60, wt: 10,
+          vid: "https://www.youtube.com/shorts/LsT-bR_zxLo", src: "YouTube" },
+      ]},
+      { name: "Arms", exercises: [
+        { name: "Cable Bayesian Curl", muscles: "Biceps", sets: 4, reps: "8-12", rest: 90, wt: 27.5,
+          calibration: true,
+          vid: "https://barbend.com/bayesian-curl/", src: "BarBend" },
+        { name: "Cable Pushdown (Bar)", muscles: "Triceps", sets: 3, reps: "8-12", rest: 90, wt: 72.5,
+          vid: "https://www.muscleandstrength.com/exercises/tricep-extension.html", src: "M&S" },
+      ]},
+    ]
+  },
+  "Lower B": {
+    day: "D4", sections: [
+      { name: "Quads", exercises: [
+        { name: "Smith Back Squat", muscles: "Quads · Glutes", sets: 3, reps: "8-10", rest: 150, wt: 130,
+          vid: "https://www.muscleandstrength.com/exercises/smith-machine-squat.html", src: "M&S" },
+      ]},
+      { name: "Calves", exercises: [
+        // De-stacked from axial: calf raise inserted between squat and RDL
+        { name: "Smith Deficit Calf Raise", muscles: "Calves", sets: 4, reps: "15-20", rest: 30, wt: 125,
+          vid: "https://www.muscleandstrength.com/exercises/smith-machine-calf-raise.html", src: "M&S" },
+      ]},
+      { name: "Hamstrings", exercises: [
+        { name: "Barbell RDL", muscles: "Hamstrings · Glutes", sets: 3, reps: "8-10", rest: 120, wt: 100,
+          vid: "https://www.youtube.com/watch?v=_oyxCn2iSjU", src: "YouTube" },
+      ]},
+      { name: "Glutes", exercises: [
+        { name: "Smith Hip Thrust", muscles: "Glutes", sets: 3, reps: "8-12", rest: 120, wt: 135,
+          vid: "https://www.muscleandstrength.com/exercises/barbell-hip-thrust.html", src: "M&S" },
+      ]},
+      { name: "Core + Delts", exercises: [
+        { name: "Hanging Knee Raise", muscles: "Abs", sets: 3, reps: "12-15", rest: 60, wt: 5,
+          vid: "https://www.muscleandstrength.com/exercises/hanging-knee-raise.html", src: "M&S" },
+        { name: "Cable Upright Row", muscles: "Side Delts", sets: 2, reps: "15-20", rest: 60, wt: 47.5,
+          vid: "https://www.muscleandstrength.com/exercises/cable-upright-row.html", src: "M&S" },
+      ]},
+    ]
+  },
+};
+
 // Deload only has 1 "week" — no progression
 const DELOAD_WEEKS = [
   { rir: "4+ RIR", note: "DELOAD · 2 sets · 50% weight · learn Meso 1 moves · prep for Apr 13", smith: 0, cable: 0, iso: 0, deload: true },
@@ -1003,6 +1127,15 @@ const MESOCYCLES = [
     endDate: "2026-07-05",
     weeks: WEEKS,
     routines: MESO2_ROUTINES,
+  },
+  {
+    id: "rp-meso-3",
+    name: "RP Meso 3",
+    shortName: "Meso 3",
+    startDate: "2026-07-05",
+    endDate: "2026-08-16",
+    weeks: WEEKS,
+    routines: MESO3_ROUTINES,
   },
 ];
 
@@ -1514,6 +1647,18 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
       const holdWt = Math.round(avgWt / minStep) * minStep;
       return holdWt !== baseTarget ? { smartTarget: holdWt } : {};
     }
+    // Safety RIR cap — hold weight in weeks where programmed intensity exceeds ex.rirCap
+    if (ex.rirCap != null) {
+      const weekRirTarget = parseInt(wkData.rir);
+      if (!isNaN(weekRirTarget) && weekRirTarget < ex.rirCap) {
+        const holdWt = Math.round(avgWt / minStep) * minStep;
+        return {
+          smartTarget: holdWt !== baseTarget ? holdWt : null,
+          progressNote: `⚠ Holding — week target (${weekRirTarget} RIR) exceeds ${ex.rirCap}+ RIR safety cap`,
+          smartTargetReps: null,
+        };
+      }
+    }
     const repRange = ex.reps.split("-").map(Number);
     const minReps = repRange[0], maxReps = repRange[1] || repRange[0];
     let adjusted, note, repsAdj = null;
@@ -1707,6 +1852,16 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
           {progressNote && (
             <div style={{ fontSize: 10, color: C.org, padding: "3px 7px", background: C.org + "11", borderRadius: 5, marginBottom: 8 }}>
               {progressNote}
+            </div>
+          )}
+          {ex.note && (
+            <div style={{ fontSize: 10, color: C.red, padding: "3px 7px", background: C.red + "11", borderRadius: 5, marginBottom: 8, fontWeight: 600 }}>
+              ⚠ {ex.note}
+            </div>
+          )}
+          {ex.calibration && (
+            <div style={{ fontSize: 10, color: C.teal, padding: "3px 7px", background: C.teal + "11", borderRadius: 5, marginBottom: 8 }}>
+              📊 Last set to actual failure — weekly RIR calibration set
             </div>
           )}
 
@@ -3899,6 +4054,26 @@ export default function App() {
       }
       localStorage.setItem('training-hub-meso2-db-setup-v1', '1');
       console.log('Meso 2 DB setup complete');
+    })().catch(console.error);
+  }, []);
+
+  // One-time: ensure Meso 3 exercises and mesocycle row exist in Supabase
+  useEffect(() => {
+    if (localStorage.getItem('training-hub-meso3-db-setup-v1')) return;
+    (async () => {
+      const newExercises = [
+        { name: 'Smith Hip Thrust', muscles: 'Glutes', muscle_group: 'Glutes', cable_ratio: 1 },
+      ];
+      for (const ex of newExercises) {
+        const { data } = await supabase.from('exercises').select('id').eq('name', ex.name).maybeSingle();
+        if (!data) await supabase.from('exercises').insert(ex);
+      }
+      const { data: existing } = await supabase.from('mesocycles').select('id').eq('name', 'RP Hypertrophy Meso 3').maybeSingle();
+      if (!existing) {
+        await supabase.from('mesocycles').insert({ name: 'RP Hypertrophy Meso 3', start_date: '2026-07-05', end_date: '2026-08-16', status: 'planned' });
+      }
+      localStorage.setItem('training-hub-meso3-db-setup-v1', '1');
+      console.log('Meso 3 DB setup complete');
     })().catch(console.error);
   }, []);
 
