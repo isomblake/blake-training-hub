@@ -2327,7 +2327,7 @@ function smaSeries(arr, getVal, winSize) {
   }
   return out;
 }
-var META_MESO_START = "2026-04-14";
+var META_MESO_START = MESOCYCLES[getActiveMeso(localDate())].startDate;
 function TrendChart(props) {
   var data = (props.data || []).filter(function(d) { return d.val != null && !isNaN(d.val); });
   if (data.length < 2) {
@@ -2647,6 +2647,7 @@ function BodyCompView() {
   var ref7 = findOnOrBefore(dateNDaysBefore(L.date, 7));
   var ref28 = findOnOrBefore(dateNDaysBefore(L.date, 28));
   var peak = asc.reduce(function(m, r) { return (r.weight != null && (m == null || r.weight > m.weight)) ? r : m; }, null);
+  var activeMesoShort = MESOCYCLES[getActiveMeso(localDate())].shortName;
   var sinceMeso = asc.find(function(r) { return r.date >= META_MESO_START; }) || null;
   function mini(label, val, color) {
     return (
@@ -2789,7 +2790,7 @@ function BodyCompView() {
         {rocCard("7-Day", ref7)}
         {rocCard("28-Day", ref28)}
         {rocCard("From Peak", peak)}
-        {rocCard("Since Meso 1", sinceMeso)}
+        {rocCard("Since " + activeMesoShort, sinceMeso)}
       </div>
       {chartBlock("Weight", "weight", C.blu, "lb")}
       {chartBlock("Body Fat", "bf", C.gld, "%")}
@@ -4054,6 +4055,16 @@ export default function App() {
       }
       localStorage.setItem('training-hub-meso2-db-setup-v1', '1');
       console.log('Meso 2 DB setup complete');
+    })().catch(console.error);
+  }, []);
+
+  // One-time: correct M2/M3 mesocycle dates (previous inserts had wrong end/start dates)
+  useEffect(() => {
+    if (localStorage.getItem('training-hub-meso-dates-fix-v1')) return;
+    (async () => {
+      await supabase.from('mesocycles').update({ end_date: '2026-07-13', status: 'completed' }).eq('name', 'RP Hypertrophy Meso 2');
+      await supabase.from('mesocycles').update({ start_date: '2026-07-14', end_date: '2026-08-24', status: 'active' }).eq('name', 'RP Hypertrophy Meso 3');
+      localStorage.setItem('training-hub-meso-dates-fix-v1', '1');
     })().catch(console.error);
   }, []);
 
