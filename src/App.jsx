@@ -1124,7 +1124,7 @@ const MESOCYCLES = [
     name: "RP Meso 2",
     shortName: "Meso 2",
     startDate: "2026-05-24",
-    endDate: "2026-07-13",
+    endDate: "2026-07-12",
     weeks: WEEKS,
     routines: MESO2_ROUTINES,
   },
@@ -1132,7 +1132,7 @@ const MESOCYCLES = [
     id: "rp-meso-3",
     name: "RP Meso 3",
     shortName: "Meso 3",
-    startDate: "2026-07-14",
+    startDate: "2026-07-13",
     endDate: "2026-08-24",
     weeks: WEEKS,
     routines: MESO3_ROUTINES,
@@ -4060,11 +4060,11 @@ export default function App() {
 
   // One-time: correct M2/M3 mesocycle dates (previous inserts had wrong end/start dates)
   useEffect(() => {
-    if (localStorage.getItem('training-hub-meso-dates-fix-v1')) return;
+    if (localStorage.getItem('training-hub-meso-dates-fix-v2')) return;
     (async () => {
-      await supabase.from('mesocycles').update({ end_date: '2026-07-13', status: 'completed' }).eq('name', 'RP Hypertrophy Meso 2');
-      await supabase.from('mesocycles').update({ start_date: '2026-07-14', end_date: '2026-08-24', status: 'active' }).eq('name', 'RP Hypertrophy Meso 3');
-      localStorage.setItem('training-hub-meso-dates-fix-v1', '1');
+      await supabase.from('mesocycles').update({ end_date: '2026-07-12', status: 'completed' }).eq('name', 'RP Hypertrophy Meso 2');
+      await supabase.from('mesocycles').update({ start_date: '2026-07-13', end_date: '2026-08-23', status: 'active' }).eq('name', 'RP Hypertrophy Meso 3');
+      localStorage.setItem('training-hub-meso-dates-fix-v2', '1');
     })().catch(console.error);
   }, []);
 
