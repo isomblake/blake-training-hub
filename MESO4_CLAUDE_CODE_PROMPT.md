@@ -3,16 +3,16 @@ Training Hub · blake-training-hub.vercel.app · apply during M3 deload week (Au
 
 ## Paste this to Claude Code
 
-> Read `MESO4_SPEC.md` for the programming rationale, then apply `patch_meso4.py`. Both files are in the repo root.
+> Read `MESO4_SPEC.md` for the programming rationale, then apply `patch_meso4.py` and run `backfill-body-comp.js`. All three files are in the repo root.
 >
-> Rules: `React.createElement`/JSX conventions already in `src/App.jsx` — do not restyle. Color keys are `C.txt / C.mut / C.card / C.bdr / C.grn / C.red / C.gld / C.blu / C.teal`. Do not touch Supabase schema, `makeDeloadRoutines`, the rest timer, push, or sound systems. Do not run any SQL. One commit.
+> Rules: `React.createElement`/JSX conventions already in `src/App.jsx` — do not restyle. Color keys are `C.txt / C.mut / C.card / C.bdr / C.grn / C.red / C.gld / C.blu / C.teal`. Do not touch Supabase schema, `makeDeloadRoutines`, the rest timer, push, or sound systems. Do not run any SQL or modify the Supabase schema — the backfill script only inserts rows via the existing anon client. One commit.
 >
 > Steps:
 > 1. `git pull` and confirm you're on the commit that has `MESO3_ROUTINES` at ~L973 and `const MESOCYCLES = [` at ~L1101. If not, stop and tell Blake.
 > 2. `python3 patch_meso4.py` — it prints nine `ok` lines and asserts every anchor is unique. If any assert fails, stop; do not hand-edit around it — report the failing label.
 > 3. `CI=true npm run build` — must pass with no warnings-as-errors.
-> 4. `git add src/App.jsx patch_meso4.py MESO4_SPEC.md && git commit -m "Meso 4: 6-exercise sessions, collapsed meso strip, collapsed meso strip, addSets + calibrationWeeks fields, calibration-set excluded from auto-reduce" && git push`
-> 5. Report back the build size line and the commit hash. Do nothing else.
+> 4. `git add src/App.jsx patch_meso4.py MESO4_SPEC.md && git commit -m "Meso 4: 6-exercise sessions, collapsed meso strip, collapsed meso strip, addSets + calibrationWeeks fields, calibration-set excluded from auto-reduce; body_comp backfill" && git push`
+> 6. Report back the build size line, the backfill counts, and the commit hash. Do nothing else.
 
 ## What the patch does (for review, not for Claude Code to re-implement)
 
