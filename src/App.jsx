@@ -4104,7 +4104,11 @@ export default function App() {
   const [showAllMesos, setShowAllMesos] = useState(false);
   const activeMeso = MESOCYCLES[mesoIdx];
   const activeWeeks = activeMeso.weeks;
-  const activeRoutines = activeMeso.routines;
+  // M3 deload week runs the M4 exercise selection — groove the new movements at deload load.
+  // Sessions still log under Meso 3; deload mechanics (2 sets, 50%, rest ≤75s) apply as usual.
+  const activeRoutines = (activeMeso.id === "rp-meso-3" && activeWeeks[week] && activeWeeks[week].deload)
+    ? MESO4_ROUTINES
+    : activeMeso.routines;
   const [soundOn, setSoundOn] = useState(false);
 
   const activeRoutineKeys = Object.keys(activeRoutines);
