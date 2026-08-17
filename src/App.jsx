@@ -1770,7 +1770,9 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
     try { perf = JSON.parse(localStorage.getItem(perfKey) || '{}'); } catch(e) {}
     const last = perf[ex.name];
     if (!last || last.avgWt == null) return null;
-    return Math.round(last.avgWt * 0.5 / minStep) * minStep;
+    // DBs round DOWN on deload — 50% of 15 is 7.5, and the rack's next plate down is 5
+    const dlRound = ex.name.startsWith("DB ") ? Math.floor : Math.round;
+    return dlRound(last.avgWt * 0.5 / minStep) * minStep;
   }, [ex.name, mesoPrefix, wkData.deload, wkData.preDeloaded, minStep]);
 
   const baseTarget = ex.wt
@@ -4394,7 +4396,8 @@ export default function App() {
       try { perf = JSON.parse(localStorage.getItem(perfKey) || '{}'); } catch(e) {}
       const last = perf[ex.name];
       const baseWt = (last && last.avgWt != null) ? last.avgWt : ex.wt;
-      return baseWt ? Math.round(baseWt * 0.5 / step) * step : null;
+      const dlRound = ex.name.startsWith("DB ") ? Math.floor : Math.round;
+      return baseWt ? dlRound(baseWt * 0.5 / step) * step : null;
     };
 
     if (nextSetNum <= currentTotalSets) {
