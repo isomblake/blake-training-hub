@@ -1759,7 +1759,8 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
 
   const exCat = getExCategory(ex.name, ex.rest);
   const weeklyAdd = wkData[exCat]; // smith, cable, or iso
-  const minStep = exCat === "smith" ? 5 : 2.5; // rounding step
+  // DB rack is 5-lb steps only (5–30), so DBs round like Smith
+  const minStep = (exCat === "smith" || ex.name.startsWith("DB ")) ? 5 : 2.5; // rounding step
 
   // For deload: use actual W5 performance × 0.5 rather than programmed base × 0.5
   const deloadActualTarget = useMemo(() => {
@@ -4386,7 +4387,7 @@ export default function App() {
 
     // Deload weight helper: actual last-week avgWt × 0.5 from localStorage, fallback to programmed × 0.5
     const getDeloadWt = (ex) => {
-      const step = ex.name.toLowerCase().startsWith("smith") ? 5 : 2.5;
+      const step = (ex.name.toLowerCase().startsWith("smith") || ex.name.startsWith("DB ")) ? 5 : 2.5;
       if (wkData.preDeloaded) return ex.wt || null; // ex.wt already deloaded by makeDeloadRoutines
       const perfKey = 'training-hub-perf-' + activeMeso.shortName.replace(/\s+/g, '-');
       let perf = {};
@@ -4399,7 +4400,7 @@ export default function App() {
     if (nextSetNum <= currentTotalSets) {
       // Next set of SAME exercise
       const exCat = getExCategory(currentEx.name, currentEx.rest);
-      const minStep = exCat === "smith" ? 5 : 2.5;
+      const minStep = (exCat === "smith" || currentEx.name.startsWith("DB ")) ? 5 : 2.5;
       const weeklyAdd = wkData[exCat];
       const baseTarget = wkData.deload ? getDeloadWt(currentEx) : (currentEx.wt ? Math.round((currentEx.wt + weeklyAdd) / minStep) * minStep : null);
       const lastLogged = logged[timer.setNum];
@@ -4414,7 +4415,7 @@ export default function App() {
 
     // First set of next exercise
     const exCat = getExCategory(nextEx.name, nextEx.rest);
-    const minStep = exCat === "smith" ? 5 : 2.5;
+    const minStep = (exCat === "smith" || nextEx.name.startsWith("DB ")) ? 5 : 2.5;
     const weeklyAdd = wkData[exCat];
     const baseTarget = wkData.deload ? getDeloadWt(nextEx) : (nextEx.wt ? Math.round((nextEx.wt + weeklyAdd) / minStep) * minStep : null);
     const targetWt = getSmartWt(nextEx, exCat, minStep, weeklyAdd, baseTarget);
