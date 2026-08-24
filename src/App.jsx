@@ -103,14 +103,18 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
       .then(reg => {
         _swRegistration = reg;
         console.log("PUSH: SW ready on load");
-        // Check if already subscribed
-        return reg.pushManager.getSubscription();
-      })
-      .then(sub => {
-        if (sub) {
-          _pushSubscription = sub.toJSON();
-          console.log("PUSH: existing subscription found on load");
+        // If permission is already granted, refresh the subscription on every launch —
+        // iOS silently kills endpoints (esp. after PWA updates) and a stale sub delivers nothing.
+        if (("Notification" in window) && Notification.permission === "granted") {
+          return subscribeToPush(reg);
         }
+        // No permission yet — just read whatever exists
+        return reg.pushManager.getSubscription().then(sub => {
+          if (sub) {
+            _pushSubscription = sub.toJSON();
+            console.log("PUSH: existing subscription found on load");
+          }
+        });
       })
       .catch(e => console.error("PUSH: SW auto-register failed:", e));
   });
@@ -151,8 +155,19 @@ async function subscribeToPush(reg) {
   try {
     console.log("PUSH: checking existing subscription...");
     let sub = await reg.pushManager.getSubscription();
+    // An existing subscription can be silently dead (iOS rotates endpoints, pushes get 410).
+    // Drop it and subscribe fresh so we always hold a live endpoint.
+    if (sub) {
+      try {
+        await sub.unsubscribe();
+        sub = null;
+        console.log("PUSH: dropped possibly-stale subscription, resubscribing fresh");
+      } catch (e) {
+        console.log("PUSH: unsubscribe failed, keeping existing sub");
+      }
+    }
     if (!sub) {
-      console.log("PUSH: no existing sub, subscribing...");
+      console.log("PUSH: subscribing...");
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
