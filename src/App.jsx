@@ -218,10 +218,12 @@ async function sendPushViaServer(delaySec, title, body, tag, timerId) {
   try {
     const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
     const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+    // keepalive lets the request complete even as iOS suspends the backgrounded PWA
     fetch(`${supabaseUrl}/functions/v1/send-push`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${supabaseKey}` },
       body: JSON.stringify({ subscription: _pushSubscription, title, body, delay_seconds: delaySec, tag }),
+      keepalive: true,
     }).catch(() => {});
   } catch (e) { console.error("Push schedule error:", e); }
 }

@@ -32,12 +32,6 @@ serve(async (req) => {
       });
     }
 
-    // Server-side delay — not affected by iOS backgrounding
-    if (delay_seconds && delay_seconds > 0) {
-      await new Promise((resolve) => setTimeout(resolve, delay_seconds * 1000));
-    }
-
-    // Send the push notification
     const payload = JSON.stringify({
       title: title || "Training Hub",
       body: body || "Timer alert",
@@ -52,11 +46,28 @@ serve(async (req) => {
       },
     };
 
-    await webpush.sendNotification(pushSub, payload);
+    // Delay + send as a background task AFTER responding. Holding the request open for the
+    // delay tied execution to the client connection — iOS drops it on backgrounding and the
+    // runtime killed the function before the push ever sent.
+    const task = async () => {
+      if (delay_seconds && delay_seconds > 0) {
+        await new Promise((resolve) => setTimeout(resolve, delay_seconds * 1000));
+      }
+      await webpush.sendNotification(pushSub, payload);
+      console.log("Push sent:", tag, "after", delay_seconds || 0, "s");
+    };
+
+    // @ts-ignore — EdgeRuntime is provided by the Supabase edge runtime
+    if (typeof EdgeRuntime !== "undefined" && EdgeRuntime.waitUntil) {
+      // @ts-ignore
+      EdgeRuntime.waitUntil(task().catch((e) => console.error("Push send error:", e)));
+    } else {
+      task().catch((e) => console.error("Push send error:", e));
+    }
 
     return new Response(
-      JSON.stringify({ success: true }),
-      { headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
+      JSON.stringify({ scheduled: true, delay_seconds: delay_seconds || 0 }),
+      { status: 202, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } }
     );
   } catch (e) {
     console.error("Push error:", e);
