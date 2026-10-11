@@ -1239,6 +1239,9 @@ const MESO5_ROUTINES = {
       {name:"Cable OH Tricep Extension",muscles:"Triceps",sets:3,reps:"10-15",rest:90,wt:45,calibration:true,addSets:{3:1},vid:"https://www.muscleandstrength.com/exercises/standing-low-pulley-overhead-tricep-extension-(rope-extension).html",src:"M&S"}]}
   ]},
   "Lower A": { day:"D2", sections:[
+    {name:"Quads",exercises:[
+      {name:"Smith Front Squat",muscles:"Quads · Glutes",sets:3,reps:"8-10",rest:150,wt:135,rirCap:4,note:"Optional: skip if knee symptoms are present or worsen; reintroduce conservatively and stop if painful",vid:"https://www.muscleandstrength.com/exercises/smith-machine-front-squat.html",src:"M&S"},
+      {name:"Leg Extension",muscles:"Quads",sets:3,reps:"15-20",rest:90,wt:80,rirCap:4,note:"Optional: skip if knee symptoms are present or worsen; use controlled, pain-free range only",vid:"https://www.muscleandstrength.com/exercises/leg-extension.html",src:"M&S"}]},
     {name:"Hamstrings",exercises:[{name:"Smith Stiff-Leg Deadlift",muscles:"Hams · Glutes",sets:3,reps:"8-10",rest:150,wt:145,vid:"https://www.muscleandstrength.com/exercises/smith-machine-stiff-leg-deadlift.html",src:"M&S"}]},
     {name:"Calves",exercises:[{name:"Smith Deficit Calf Raise",muscles:"Calves",sets:4,reps:"15-20",rest:60,wt:135,note:"Keep only if pain-free and not worse later or next morning",vid:"https://www.muscleandstrength.com/exercises/smith-machine-calf-raise.html",src:"M&S"}]},
     {name:"Core + Delts",exercises:[
@@ -1256,6 +1259,7 @@ const MESO5_ROUTINES = {
       {name:"Cable Pushdown (Bar)",muscles:"Triceps",sets:3,reps:"8-12",rest:90,wt:70,addSets:{3:1},vid:"https://www.muscleandstrength.com/exercises/tricep-extension.html",src:"M&S"}]}
   ]},
   "Lower B": { day:"D4", sections:[
+    {name:"Quads",exercises:[{name:"Smith Back Squat",muscles:"Quads · Glutes",sets:3,reps:"8-10",rest:150,wt:135,rirCap:4,note:"Optional: skip if knee symptoms are present or worsen; reintroduce conservatively and stop if painful",vid:"https://www.muscleandstrength.com/exercises/smith-machine-squat.html",src:"M&S"}]},
     {name:"Calves",exercises:[{name:"Smith Deficit Calf Raise",muscles:"Calves",sets:4,reps:"15-20",rest:60,wt:135,note:"Keep only if pain-free and not worse later or next morning",vid:"https://www.muscleandstrength.com/exercises/smith-machine-calf-raise.html",src:"M&S"}]},
     {name:"Hamstrings",exercises:[{name:"Barbell RDL",muscles:"Hamstrings · Glutes",sets:3,reps:"8-10",rest:150,wt:115,vid:"https://www.youtube.com/watch?v=_oyxCn2iSjU",src:"YouTube"}]},
     {name:"Glutes",exercises:[{name:"Smith Hip Thrust",muscles:"Glutes",sets:3,reps:"8-12",rest:120,wt:130,addSets:{3:1},note:"Keep only if knee remains comfortable",vid:"https://www.muscleandstrength.com/exercises/barbell-hip-thrust.html",src:"M&S"}]},
@@ -1808,7 +1812,7 @@ function saveSessionPerformance(allSets, sessionKey, weekNumber, rir, mesoPrefix
   try { localStorage.setItem(perfKey, JSON.stringify(perf)); } catch(e) {}
 }
 
-function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, onStartRest, onSave, onSync, onDeleteFromDb, mesoPrefix, isLastExercise }) {
+function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, onStartRest, onSave, onSync, onDeleteFromDb, mesoPrefix, isLastExercise, skipped, onToggleSkip }) {
   const [expanded, setExpanded] = useState(false);
   const lastWeightRef = useRef(null);
   const lastRepsRef = useRef(null);
@@ -1820,7 +1824,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
     ? Object.entries(ex.addSets).reduce((a, [w, n]) => a + (parseInt(w) <= week + 1 ? n : 0), 0)
     : 0;
   const totalSets = wkData.deload ? 2 : ex.sets + addedSets;
-  const allDone = numDone >= totalSets;
+  const allDone = skipped || numDone >= totalSets;
   const calibrationActive = !!ex.calibration && !wkData.deload
     && (!ex.calibrationWeeks || ex.calibrationWeeks.includes(week + 1));
 
@@ -2022,13 +2026,13 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
   };
 
   return (
-    <div style={{ background: C.card, borderRadius: 12, padding: 12, marginBottom: 8, border: `1px solid ${allDone ? C.grn + "33" : C.bdr}` }}>
+    <div style={{ background: C.card, borderRadius: 12, padding: 12, marginBottom: 8, border: `1px solid ${allDone ? C.grn + "33" : C.bdr}`, opacity: skipped ? 0.72 : 1 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", cursor: "pointer" }}
         onClick={() => setExpanded(!expanded)}>
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: allDone ? C.grn : C.txt }}>
-              {expanded ? "▾" : "▸"} {ex.name} {allDone && <span style={{ fontSize: 10, color: C.grn }}>✓</span>}
+              {expanded ? "▾" : "▸"} {ex.name} {skipped ? <span style={{ fontSize: 10, color: C.org }}>— skipped</span> : allDone && <span style={{ fontSize: 10, color: C.grn }}>✓</span>}
             </div>
           </div>
           <div style={{ fontSize: 10, color: C.mut, marginTop: 1, marginLeft: 16 }}>{ex.muscles}</div>
@@ -2045,6 +2049,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
               <div style={{ fontSize: 9, color: C.mut }}>{numDone}/{totalSets} logged</div>
             </div>
           )}
+          <button onClick={e => { e.stopPropagation(); onToggleSkip(); }} style={{ borderRadius: 6, padding: "4px 7px", fontSize: 9, fontWeight: 700, cursor: "pointer", border: `1px solid ${skipped ? C.org + "55" : C.bdr}`, background: skipped ? C.org + "15" : "transparent", color: skipped ? C.org : C.mut }}>{skipped ? "Undo skip" : "Skip"}</button>
           <a href={ex.vid} target="_blank" rel="noopener" onClick={e => e.stopPropagation()}
             style={{ display: "inline-flex", alignItems: "center", gap: 3, background: C.teal + "15", border: `1px solid ${C.teal}33`, borderRadius: 6, padding: "3px 7px", fontSize: 9, color: C.teal, textDecoration: "none", fontWeight: 600 }}>
             ▶ {ex.src}
@@ -2052,7 +2057,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
         </div>
       </div>
 
-      {expanded && (
+      {expanded && !skipped && (
         <div onClick={e => e.stopPropagation()}>
           <div style={{ fontSize: 11, color: C.pur, padding: "5px 7px", background: C.pur + "11", borderRadius: 6, marginTop: 8, marginBottom: 8 }}>
             {wkData.rir} · {wkData.note}
@@ -4186,6 +4191,21 @@ export default function App() {
   const rKey = activeRoutineKeys[routine];
   const today = localDate();
   const sessionKey = today + "-" + rKey.replace(/\s+/g, "") + "-W" + (week + 1);
+  // Exercise skips are scoped to the workout session and persist across refreshes.
+  const [skippedExercises, setSkippedExercises] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("training-hub-skipped-exercises") || "{}"); }
+    catch (e) { return {}; }
+  });
+  const toggleExerciseSkip = useCallback((key) => {
+    setSkippedExercises(prev => {
+      const next = { ...prev };
+      if (next[key]) delete next[key];
+      else next[key] = true;
+      try { localStorage.setItem("training-hub-skipped-exercises", JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+  }, []);
+
 
   // Auto-detect next routine based on last completed session (current meso only)
   useEffect(() => {
@@ -4390,7 +4410,7 @@ export default function App() {
   const doneExercises = r.sections.reduce((s, sec) => {
     return s + sec.exercises.filter(ex => {
       const key = `${sessionKey}|${ex.name}`;
-      return Object.keys(allSets[key] || {}).length >= ex.sets;
+      return !!skippedExercises[key] || Object.keys(allSets[key] || {}).length >= ex.sets;
     }).length;
   }, 0);
 
@@ -4678,7 +4698,7 @@ export default function App() {
             {sec.exercises.map((ex, ei) => {
               const isLastSec = si === r.sections.length - 1;
               const isLastEx = isLastSec && ei === sec.exercises.length - 1;
-              return <ExerciseCard key={`${sessionKey}-${ei}`} ex={ex} week={week} weeksConfig={activeWeeks} sessionKey={sessionKey} allSets={allSets} setAllSets={setAllSets} onStartRest={startRest} onSave={saveToStorage} onSync={syncToDb} onDeleteFromDb={deleteFromDb} mesoPrefix={activeMeso.shortName} isLastExercise={isLastEx} />;
+              return <ExerciseCard key={`${sessionKey}-${ex.name}`} ex={ex} week={week} weeksConfig={activeWeeks} sessionKey={sessionKey} allSets={allSets} setAllSets={setAllSets} onStartRest={startRest} onSave={saveToStorage} onSync={syncToDb} onDeleteFromDb={deleteFromDb} mesoPrefix={activeMeso.shortName} isLastExercise={isLastEx} skipped={!!skippedExercises[`${sessionKey}|${ex.name}`]} onToggleSkip={() => toggleExerciseSkip(`${sessionKey}|${ex.name}`)} />;
             })}
           </div>
         ))}
