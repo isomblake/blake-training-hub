@@ -1225,6 +1225,55 @@ const MESO4_ROUTINES = {
   },
 };
 
+// MESO 5 — Oct 12, 2026. Six accumulation weeks; Thanksgiving week (Nov 23–29)
+// is planned full rest. Knee-sensitive quad work is withheld pending symptom review.
+const MESO5_ROUTINES = {
+  "Upper A": { day:"D1", sections:[
+    {name:"Chest",exercises:[{name:"Smith Flat Bench Press",muscles:"Chest",sets:5,reps:"10-15",rest:120,wt:120,vid:"https://www.muscleandstrength.com/exercises/smith-machine-bench-press.html",src:"M&S"}]},
+    {name:"Back",exercises:[{name:"Cable Lat Pulldown (Close)",muscles:"Lats",sets:5,reps:"8-12",rest:120,wt:190,vid:"https://www.muscleandstrength.com/exercises/close-grip-pull-down.html",src:"M&S"}]},
+    {name:"Shoulders",exercises:[
+      {name:"DB Lateral Raise",muscles:"Side Delts",sets:3,reps:"15-20",rest:60,wt:10,addSets:{3:1},vid:"https://www.youtube.com/watch?v=4hTUCDUQaNA",src:"YouTube"},
+      {name:"Cable Face Pull (Rope)",muscles:"Rear Delts",sets:4,reps:"15-20",rest:60,wt:72.5,vid:"https://www.muscleandstrength.com/exercises/cable-face-pull",src:"M&S"}]},
+    {name:"Arms",exercises:[
+      {name:"Cable EZ Bar Curl",muscles:"Biceps",sets:4,reps:"8-12",rest:90,wt:50,vid:"https://www.muscleandstrength.com/exercises/cable-curl.html",src:"M&S"},
+      {name:"Cable OH Tricep Extension",muscles:"Triceps",sets:3,reps:"10-15",rest:90,wt:45,calibration:true,addSets:{3:1},vid:"https://www.muscleandstrength.com/exercises/standing-low-pulley-overhead-tricep-extension-(rope-extension).html",src:"M&S"}]}
+  ]},
+  "Lower A": { day:"D2", sections:[
+    {name:"Hamstrings",exercises:[{name:"Smith Stiff-Leg Deadlift",muscles:"Hams · Glutes",sets:3,reps:"8-10",rest:150,wt:145,vid:"https://www.muscleandstrength.com/exercises/smith-machine-stiff-leg-deadlift.html",src:"M&S"}]},
+    {name:"Calves",exercises:[{name:"Smith Deficit Calf Raise",muscles:"Calves",sets:4,reps:"15-20",rest:60,wt:135,note:"Keep only if pain-free and not worse later or next morning",vid:"https://www.muscleandstrength.com/exercises/smith-machine-calf-raise.html",src:"M&S"}]},
+    {name:"Core + Delts",exercises:[
+      {name:"Cable Crunch (Kneeling)",muscles:"Abs",sets:3,reps:"12-15",rest:60,wt:80,calibration:true,calibrationWeeks:[1],vid:"https://www.muscleandstrength.com/exercises/cable-crunch.html",src:"M&S"},
+      {name:"Cable Upright Row",muscles:"Side Delts",sets:3,reps:"15-20",rest:60,wt:47.5,note:"Wide grip; elbows lead; stop below shoulder height",vid:"https://www.muscleandstrength.com/exercises/cable-upright-row.html",src:"M&S"}]}
+  ]},
+  "Upper B": { day:"D3", sections:[
+    {name:"Chest",exercises:[{name:"Smith Incline Press",muscles:"Upper Chest",sets:5,reps:"10-15",rest:120,wt:80,vid:"https://www.muscleandstrength.com/exercises/incline-smith-machine-bench-press.html",src:"M&S"}]},
+    {name:"Back",exercises:[{name:"Seated Cable Row (Neutral)",muscles:"Upper Back · Lats",sets:5,reps:"8-12",rest:120,wt:175,vid:"https://www.muscleandstrength.com/exercises/seated-row.html",src:"M&S"}]},
+    {name:"Shoulders",exercises:[
+      {name:"Cable Cross-Body Lateral",muscles:"Side Delts",sets:3,reps:"15-20",rest:60,wt:5,addSets:{3:1},note:"Single arm, low pulley, across body",vid:"https://www.muscleandstrength.com/exercises/one-arm-cable-lateral-raise.html",src:"M&S"},
+      {name:"Cable Rear Delt Fly",muscles:"Rear Delts",sets:4,reps:"15-20",rest:60,wt:2.5,note:"Build reps to 20 before trying 5 lb",vid:"https://www.muscleandstrength.com/exercises/standing-cable-flys.html",src:"M&S"}]},
+    {name:"Arms",exercises:[
+      {name:"Cable Bayesian Curl",muscles:"Biceps",sets:4,reps:"8-12",rest:90,wt:22.5,calibration:true,vid:"https://barbend.com/bayesian-curl/",src:"BarBend"},
+      {name:"Cable Pushdown (Bar)",muscles:"Triceps",sets:3,reps:"8-12",rest:90,wt:70,addSets:{3:1},vid:"https://www.muscleandstrength.com/exercises/tricep-extension.html",src:"M&S"}]}
+  ]},
+  "Lower B": { day:"D4", sections:[
+    {name:"Calves",exercises:[{name:"Smith Deficit Calf Raise",muscles:"Calves",sets:4,reps:"15-20",rest:60,wt:135,note:"Keep only if pain-free and not worse later or next morning",vid:"https://www.muscleandstrength.com/exercises/smith-machine-calf-raise.html",src:"M&S"}]},
+    {name:"Hamstrings",exercises:[{name:"Barbell RDL",muscles:"Hamstrings · Glutes",sets:3,reps:"8-10",rest:150,wt:115,vid:"https://www.youtube.com/watch?v=_oyxCn2iSjU",src:"YouTube"}]},
+    {name:"Glutes",exercises:[{name:"Smith Hip Thrust",muscles:"Glutes",sets:3,reps:"8-12",rest:120,wt:130,addSets:{3:1},note:"Keep only if knee remains comfortable",vid:"https://www.muscleandstrength.com/exercises/barbell-hip-thrust.html",src:"M&S"}]},
+    {name:"Core + Delts",exercises:[
+      {name:"Hanging Straight-Leg Raise",muscles:"Abs",sets:3,reps:"8-15",rest:60,wt:null,bodyweight:true,vid:"https://www.muscleandstrength.com/exercises/hanging-leg-raise.html",src:"M&S"},
+      {name:"Cable Upright Row",muscles:"Side Delts",sets:3,reps:"15-20",rest:60,wt:47.5,note:"Wide grip; stop below shoulder height",vid:"https://www.muscleandstrength.com/exercises/cable-upright-row.html",src:"M&S"}]}
+  ]}
+};
+
+const MESO5_WEEKS = [
+ {rir:"4 RIR",note:"W1 · Conservative re-entry; quad loading withheld pending knee assessment",smith:0,cable:0,iso:0,deload:false},
+ {rir:"3–4 RIR",note:"W2 · Build reps; progress only tolerated movements",smith:5,cable:2.5,iso:0,deload:false},
+ {rir:"3 RIR",note:"W3 · Selected accessory set additions begin",smith:5,cable:2.5,iso:0,deload:false},
+ {rir:"2–3 RIR",note:"W4 · Productive accumulation",smith:5,cable:5,iso:2.5,deload:false},
+ {rir:"2 RIR",note:"W5 · High accumulation; no forced reps",smith:5,cable:7.5,iso:2.5,deload:false},
+ {rir:"0–1 RIR",note:"W6 · Peak week; presses stop at 1 RIR; full rest follows Nov 23–29",smith:10,cable:10,iso:5,deload:false},
+];
+
 // Deload only has 1 "week" — no progression
 const DELOAD_WEEKS = [
   { rir: "4+ RIR", note: "DELOAD · 2 sets · 50% weight · learn Meso 1 moves · prep for Apr 13", smith: 0, cable: 0, iso: 0, deload: true },
@@ -1276,13 +1325,14 @@ const MESOCYCLES = [
     routines: MESO3_ROUTINES,
   },
   {
-    id: "rp-meso-4",
-    name: "RP Meso 4",
-    shortName: "Meso 4",
-    startDate: "2026-08-24",
-    endDate: "2026-10-11",
-    weeks: WEEKS,
-    routines: MESO4_ROUTINES,
+    id: "rp-meso-4", name: "RP Meso 4", shortName: "Meso 4",
+    startDate: "2026-08-24", endDate: "2026-10-11", weeks: WEEKS,
+    routines: MESO4_ROUTINES, note: "Completed Oct 11, 2026",
+  },
+  {
+    id: "rp-meso-5", name: "RP Meso 5", shortName: "Meso 5",
+    startDate: "2026-10-12", endDate: "2026-11-29", weeks: MESO5_WEEKS,
+    routines: MESO5_ROUTINES, note: "Six training weeks; Thanksgiving week Nov 23–29 is full rest",
   },
 ];
 
@@ -4232,13 +4282,19 @@ export default function App() {
     })().catch(console.error);
   }, []);
 
-  // One-time: correct M2/M3 mesocycle dates (previous inserts had wrong end/start dates)
+  // Versioned reconciliation: M3/M4 complete; M5 active.
   useEffect(() => {
-    if (localStorage.getItem('training-hub-meso-dates-fix-v2')) return;
+    if (localStorage.getItem('training-hub-meso-dates-fix-v3')) return;
     (async () => {
-      await supabase.from('mesocycles').update({ end_date: '2026-07-12', status: 'completed' }).eq('name', 'RP Hypertrophy Meso 2');
-      await supabase.from('mesocycles').update({ start_date: '2026-07-13', end_date: '2026-08-23', status: 'active' }).eq('name', 'RP Hypertrophy Meso 3');
-      localStorage.setItem('training-hub-meso-dates-fix-v2', '1');
+      await supabase.from('mesocycles').update({end_date:'2026-07-12',status:'completed'}).eq('name','RP Hypertrophy Meso 2');
+      await supabase.from('mesocycles').update({start_date:'2026-07-13',end_date:'2026-08-23',status:'completed'}).eq('name','RP Hypertrophy Meso 3');
+      const {data:m4}=await supabase.from('mesocycles').select('id').eq('name','RP Hypertrophy Meso 4').maybeSingle();
+      if(m4) await supabase.from('mesocycles').update({start_date:'2026-08-24',end_date:'2026-10-11',weeks:6,status:'completed'}).eq('id',m4.id);
+      else await supabase.from('mesocycles').insert({name:'RP Hypertrophy Meso 4',start_date:'2026-08-24',end_date:'2026-10-11',weeks:6,status:'completed'});
+      const {data:m5}=await supabase.from('mesocycles').select('id').eq('name','RP Hypertrophy Meso 5').maybeSingle();
+      if(m5) await supabase.from('mesocycles').update({start_date:'2026-10-12',end_date:'2026-11-29',weeks:6,status:'active'}).eq('id',m5.id);
+      else await supabase.from('mesocycles').insert({name:'RP Hypertrophy Meso 5',start_date:'2026-10-12',end_date:'2026-11-29',weeks:6,status:'active'});
+      localStorage.setItem('training-hub-meso-dates-fix-v3','1');
     })().catch(console.error);
   }, []);
 
