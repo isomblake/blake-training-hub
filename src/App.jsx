@@ -4490,8 +4490,8 @@ export default function App() {
       const last = perf[ex.name];
       const baseWt = (last && last.avgWt != null) ? last.avgWt : ex.wt;
       const dlRound = ex.name.startsWith("DB ") ? Math.floor : Math.round;
-      // Deload keeps load reasonably close to recent work; reduced sets and easy RIR drive fatigue reduction.
-      return baseWt ? dlRound(baseWt * 0.85 / step) * step : null;
+      // Deload uses about 50% of recent working load, rounded to the normal increment.
+      return baseWt ? dlRound(baseWt * 0.5 / step) * step : null;
     };
 
     if (nextSetNum <= currentTotalSets) {
