@@ -1804,10 +1804,11 @@ function saveSessionPerformance(allSets, sessionKey, weekNumber, rir, mesoPrefix
     const nonLast = setArr.length > 1 ? setArr.slice(0, -1) : setArr;
     const avgWtX = nonLast.reduce((a, s) => a + (parseFloat(s.wt) || 0), 0) / nonLast.length;
     const avgRepsX = nonLast.reduce((a, s) => a + (parseInt(s.reps) || 0), 0) / nonLast.length;
-    // Use last set's RIR — the only set performed under full accumulated fatigue
+    const minReps = Math.min(...setArr.map(s => parseInt(s.reps) || 0));
+    // Use last set's RIR — the set performed under the greatest accumulated fatigue.
     const setsWithRir = setArr.filter(s => s.rir != null);
     const lastRir = setsWithRir.length > 0 ? setsWithRir[setsWithRir.length - 1].rir : null;
-    perf[exName] = { avgWt, avgReps, avgWtX, avgRepsX, weekNumber, rir, avgRir: lastRir };
+    perf[exName] = { avgWt, avgReps, avgWtX, avgRepsX, minReps, setCount: setArr.length, weekNumber, rir, avgRir: lastRir };
   });
   try { localStorage.setItem(perfKey, JSON.stringify(perf)); } catch(e) {}
 }
@@ -4468,16 +4469,22 @@ export default function App() {
       if (!last || last.avgWt == null) return baseTarget;
       const lastWk = last.weekNumber || 0;
       const curWk = week + 1;
+      const hold = Math.round(last.avgWt / minStep) * minStep;
       if (lastWk > curWk) return baseTarget;
-      if (lastWk === curWk) {
-        const hold = Math.round(last.avgWt / minStep) * minStep;
-        return hold !== baseTarget ? hold : baseTarget;
-      }
+      if (lastWk === curWk) return hold;
       const repRange = ex.reps.split("-").map(Number);
-      const min = repRange[0], max = repRange[1] || repRange[0];
-      if (last.avgReps < min) return Math.round(last.avgWt / minStep) * minStep;
-      if (last.avgReps > max) return Math.round((last.avgWt + weeklyAdd + minStep) / minStep) * minStep;
-      return Math.round((last.avgWt + weeklyAdd) / minStep) * minStep;
+      const max = repRange[1] || repRange[0];
+      const rirMatch = String(wkData.rir || "").match(/\d+(?:\.\d+)?/);
+      const targetRir = rirMatch ? Number(rirMatch[0]) : 0;
+      // Double progression: increase only when every logged set reaches the rep ceiling
+      // and the final set still meets the current week's minimum RIR target.
+      const earnedIncrease = last.minReps != null
+        && last.minReps >= max
+        && last.avgRir != null
+        && last.avgRir >= targetRir;
+      return earnedIncrease
+        ? Math.round((last.avgWt + minStep) / minStep) * minStep
+        : hold;
     };
 
     // Deload weight helper: actual last-week avgWt × 0.5 from localStorage, fallback to programmed × 0.5
@@ -4499,7 +4506,7 @@ export default function App() {
       const exCat = getExCategory(currentEx.name, currentEx.rest);
       const minStep = (exCat === "smith" || currentEx.name.startsWith("DB ")) ? 5 : 2.5;
       const weeklyAdd = wkData[exCat];
-      const baseTarget = wkData.deload ? getDeloadWt(currentEx) : (currentEx.wt ? Math.round((currentEx.wt + weeklyAdd) / minStep) * minStep : null);
+      const baseTarget = wkData.deload ? getDeloadWt(currentEx) : (currentEx.wt || null);
       const lastLogged = logged[timer.setNum];
       const targetWt = lastLogged ? lastLogged.wt : getSmartWt(currentEx, exCat, minStep, weeklyAdd, baseTarget);
       const targetReps = lastLogged ? String(lastLogged.reps) : currentEx.reps.split("-").at(-1);
