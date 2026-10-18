@@ -717,6 +717,89 @@ function getExCategory(name, rest) {
   return "iso"; // cable/landmine isolation
 }
 
+function parseRirTarget(rir) {
+  const values = (String(rir ?? "").match(/\\d+(?:\\.\\d+)?/g) || []).map(Number);
+  if (!values.length) return null;
+  if (String(rir).includes("+")) return values[0];
+  return values.length > 1 ? (values[0] + values[1]) / 2 : values[0];
+}
+
+function getRepRangeBounds(repRange) {
+  const values = String(repRange ?? "").split("-").map(v => Number(v.trim()));
+  if (!values.length || !Number.isFinite(values[0])) return [1, 30];
+  const min = values[0];
+  const max = Number.isFinite(values[1]) ? values[1] : min;
+  return [Math.min(min, max), Math.max(min, max)];
+}
+
+function getMeso5TargetReps(ex) {
+  const [min, max] = getRepRangeBounds(ex.reps);
+  const configured = Number(ex.targetReps);
+  const target = Number.isFinite(configured) && configured > 0
+    ? configured
+    : Math.round((min + max) / 2);
+  return Math.max(min, Math.min(max, Math.round(target)));
+}
+
+function getMeso5LoadRecommendation(ex, perf, targetWeek, currentRirLabel, minStep, fallbackWt) {
+  const fallback = fallbackWt ?? (ex.wt ?? null);
+  if (!ex.wt || !perf || perf.avgWt == null || !Number.isFinite(Number(perf.avgWt))) {
+    return { weight: fallback, note: null };
+  }
+
+  const lastWeek = Number(perf.weekNumber) || 0;
+  const lastWt = Math.round(Number(perf.avgWt) / minStep) * minStep;
+  // Same-week repeats (or stale future logs) must never trigger a new increase.
+  if (lastWeek >= targetWeek) return { weight: lastWt, note: null };
+
+  // Calibration exercises intentionally take the final set to failure, so use
+  // their pre-failure sets and do not interpret the failure set's RIR as work-set effort.
+  const calibration = !!ex.calibration;
+  const observedWt = calibration && perf.avgWtX != null ? Number(perf.avgWtX) : Number(perf.avgWt);
+  const observedReps = calibration && perf.avgRepsX != null ? Number(perf.avgRepsX) : Number(perf.avgReps);
+  const priorWt = Math.round(observedWt / minStep) * minStep;
+  const actualRir = calibration || perf.avgRir == null ? null : Number(perf.avgRir);
+  const previousTargetRir = parseRirTarget(perf.rir);
+  const currentTargetRir = parseRirTarget(currentRirLabel);
+  const [minReps] = getRepRangeBounds(ex.reps);
+  const targetReps = getMeso5TargetReps(ex);
+
+  if (ex.rirCap != null && currentTargetRir != null && currentTargetRir < ex.rirCap) {
+    return { weight: priorWt, note: `⚠ Holding ${priorWt} lb — this lift has a ${ex.rirCap}+ RIR safety cap` };
+  }
+
+  if (calibration) {
+    if (observedReps != null && observedReps < minReps) {
+      return { weight: Math.max(0, priorWt - minStep), note: `↓ Reducing one increment — pre-failure sets averaged below ${minReps} reps` };
+    }
+    if (observedReps != null && observedReps >= targetReps + 1) {
+      return { weight: priorWt + minStep, note: `↑ Adding one increment — pre-failure sets exceeded the ${targetReps}-rep target` };
+    }
+    return { weight: priorWt, note: `⏸ Holding ${priorWt} lb — use pre-failure sets to calibrate this movement` };
+  }
+
+  if (actualRir == null || !Number.isFinite(actualRir) || previousTargetRir == null || currentTargetRir == null) {
+    return { weight: priorWt, note: `⏸ Holding ${priorWt} lb — record final-set RIR to guide progression` };
+  }
+
+  const rirDifference = actualRir - previousTargetRir;
+  let steps = 0;
+  let note = `⏸ Holding ${priorWt} lb — prior effort supports the current target`;
+
+  if ((observedReps != null && observedReps < targetReps - 1 && actualRir < currentTargetRir)
+      || (observedReps != null && observedReps < minReps && actualRir < previousTargetRir)
+      || rirDifference <= -1.5) {
+    steps = -1;
+    note = `↓ Reducing one increment — prior performance was too hard for the prescribed reps/RIR`;
+  } else if (rirDifference >= 0.5 || (currentTargetRir < previousTargetRir && actualRir >= previousTargetRir)) {
+    steps = 1;
+    note = `↑ Adding one increment — prior effort supports the next week's lower RIR target`;
+  }
+
+  const weight = Math.max(0, Math.round((priorWt + steps * minStep) / minStep) * minStep);
+  return { weight, note: steps === 0 ? note : note + ` (${priorWt} → ${weight} lb)` };
+}
+
 // ============================================================
 // MESOCYCLE DEFINITIONS
 // Each mesocycle has its own routines, weeks config, and date range.
@@ -1229,52 +1312,52 @@ const MESO4_ROUTINES = {
 // Thanksgiving is now a normal training period; Christmas travel is outside this mesocycle. Knee-sensitive quad work remains optional.
 const MESO5_ROUTINES = {
   "Upper A": { day:"D1", sections:[
-    {name:"Chest",exercises:[{name:"Smith Flat Bench Press",muscles:"Chest",sets:5,reps:"10-15",rest:120,wt:120,vid:"https://www.muscleandstrength.com/exercises/smith-machine-bench-press.html",src:"M&S"}]},
-    {name:"Back",exercises:[{name:"Cable Lat Pulldown (Close)",muscles:"Lats",sets:5,reps:"8-12",rest:120,wt:190,vid:"https://www.muscleandstrength.com/exercises/close-grip-pull-down.html",src:"M&S"}]},
+    {name:"Chest",exercises:[{name:"Smith Flat Bench Press",muscles:"Chest",sets:5,reps:"8-12",targetReps:10,rest:120,wt:120,vid:"https://www.muscleandstrength.com/exercises/smith-machine-bench-press.html",src:"M&S"}]},
+    {name:"Back",exercises:[{name:"Cable Lat Pulldown (Close)",muscles:"Lats",sets:5,reps:"8-12",targetReps:10,rest:120,wt:190,vid:"https://www.muscleandstrength.com/exercises/close-grip-pull-down.html",src:"M&S"}]},
     {name:"Shoulders",exercises:[
-      {name:"DB Lateral Raise",muscles:"Side Delts",sets:3,reps:"15-20",rest:60,wt:10,addSets:{3:1},vid:"https://www.youtube.com/watch?v=4hTUCDUQaNA",src:"YouTube"},
-      {name:"Cable Face Pull (Rope)",muscles:"Rear Delts",sets:4,reps:"15-20",rest:60,wt:72.5,vid:"https://www.muscleandstrength.com/exercises/cable-face-pull",src:"M&S"}]},
+      {name:"DB Lateral Raise",muscles:"Side Delts",sets:3,reps:"12-20",targetReps:15,rest:60,wt:10,addSets:{3:1},vid:"https://www.youtube.com/watch?v=4hTUCDUQaNA",src:"YouTube"},
+      {name:"Cable Face Pull (Rope)",muscles:"Rear Delts",sets:4,reps:"12-20",targetReps:15,rest:60,wt:72.5,vid:"https://www.muscleandstrength.com/exercises/cable-face-pull",src:"M&S"}]},
     {name:"Arms",exercises:[
-      {name:"Cable EZ Bar Curl",muscles:"Biceps",sets:4,reps:"8-12",rest:90,wt:50,vid:"https://www.muscleandstrength.com/exercises/cable-curl.html",src:"M&S"},
-      {name:"Cable OH Tricep Extension",muscles:"Triceps",sets:3,reps:"10-15",rest:90,wt:45,calibration:true,addSets:{3:1},vid:"https://www.muscleandstrength.com/exercises/standing-low-pulley-overhead-tricep-extension-(rope-extension).html",src:"M&S"}]}
+      {name:"Cable EZ Bar Curl",muscles:"Biceps",sets:4,reps:"10-15",targetReps:12,rest:90,wt:50,vid:"https://www.muscleandstrength.com/exercises/cable-curl.html",src:"M&S"},
+      {name:"Cable OH Tricep Extension",muscles:"Triceps",sets:3,reps:"10-15",targetReps:12,rest:90,wt:45,calibration:true,addSets:{3:1},vid:"https://www.muscleandstrength.com/exercises/standing-low-pulley-overhead-tricep-extension-(rope-extension).html",src:"M&S"}]}
   ]},
   "Lower A": { day:"D2", sections:[
     {name:"Quads",exercises:[
-      {name:"Smith Front Squat",muscles:"Quads · Glutes",sets:3,reps:"8-10",rest:150,wt:135,rirCap:4,note:"Optional: skip if knee symptoms are present or worsen; reintroduce conservatively and stop if painful",vid:"https://www.muscleandstrength.com/exercises/smith-machine-front-squat.html",src:"M&S"},
-      {name:"Leg Extension",muscles:"Quads",sets:3,reps:"15-20",rest:90,wt:80,rirCap:4,note:"Optional: skip if knee symptoms are present or worsen; use controlled, pain-free range only",vid:"https://www.muscleandstrength.com/exercises/leg-extension.html",src:"M&S"}]},
-    {name:"Hamstrings",exercises:[{name:"Smith Stiff-Leg Deadlift",muscles:"Hams · Glutes",sets:3,reps:"8-10",rest:150,wt:145,vid:"https://www.muscleandstrength.com/exercises/smith-machine-stiff-leg-deadlift.html",src:"M&S"}]},
-    {name:"Calves",exercises:[{name:"Smith Deficit Calf Raise",muscles:"Calves",sets:4,reps:"15-20",rest:60,wt:135,note:"Keep only if pain-free and not worse later or next morning",vid:"https://www.muscleandstrength.com/exercises/smith-machine-calf-raise.html",src:"M&S"}]},
+      {name:"Smith Front Squat",muscles:"Quads · Glutes",sets:3,reps:"8-10",targetReps:9,rest:150,wt:135,rirCap:4,note:"Optional: skip if knee symptoms are present or worsen; reintroduce conservatively and stop if painful",vid:"https://www.muscleandstrength.com/exercises/smith-machine-front-squat.html",src:"M&S"},
+      {name:"Leg Extension",muscles:"Quads",sets:3,reps:"12-20",targetReps:15,rest:90,wt:80,rirCap:4,note:"Optional: skip if knee symptoms are present or worsen; use controlled, pain-free range only",vid:"https://www.muscleandstrength.com/exercises/leg-extension.html",src:"M&S"}]},
+    {name:"Hamstrings",exercises:[{name:"Smith Stiff-Leg Deadlift",muscles:"Hams · Glutes",sets:3,reps:"8-12",targetReps:10,rest:150,wt:145,vid:"https://www.muscleandstrength.com/exercises/smith-machine-stiff-leg-deadlift.html",src:"M&S"}]},
+    {name:"Calves",exercises:[{name:"Smith Deficit Calf Raise",muscles:"Calves",sets:4,reps:"10-20",targetReps:15,rest:60,wt:135,note:"Keep only if pain-free and not worse later or next morning",vid:"https://www.muscleandstrength.com/exercises/smith-machine-calf-raise.html",src:"M&S"}]},
     {name:"Core + Delts",exercises:[
-      {name:"Cable Crunch (Kneeling)",muscles:"Abs",sets:3,reps:"12-15",rest:60,wt:80,calibration:true,calibrationWeeks:[1],vid:"https://www.muscleandstrength.com/exercises/cable-crunch.html",src:"M&S"},
-      {name:"Cable Upright Row",muscles:"Side Delts",sets:3,reps:"15-20",rest:60,wt:47.5,note:"Wide grip; elbows lead; stop below shoulder height",vid:"https://www.muscleandstrength.com/exercises/cable-upright-row.html",src:"M&S"}]}
+      {name:"Cable Crunch (Kneeling)",muscles:"Abs",sets:3,reps:"10-20",targetReps:15,rest:60,wt:80,calibration:true,calibrationWeeks:[1],vid:"https://www.muscleandstrength.com/exercises/cable-crunch.html",src:"M&S"},
+      {name:"Cable Upright Row",muscles:"Side Delts",sets:3,reps:"12-20",targetReps:15,rest:60,wt:47.5,note:"Wide grip; elbows lead; stop below shoulder height",vid:"https://www.muscleandstrength.com/exercises/cable-upright-row.html",src:"M&S"}]}
   ]},
   "Upper B": { day:"D3", sections:[
-    {name:"Chest",exercises:[{name:"Smith Incline Press",muscles:"Upper Chest",sets:5,reps:"10-15",rest:120,wt:80,vid:"https://www.muscleandstrength.com/exercises/incline-smith-machine-bench-press.html",src:"M&S"}]},
-    {name:"Back",exercises:[{name:"Seated Cable Row (Neutral)",muscles:"Upper Back · Lats",sets:5,reps:"8-12",rest:120,wt:175,vid:"https://www.muscleandstrength.com/exercises/seated-row.html",src:"M&S"}]},
+    {name:"Chest",exercises:[{name:"Smith Incline Press",muscles:"Upper Chest",sets:5,reps:"8-12",targetReps:10,rest:120,wt:80,vid:"https://www.muscleandstrength.com/exercises/incline-smith-machine-bench-press.html",src:"M&S"}]},
+    {name:"Back",exercises:[{name:"Seated Cable Row (Neutral)",muscles:"Upper Back · Lats",sets:5,reps:"8-12",targetReps:10,rest:120,wt:175,vid:"https://www.muscleandstrength.com/exercises/seated-row.html",src:"M&S"}]},
     {name:"Shoulders",exercises:[
-      {name:"Cable Cross-Body Lateral",muscles:"Side Delts",sets:3,reps:"15-20",rest:60,wt:5,addSets:{3:1},note:"Single arm, low pulley, across body",vid:"https://www.muscleandstrength.com/exercises/one-arm-cable-lateral-raise.html",src:"M&S"},
-      {name:"Cable Rear Delt Fly",muscles:"Rear Delts",sets:4,reps:"15-20",rest:60,wt:2.5,note:"Build reps to 20 before trying 5 lb",vid:"https://www.muscleandstrength.com/exercises/standing-cable-flys.html",src:"M&S"}]},
+      {name:"Cable Cross-Body Lateral",muscles:"Side Delts",sets:3,reps:"12-20",targetReps:15,rest:60,wt:5,addSets:{3:1},note:"Single arm, low pulley, across body",vid:"https://www.muscleandstrength.com/exercises/one-arm-cable-lateral-raise.html",src:"M&S"},
+      {name:"Cable Rear Delt Fly",muscles:"Rear Delts",sets:4,reps:"12-20",targetReps:15,rest:60,wt:2.5,note:"Build reps to 20 before trying 5 lb",vid:"https://www.muscleandstrength.com/exercises/standing-cable-flys.html",src:"M&S"}]},
     {name:"Arms",exercises:[
-      {name:"Cable Bayesian Curl",muscles:"Biceps",sets:4,reps:"8-12",rest:90,wt:22.5,calibration:true,vid:"https://barbend.com/bayesian-curl/",src:"BarBend"},
-      {name:"Cable Pushdown (Bar)",muscles:"Triceps",sets:3,reps:"8-12",rest:90,wt:70,addSets:{3:1},vid:"https://www.muscleandstrength.com/exercises/tricep-extension.html",src:"M&S"}]}
+      {name:"Cable Bayesian Curl",muscles:"Biceps",sets:4,reps:"10-15",targetReps:12,rest:90,wt:22.5,calibration:true,vid:"https://barbend.com/bayesian-curl/",src:"BarBend"},
+      {name:"Cable Pushdown (Bar)",muscles:"Triceps",sets:3,reps:"10-15",targetReps:12,rest:90,wt:70,addSets:{3:1},vid:"https://www.muscleandstrength.com/exercises/tricep-extension.html",src:"M&S"}]}
   ]},
   "Lower B": { day:"D4", sections:[
-    {name:"Quads",exercises:[{name:"Smith Back Squat",muscles:"Quads · Glutes",sets:3,reps:"8-10",rest:150,wt:135,rirCap:4,note:"Optional: skip if knee symptoms are present or worsen; reintroduce conservatively and stop if painful",vid:"https://www.muscleandstrength.com/exercises/smith-machine-squat.html",src:"M&S"}]},
-    {name:"Calves",exercises:[{name:"Smith Deficit Calf Raise",muscles:"Calves",sets:4,reps:"15-20",rest:60,wt:135,note:"Keep only if pain-free and not worse later or next morning",vid:"https://www.muscleandstrength.com/exercises/smith-machine-calf-raise.html",src:"M&S"}]},
-    {name:"Hamstrings",exercises:[{name:"Barbell RDL",muscles:"Hamstrings · Glutes",sets:3,reps:"8-10",rest:150,wt:115,vid:"https://www.youtube.com/watch?v=_oyxCn2iSjU",src:"YouTube"}]},
-    {name:"Glutes",exercises:[{name:"Smith Hip Thrust",muscles:"Glutes",sets:3,reps:"8-12",rest:120,wt:130,addSets:{3:1},note:"Keep only if knee remains comfortable",vid:"https://www.muscleandstrength.com/exercises/barbell-hip-thrust.html",src:"M&S"}]},
+    {name:"Quads",exercises:[{name:"Smith Back Squat",muscles:"Quads · Glutes",sets:3,reps:"8-10",targetReps:9,rest:150,wt:135,rirCap:4,note:"Optional: skip if knee symptoms are present or worsen; reintroduce conservatively and stop if painful",vid:"https://www.muscleandstrength.com/exercises/smith-machine-squat.html",src:"M&S"}]},
+    {name:"Calves",exercises:[{name:"Smith Deficit Calf Raise",muscles:"Calves",sets:4,reps:"10-20",targetReps:15,rest:60,wt:135,note:"Keep only if pain-free and not worse later or next morning",vid:"https://www.muscleandstrength.com/exercises/smith-machine-calf-raise.html",src:"M&S"}]},
+    {name:"Hamstrings",exercises:[{name:"Barbell RDL",muscles:"Hamstrings · Glutes",sets:3,reps:"8-12",targetReps:10,rest:150,wt:115,vid:"https://www.youtube.com/watch?v=_oyxCn2iSjU",src:"YouTube"}]},
+    {name:"Glutes",exercises:[{name:"Smith Hip Thrust",muscles:"Glutes",sets:3,reps:"8-12",targetReps:10,rest:120,wt:130,addSets:{3:1},note:"Keep only if knee remains comfortable",vid:"https://www.muscleandstrength.com/exercises/barbell-hip-thrust.html",src:"M&S"}]},
     {name:"Core + Delts",exercises:[
-      {name:"Hanging Straight-Leg Raise",muscles:"Abs",sets:3,reps:"8-15",rest:60,wt:null,bodyweight:true,vid:"https://www.muscleandstrength.com/exercises/hanging-leg-raise.html",src:"M&S"},
+      {name:"Hanging Straight-Leg Raise",muscles:"Abs",sets:3,reps:"8-15",targetReps:10,rest:60,wt:null,bodyweight:true,vid:"https://www.muscleandstrength.com/exercises/hanging-leg-raise.html",src:"M&S"},
       {name:"Cable Upright Row",muscles:"Side Delts",sets:3,reps:"15-20",rest:60,wt:47.5,note:"Wide grip; stop below shoulder height",vid:"https://www.muscleandstrength.com/exercises/cable-upright-row.html",src:"M&S"}]}
   ]}
 };
 
 const MESO5_WEEKS = [
  {rir:"4 RIR",note:"W1 · Completed; conservative re-entry, unchanged",smith:0,cable:0,iso:0,deload:false},
- {rir:"3–4 RIR",note:"W2 · Build reps; progress only tolerated movements",smith:0,cable:0,iso:0,deload:false},
- {rir:"3 RIR",note:"W3 · Add load only after reaching the top of the rep range with target RIR",smith:5,cable:2.5,iso:0,deload:false},
- {rir:"2–3 RIR",note:"W4 · Productive accumulation; no forced reps",smith:5,cable:2.5,iso:0,deload:false},
- {rir:"1–2 RIR",note:"W5 · Hardest week; compounds stay controlled and knee-sensitive lifts stay symptom-limited",smith:5,cable:5,iso:2.5,deload:false},
+ {rir:"3–4 RIR",note:"W2 · Keep prescribed reps steady; adjust load to land at 3–4 RIR",smith:0,cable:0,iso:0,deload:false},
+ {rir:"3 RIR",note:"W3 · Keep rep targets steady; add load conservatively to reach 3 RIR",smith:0,cable:0,iso:0,deload:false},
+ {rir:"2–3 RIR",note:"W4 · Maintain reps; adjust load for 2–3 RIR without grinding",smith:0,cable:0,iso:0,deload:false},
+ {rir:"1–2 RIR",note:"W5 · Hardest week; maintain reps and target 1–2 RIR on suitable lifts; keep knee-sensitive work symptom-limited",smith:0,cable:0,iso:0,deload:false},
  {rir:"4–5+ RIR",note:"DELOAD · 2 sets per exercise · use a comfortably lighter load (typically ~80–90% of recent working load); no grinding",smith:0,cable:0,iso:0,deload:true},
 ];
 
@@ -1849,11 +1932,27 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
   const baseTarget = ex.wt
     ? wkData.deload
       ? (wkData.preDeloaded ? ex.wt : (deloadActualTarget ?? Math.round(ex.wt * 0.5 / minStep) * minStep))
-      : Math.round((ex.wt + weeklyAdd) / minStep) * minStep
+      : (mesoPrefix === "Meso 5" ? ex.wt : Math.round((ex.wt + weeklyAdd) / minStep) * minStep)
     : null;
 
   // Helper: run the progression computation given raw perf data
   function computeAdjustment(avgWt, avgReps, lastWk, lastRir, lastAvgRir) {
+    if (mesoPrefix === "Meso 5") {
+      if (lastWk > (week + 1)) return {};
+      const recommendation = getMeso5LoadRecommendation(
+        ex,
+        { avgWt, avgReps, weekNumber: lastWk, rir: lastRir, avgRir: lastAvgRir },
+        week + 1,
+        wkData.rir,
+        minStep,
+        baseTarget
+      );
+      return {
+        smartTarget: recommendation.weight != null && recommendation.weight !== baseTarget ? recommendation.weight : null,
+        progressNote: recommendation.note,
+        smartTargetReps: null,
+      };
+    }
     if (lastWk > (week + 1)) return {};
     if (lastWk === (week + 1)) {
       // Same week: don't add progression, but show actual weight rather than programmed base
@@ -2090,7 +2189,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
           )}
 
           {Array.from({ length: totalSets }, (_, i) => (
-            <SetRow key={i} setNum={i + 1} isLastSet={i + 1 === totalSets} targetReps={smartTargetReps ? String(smartTargetReps) : ex.reps.split("-").at(-1)} targetWt={targetWt} lastWeight={lastWeightRef.current} lastReps={lastRepsRef.current} isBW={!!ex.bodyweight} bands={ex.bands} logged={logged[i + 1]} onLog={logSet} onDelete={deleteSet} onRir={handleRir} />
+            <SetRow key={i} setNum={i + 1} isLastSet={i + 1 === totalSets} targetReps={smartTargetReps ? String(smartTargetReps) : (mesoPrefix === "Meso 5" ? String(getMeso5TargetReps(ex)) : ex.reps.split("-").at(-1))} targetWt={targetWt} lastWeight={lastWeightRef.current} lastReps={lastRepsRef.current} isBW={!!ex.bodyweight} bands={ex.bands} logged={logged[i + 1]} onLog={logSet} onDelete={deleteSet} onRir={handleRir} />
           ))}
         </div>
       )}
@@ -4461,6 +4560,12 @@ export default function App() {
     // Smart target helper: mirrors ExerciseCard's computeAdjustment using localStorage perf data
     const getSmartWt = (ex, exCat, minStep, weeklyAdd, baseTarget) => {
       if (!ex.wt || wkData.deload) return baseTarget;
+      if (activeMeso.id === "rp-meso-5") {
+        const perfKey = 'training-hub-perf-' + activeMeso.shortName.replace(/\\s+/g, '-');
+        let perf = {};
+        try { perf = JSON.parse(localStorage.getItem(perfKey) || '{}'); } catch(e) {}
+        return getMeso5LoadRecommendation(ex, perf[ex.name], week + 1, wkData.rir, minStep, baseTarget).weight;
+      }
       const perfKey = 'training-hub-perf-' + activeMeso.shortName.replace(/\s+/g, '-');
       let perf = {};
       try { perf = JSON.parse(localStorage.getItem(perfKey) || '{}'); } catch(e) {}
@@ -4499,10 +4604,10 @@ export default function App() {
       const exCat = getExCategory(currentEx.name, currentEx.rest);
       const minStep = (exCat === "smith" || currentEx.name.startsWith("DB ")) ? 5 : 2.5;
       const weeklyAdd = wkData[exCat];
-      const baseTarget = wkData.deload ? getDeloadWt(currentEx) : (currentEx.wt ? Math.round((currentEx.wt + weeklyAdd) / minStep) * minStep : null);
+      const baseTarget = wkData.deload ? getDeloadWt(currentEx) : (activeMeso.id === "rp-meso-5" ? (currentEx.wt || null) : (currentEx.wt ? Math.round((currentEx.wt + weeklyAdd) / minStep) * minStep : null));
       const lastLogged = logged[timer.setNum];
       const targetWt = lastLogged ? lastLogged.wt : getSmartWt(currentEx, exCat, minStep, weeklyAdd, baseTarget);
-      const targetReps = lastLogged ? String(lastLogged.reps) : currentEx.reps.split("-").at(-1);
+      const targetReps = activeMeso.id === "rp-meso-5" ? String(getMeso5TargetReps(currentEx)) : (lastLogged ? String(lastLogged.reps) : currentEx.reps.split("-").at(-1));
       return { exName: currentEx.name, muscles: currentEx.muscles, nextSetNum, totalSets: currentTotalSets, targetReps, targetWt, isBW: !currentEx.wt && currentEx.wt !== 0, restSeconds: currentEx.rest, isLastExInSession: false };
     }
 
@@ -4514,9 +4619,9 @@ export default function App() {
     const exCat = getExCategory(nextEx.name, nextEx.rest);
     const minStep = (exCat === "smith" || nextEx.name.startsWith("DB ")) ? 5 : 2.5;
     const weeklyAdd = wkData[exCat];
-    const baseTarget = wkData.deload ? getDeloadWt(nextEx) : (nextEx.wt ? Math.round((nextEx.wt + weeklyAdd) / minStep) * minStep : null);
+    const baseTarget = wkData.deload ? getDeloadWt(nextEx) : (activeMeso.id === "rp-meso-5" ? (nextEx.wt || null) : (nextEx.wt ? Math.round((nextEx.wt + weeklyAdd) / minStep) * minStep : null));
     const targetWt = getSmartWt(nextEx, exCat, minStep, weeklyAdd, baseTarget);
-    const targetReps = nextEx.reps.split("-").at(-1);
+    const targetReps = activeMeso.id === "rp-meso-5" ? String(getMeso5TargetReps(nextEx)) : nextEx.reps.split("-").at(-1);
     const isLastEx = currentIdx + 1 === allExercises.length - 1;
     return { exName: nextEx.name, muscles: nextEx.muscles, nextSetNum: 1, totalSets: wkData.deload ? deloadSets : nextEx.sets, targetReps, targetWt, isBW: !nextEx.wt && nextEx.wt !== 0, restSeconds: nextEx.rest, isLastExInSession: isLastEx, isNewExercise: true };
   }, [timer, r, sessionKey, allSets, activeWeeks, week]);
