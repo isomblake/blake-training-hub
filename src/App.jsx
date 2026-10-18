@@ -1348,7 +1348,7 @@ const MESO5_ROUTINES = {
     {name:"Glutes",exercises:[{name:"Smith Hip Thrust",muscles:"Glutes",sets:3,reps:"8-12",targetReps:10,rest:120,wt:130,addSets:{3:1},note:"Keep only if knee remains comfortable",vid:"https://www.muscleandstrength.com/exercises/barbell-hip-thrust.html",src:"M&S"}]},
     {name:"Core + Delts",exercises:[
       {name:"Hanging Straight-Leg Raise",muscles:"Abs",sets:3,reps:"8-15",targetReps:10,rest:60,wt:null,bodyweight:true,vid:"https://www.muscleandstrength.com/exercises/hanging-leg-raise.html",src:"M&S"},
-      {name:"Cable Upright Row",muscles:"Side Delts",sets:3,reps:"15-20",rest:60,wt:47.5,note:"Wide grip; stop below shoulder height",vid:"https://www.muscleandstrength.com/exercises/cable-upright-row.html",src:"M&S"}]}
+      {name:"Cable Upright Row",muscles:"Side Delts",sets:3,reps:"12-20",targetReps:15,rest:60,wt:47.5,note:"Wide grip; stop below shoulder height",vid:"https://www.muscleandstrength.com/exercises/cable-upright-row.html",src:"M&S"}]}
   ]}
 };
 
