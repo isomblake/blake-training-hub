@@ -1225,8 +1225,8 @@ const MESO4_ROUTINES = {
   },
 };
 
-// MESO 5 — Oct 12, 2026. Six accumulation weeks; Thanksgiving week (Nov 23–29)
-// is planned full rest. Knee-sensitive quad work is withheld pending symptom review.
+// MESO 5 — Oct 12–Nov 22, 2026. Five accumulation weeks plus one deload week.
+// Thanksgiving is now a normal training period; Christmas travel is outside this mesocycle. Knee-sensitive quad work remains optional.
 const MESO5_ROUTINES = {
   "Upper A": { day:"D1", sections:[
     {name:"Chest",exercises:[{name:"Smith Flat Bench Press",muscles:"Chest",sets:5,reps:"10-15",rest:120,wt:120,vid:"https://www.muscleandstrength.com/exercises/smith-machine-bench-press.html",src:"M&S"}]},
@@ -1272,10 +1272,10 @@ const MESO5_ROUTINES = {
 const MESO5_WEEKS = [
  {rir:"4 RIR",note:"W1 · Conservative re-entry; quad loading withheld pending knee assessment",smith:0,cable:0,iso:0,deload:false},
  {rir:"3–4 RIR",note:"W2 · Build reps; progress only tolerated movements",smith:5,cable:2.5,iso:0,deload:false},
- {rir:"3 RIR",note:"W3 · Selected accessory set additions begin",smith:5,cable:2.5,iso:0,deload:false},
- {rir:"2–3 RIR",note:"W4 · Productive accumulation",smith:5,cable:5,iso:2.5,deload:false},
- {rir:"2 RIR",note:"W5 · High accumulation; no forced reps",smith:5,cable:7.5,iso:2.5,deload:false},
- {rir:"0–1 RIR",note:"W6 · Peak week; presses stop at 1 RIR; full rest follows Nov 23–29",smith:10,cable:10,iso:5,deload:false},
+ {rir:"3 RIR",note:"W3 · Selected accessory set additions begin",smith:5,cable:5,iso:2.5,deload:false},
+ {rir:"2–3 RIR",note:"W4 · Productive accumulation",smith:5,cable:7.5,iso:2.5,deload:false},
+ {rir:"0–1 RIR",note:"W5 · Peak week; presses stop at 1 RIR; no forced reps",smith:10,cable:10,iso:5,deload:false},
+ {rir:"4+ RIR",note:"DELOAD · 2 sets per exercise · ~50% load · recover before Christmas travel",smith:0,cable:0,iso:0,deload:true},
 ];
 
 // Deload only has 1 "week" — no progression
@@ -1335,8 +1335,8 @@ const MESOCYCLES = [
   },
   {
     id: "rp-meso-5", name: "RP Meso 5", shortName: "Meso 5",
-    startDate: "2026-10-12", endDate: "2026-11-29", weeks: MESO5_WEEKS,
-    routines: MESO5_ROUTINES, note: "Six training weeks; Thanksgiving week Nov 23–29 is full rest",
+    startDate: "2026-10-12", endDate: "2026-11-22", weeks: MESO5_WEEKS,
+    routines: MESO5_ROUTINES, note: "Five accumulation weeks plus deload · Oct 12–Nov 22, 2026",
   },
 ];
 
