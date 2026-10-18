@@ -718,7 +718,7 @@ function getExCategory(name, rest) {
 }
 
 function parseRirTarget(rir) {
-  const values = (String(rir ?? "").match(/\\d+(?:\\.\\d+)?/g) || []).map(Number);
+  const values = (String(rir ?? "").match(/\d+(?:\.\d+)?/g) || []).map(Number);
   if (!values.length) return null;
   if (String(rir).includes("+")) return values[0];
   return values.length > 1 ? (values[0] + values[1]) / 2 : values[0];
