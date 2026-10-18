@@ -1323,7 +1323,7 @@ const MESO5_ROUTINES = {
   ]},
   "Lower A": { day:"D2", sections:[
     {name:"Quads",exercises:[
-      {name:"Smith Front Squat",muscles:"Quads · Glutes",sets:3,reps:"8-10",targetReps:9,rest:150,wt:135,rirCap:4,note:"Optional: skip if knee symptoms are present or worsen; reintroduce conservatively and stop if painful",vid:"https://www.muscleandstrength.com/exercises/smith-machine-front-squat.html",src:"M&S"},
+      {name:"Smith Front Squat",muscles:"Quads · Glutes",sets:3,reps:"8-10",targetReps:10,rest:150,wt:135,rirCap:4,note:"Optional: skip if knee symptoms are present or worsen; reintroduce conservatively and stop if painful",vid:"https://www.muscleandstrength.com/exercises/smith-machine-front-squat.html",src:"M&S"},
       {name:"Leg Extension",muscles:"Quads",sets:3,reps:"12-20",targetReps:15,rest:90,wt:80,rirCap:4,note:"Optional: skip if knee symptoms are present or worsen; use controlled, pain-free range only",vid:"https://www.muscleandstrength.com/exercises/leg-extension.html",src:"M&S"}]},
     {name:"Hamstrings",exercises:[{name:"Smith Stiff-Leg Deadlift",muscles:"Hams · Glutes",sets:3,reps:"8-12",targetReps:10,rest:150,wt:145,vid:"https://www.muscleandstrength.com/exercises/smith-machine-stiff-leg-deadlift.html",src:"M&S"}]},
     {name:"Calves",exercises:[{name:"Smith Deficit Calf Raise",muscles:"Calves",sets:4,reps:"10-20",targetReps:15,rest:60,wt:135,note:"Keep only if pain-free and not worse later or next morning",vid:"https://www.muscleandstrength.com/exercises/smith-machine-calf-raise.html",src:"M&S"}]},
@@ -1342,7 +1342,7 @@ const MESO5_ROUTINES = {
       {name:"Cable Pushdown (Bar)",muscles:"Triceps",sets:3,reps:"10-15",targetReps:12,rest:90,wt:70,addSets:{3:1},vid:"https://www.muscleandstrength.com/exercises/tricep-extension.html",src:"M&S"}]}
   ]},
   "Lower B": { day:"D4", sections:[
-    {name:"Quads",exercises:[{name:"Smith Back Squat",muscles:"Quads · Glutes",sets:3,reps:"8-10",targetReps:9,rest:150,wt:135,rirCap:4,note:"Optional: skip if knee symptoms are present or worsen; reintroduce conservatively and stop if painful",vid:"https://www.muscleandstrength.com/exercises/smith-machine-squat.html",src:"M&S"}]},
+    {name:"Quads",exercises:[{name:"Smith Back Squat",muscles:"Quads · Glutes",sets:3,reps:"8-10",targetReps:10,rest:150,wt:135,rirCap:4,note:"Optional: skip if knee symptoms are present or worsen; reintroduce conservatively and stop if painful",vid:"https://www.muscleandstrength.com/exercises/smith-machine-squat.html",src:"M&S"}]},
     {name:"Calves",exercises:[{name:"Smith Deficit Calf Raise",muscles:"Calves",sets:4,reps:"10-20",targetReps:15,rest:60,wt:135,note:"Keep only if pain-free and not worse later or next morning",vid:"https://www.muscleandstrength.com/exercises/smith-machine-calf-raise.html",src:"M&S"}]},
     {name:"Hamstrings",exercises:[{name:"Barbell RDL",muscles:"Hamstrings · Glutes",sets:3,reps:"8-12",targetReps:10,rest:150,wt:115,vid:"https://www.youtube.com/watch?v=_oyxCn2iSjU",src:"YouTube"}]},
     {name:"Glutes",exercises:[{name:"Smith Hip Thrust",muscles:"Glutes",sets:3,reps:"8-12",targetReps:10,rest:120,wt:130,addSets:{3:1},note:"Keep only if knee remains comfortable",vid:"https://www.muscleandstrength.com/exercises/barbell-hip-thrust.html",src:"M&S"}]},
