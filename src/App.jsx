@@ -1275,7 +1275,7 @@ const MESO5_WEEKS = [
  {rir:"3 RIR",note:"W3 · Add load only after reaching the top of the rep range with target RIR",smith:5,cable:2.5,iso:0,deload:false},
  {rir:"2–3 RIR",note:"W4 · Productive accumulation; no forced reps",smith:5,cable:2.5,iso:0,deload:false},
  {rir:"1–2 RIR",note:"W5 · Hardest week; compounds stay controlled and knee-sensitive lifts stay symptom-limited",smith:5,cable:5,iso:2.5,deload:false},
- {rir:"4–5+ RIR",note:"DELOAD · 2 sets per exercise · use a comfortably lighter load (typically ~80–90% of recent working load); no grinding",smith:0,cable:0,iso:0,deload:true},
+ {rir:"4–5+ RIR",note:"DELOAD · 2 sets per exercise · use about 50% of the recent working load; no grinding",smith:0,cable:0,iso:0,deload:true},
 ];
 
 // Deload only has 1 "week" — no progression
