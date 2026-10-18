@@ -1270,12 +1270,12 @@ const MESO5_ROUTINES = {
 };
 
 const MESO5_WEEKS = [
- {rir:"4 RIR",note:"W1 · Conservative re-entry; quad loading withheld pending knee assessment",smith:0,cable:0,iso:0,deload:false},
- {rir:"3–4 RIR",note:"W2 · Build reps; progress only tolerated movements",smith:5,cable:2.5,iso:0,deload:false},
- {rir:"3 RIR",note:"W3 · Selected accessory set additions begin",smith:5,cable:5,iso:2.5,deload:false},
- {rir:"2–3 RIR",note:"W4 · Productive accumulation",smith:5,cable:7.5,iso:2.5,deload:false},
- {rir:"0–1 RIR",note:"W5 · Peak week; presses stop at 1 RIR; no forced reps",smith:10,cable:10,iso:5,deload:false},
- {rir:"4+ RIR",note:"DELOAD · 2 sets per exercise · ~50% load · recover before Christmas travel",smith:0,cable:0,iso:0,deload:true},
+ {rir:"4 RIR",note:"W1 · Completed; conservative re-entry, unchanged",smith:0,cable:0,iso:0,deload:false},
+ {rir:"3–4 RIR",note:"W2 · Build reps; progress only tolerated movements",smith:0,cable:0,iso:0,deload:false},
+ {rir:"3 RIR",note:"W3 · Add load only after reaching the top of the rep range with target RIR",smith:5,cable:2.5,iso:0,deload:false},
+ {rir:"2–3 RIR",note:"W4 · Productive accumulation; no forced reps",smith:5,cable:2.5,iso:0,deload:false},
+ {rir:"1–2 RIR",note:"W5 · Hardest week; compounds stay controlled and knee-sensitive lifts stay symptom-limited",smith:5,cable:5,iso:2.5,deload:false},
+ {rir:"4–5+ RIR",note:"DELOAD · 2 sets per exercise · use a comfortably lighter load (typically ~80–90% of recent working load); no grinding",smith:0,cable:0,iso:0,deload:true},
 ];
 
 // Deload only has 1 "week" — no progression
@@ -4490,7 +4490,8 @@ export default function App() {
       const last = perf[ex.name];
       const baseWt = (last && last.avgWt != null) ? last.avgWt : ex.wt;
       const dlRound = ex.name.startsWith("DB ") ? Math.floor : Math.round;
-      return baseWt ? dlRound(baseWt * 0.5 / step) * step : null;
+      // Deload keeps load reasonably close to recent work; reduced sets and easy RIR drive fatigue reduction.
+      return baseWt ? dlRound(baseWt * 0.85 / step) * step : null;
     };
 
     if (nextSetNum <= currentTotalSets) {
