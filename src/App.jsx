@@ -743,17 +743,20 @@ function getMeso5TargetReps(ex) {
 
 function getMeso5LoadRecommendation(ex, perf, targetWeek, currentRirLabel, minStep, fallbackWt) {
   const fallback = fallbackWt ?? (ex.wt ?? null);
-  if (!ex.wt || !perf || perf.avgWt == null || !Number.isFinite(Number(perf.avgWt))) {
-    return { weight: fallback, note: null };
+  if (fallback == null || !Number.isFinite(Number(fallback))) return { weight: null, note: null };
+  const defaultWt = Math.max(0, Math.round(Number(fallback) / minStep) * minStep);
+  if (!perf || perf.avgWt == null || !Number.isFinite(Number(perf.avgWt))) {
+    return { weight: defaultWt, note: null };
   }
 
   const lastWeek = Number(perf.weekNumber) || 0;
   const lastWt = Math.round(Number(perf.avgWt) / minStep) * minStep;
-  // Same-week repeats (or stale future logs) must never trigger a new increase.
+  // Once this week's session has been logged, preserve that actual load for repeats.
   if (lastWeek >= targetWeek) return { weight: lastWt, note: null };
 
-  // Calibration exercises intentionally take the final set to failure, so use
-  // their pre-failure sets and do not interpret the failure set's RIR as work-set effort.
+  // Start from the programmed week-by-week progression, then make only a small
+  // performance-based correction. This keeps the default plan visible without
+  // ignoring the lifter's actual reps and effort.
   const calibration = !!ex.calibration;
   const observedWt = calibration && perf.avgWtX != null ? Number(perf.avgWtX) : Number(perf.avgWt);
   const observedReps = calibration && perf.avgRepsX != null ? Number(perf.avgRepsX) : Number(perf.avgReps);
@@ -761,43 +764,50 @@ function getMeso5LoadRecommendation(ex, perf, targetWeek, currentRirLabel, minSt
   const actualRir = calibration || perf.avgRir == null ? null : Number(perf.avgRir);
   const previousTargetRir = parseRirTarget(perf.rir);
   const currentTargetRir = parseRirTarget(currentRirLabel);
-  const [minReps] = getRepRangeBounds(ex.reps);
+  const [minReps, maxReps] = getRepRangeBounds(ex.reps);
   const targetReps = getMeso5TargetReps(ex);
 
   if (ex.rirCap != null && currentTargetRir != null && currentTargetRir < ex.rirCap) {
-    return { weight: priorWt, note: `⚠ Holding ${priorWt} lb — this lift has a ${ex.rirCap}+ RIR safety cap` };
+    return { weight: Math.min(defaultWt, priorWt), note: `⚠ Holding conservative load — this lift has a ${ex.rirCap}+ RIR safety cap` };
   }
 
   if (calibration) {
     if (observedReps != null && observedReps < minReps) {
-      return { weight: Math.max(0, priorWt - minStep), note: `↓ Reducing one increment — pre-failure sets averaged below ${minReps} reps` };
+      const weight = Math.max(0, defaultWt - minStep);
+      return { weight, note: `↓ One increment below default — pre-failure sets averaged below ${minReps} reps (${defaultWt} → ${weight} lb)` };
     }
-    if (observedReps != null && observedReps >= targetReps + 1) {
-      return { weight: priorWt + minStep, note: `↑ Adding one increment — pre-failure sets exceeded the ${targetReps}-rep target` };
+    if (observedReps != null && observedReps > maxReps) {
+      const weight = defaultWt + minStep;
+      return { weight, note: `↑ One increment above default — pre-failure sets exceeded the ${maxReps}-rep range (${defaultWt} → ${weight} lb)` };
     }
-    return { weight: priorWt, note: `⏸ Holding ${priorWt} lb — use pre-failure sets to calibrate this movement` };
+    return { weight: defaultWt, note: `⏸ Using programmed default ${defaultWt} lb — calibration data supports staying in range` };
   }
 
   if (actualRir == null || !Number.isFinite(actualRir) || previousTargetRir == null || currentTargetRir == null) {
-    return { weight: priorWt, note: `⏸ Holding ${priorWt} lb — record final-set RIR to guide progression` };
+    return { weight: defaultWt, note: `Using programmed default ${defaultWt} lb — record final-set RIR to personalize the next adjustment` };
   }
 
   const rirDifference = actualRir - previousTargetRir;
   let steps = 0;
-  let note = `⏸ Holding ${priorWt} lb — prior effort supports the current target`;
+  let reason = `prior reps and RIR support the programmed progression`;
 
-  if ((observedReps != null && observedReps < targetReps - 1 && actualRir < currentTargetRir)
-      || (observedReps != null && observedReps < minReps && actualRir < previousTargetRir)
+  if ((observedReps != null && observedReps < minReps)
+      || (observedReps != null && observedReps < targetReps - 1 && actualRir < currentTargetRir)
       || rirDifference <= -1.5) {
     steps = -1;
-    note = `↓ Reducing one increment — prior performance was too hard for the prescribed reps/RIR`;
-  } else if (rirDifference >= 0.5 || (currentTargetRir < previousTargetRir && actualRir >= previousTargetRir)) {
+    reason = `prior performance was too hard for the prescribed reps/RIR`;
+  } else if ((observedReps != null && observedReps > maxReps)
+      || (observedReps != null && observedReps >= targetReps + 1 && actualRir >= currentTargetRir)
+      || rirDifference >= 1.5) {
     steps = 1;
-    note = `↑ Adding one increment — prior effort supports the next week's lower RIR target`;
+    reason = `prior performance supports a small increase above the programmed default`;
   }
 
-  const weight = Math.max(0, Math.round((priorWt + steps * minStep) / minStep) * minStep);
-  return { weight, note: steps === 0 ? note : note + ` (${priorWt} → ${weight} lb)` };
+  const weight = Math.max(0, defaultWt + steps * minStep);
+  const note = steps === 0
+    ? `⏸ Using programmed default ${defaultWt} lb — ${reason}`
+    : `${steps > 0 ? "↑" : "↓"} Adjusting one increment from default — ${reason} (${defaultWt} → ${weight} lb)`;
+  return { weight, note };
 }
 
 // ============================================================
