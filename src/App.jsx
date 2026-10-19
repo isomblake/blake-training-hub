@@ -2040,6 +2040,59 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
         smartTargetReps: recommendation.targetReps !== getMeso5TargetReps(ex) ? recommendation.targetReps : null,
       };
     }
+    if (lastWk > (week + 1)) return {};
+    if (lastWk === (week + 1)) {
+      const holdWt = Math.round(avgWt / minStep) * minStep;
+      return holdWt !== baseTarget ? { smartTarget: holdWt } : {};
+    }
+    if (ex.rirCap != null) {
+      const weekRirTarget = parseInt(wkData.rir);
+      if (!isNaN(weekRirTarget) && weekRirTarget < ex.rirCap) {
+        const holdWt = Math.round(avgWt / minStep) * minStep;
+        return { smartTarget: holdWt !== baseTarget ? holdWt : null, progressNote: `⚠ Holding — week target (${weekRirTarget} RIR) exceeds ${ex.rirCap}+ RIR safety cap`, smartTargetReps: null };
+      }
+    }
+    const repRange = ex.reps.split("-").map(Number);
+    const minReps = repRange[0], maxReps = repRange[1] || repRange[0];
+    let adjusted, note, repsAdj = null;
+    const targetRirLow = lastRir ? parseInt(lastRir) : null;
+    const rirDiff = (lastAvgRir != null && targetRirLow != null) ? lastAvgRir - targetRirLow : null;
+    if (avgReps < minReps) {
+      const gap = minReps - avgReps;
+      const stepsDown = (rirDiff != null && rirDiff <= -2) ? Math.max(1, Math.ceil(gap / 2)) : Math.floor(gap / 2);
+      if (stepsDown > 0) {
+        adjusted = Math.round((avgWt - stepsDown * minStep) / minStep) * minStep;
+        note = `↓ Reduced ${stepsDown > 1 ? `${stepsDown}× ` : ""}— only ${Math.round(avgReps)} reps last session (min ${minReps}), recalibrating for new range`;
+      } else {
+        adjusted = Math.round(avgWt / minStep) * minStep;
+        note = `⏸ Holding @ ${Math.round(avgWt)} lb — ${Math.round(avgReps)} reps, 1 below floor, should resolve next session`;
+      }
+      repsAdj = maxReps;
+    } else if (avgReps > maxReps) {
+      adjusted = Math.round((avgWt + weeklyAdd + minStep) / minStep) * minStep;
+      note = `↑ Bumped — ${Math.round(avgReps)} reps @ ${Math.round(avgWt)} lb last session (exceeded range)`;
+    } else {
+      let add = weeklyAdd;
+      if (rirDiff != null) {
+        if (rirDiff >= 2) { add = weeklyAdd + minStep; note = `↑↑ Extra bump — ${Math.round(lastAvgRir)} RIR logged vs ${targetRirLow} target`; }
+        else if (rirDiff <= -3) { adjusted = Math.round((avgWt - minStep) / minStep) * minStep; note = `↓ Reduced — ${Math.round(lastAvgRir)} RIR logged (too far below ${targetRirLow} target)`; }
+        else if (rirDiff <= -2) { adjusted = Math.round(avgWt / minStep) * minStep; note = `⏸ Holding — ${Math.round(lastAvgRir)} RIR logged (grinding past target)`; }
+      }
+      if (adjusted === undefined) {
+        adjusted = Math.round((avgWt + add) / minStep) * minStep;
+        const rirTag = lastRir ? ` (${lastRir})` : "";
+        if (!note) {
+          if (avgWt < ex.wt - minStep / 2) note = `↓ ${Math.round(avgWt)} lb used last${rirTag} → ${adjusted} lb this week`;
+          else if (avgWt > ex.wt + minStep / 2) note = `↑ ${Math.round(avgWt)} lb used last${rirTag} → ${adjusted} lb this week`;
+        }
+      }
+      if (adjusted === Math.round(avgWt / minStep) * minStep && (rirDiff == null || rirDiff >= 0)) repsAdj = maxReps;
+    }
+    if (adjusted === undefined) return {};
+    if (adjusted === baseTarget && repsAdj == null) return {};
+    return { smartTarget: adjusted !== baseTarget ? adjusted : null, progressNote: note || null, smartTargetReps: repsAdj };
+  }
+
   // Fast path: read from localStorage (written at session finish)
   const lsResult = useMemo(() => {
     if (!ex.wt || wkData.deload) return null;
