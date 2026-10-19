@@ -745,68 +745,61 @@ function getMeso5LoadRecommendation(ex, perf, targetWeek, currentRirLabel, minSt
   const fallback = fallbackWt ?? (ex.wt ?? null);
   if (fallback == null || !Number.isFinite(Number(fallback))) return { weight: null, note: null };
   const defaultWt = Math.max(0, Math.round(Number(fallback) / minStep) * minStep);
-  if (!perf || perf.avgWt == null || !Number.isFinite(Number(perf.avgWt))) {
-    return { weight: defaultWt, note: null };
-  }
+  if (!perf || perf.avgWt == null || !Number.isFinite(Number(perf.avgWt))) return { weight: defaultWt, note: null };
 
   const lastWeek = Number(perf.weekNumber) || 0;
   const lastWt = Math.round(Number(perf.avgWt) / minStep) * minStep;
-  // Once this week's session has been logged, preserve that actual load for repeats.
   if (lastWeek >= targetWeek) return { weight: lastWt, note: null };
 
-  // Start from the programmed week-by-week progression, then make only a small
-  // performance-based correction. This keeps the default plan visible without
-  // ignoring the lifter's actual reps and effort.
   const calibration = !!ex.calibration;
-  const observedWt = calibration && perf.avgWtX != null ? Number(perf.avgWtX) : Number(perf.avgWt);
   const observedReps = calibration && perf.avgRepsX != null ? Number(perf.avgRepsX) : Number(perf.avgReps);
-  const priorWt = Math.round(observedWt / minStep) * minStep;
   const actualRir = calibration || perf.avgRir == null ? null : Number(perf.avgRir);
   const previousTargetRir = parseRirTarget(perf.rir);
   const currentTargetRir = parseRirTarget(currentRirLabel);
   const [minReps, maxReps] = getRepRangeBounds(ex.reps);
   const targetReps = getMeso5TargetReps(ex);
+  const history = Array.isArray(perf.history) ? perf.history : [];
+  const prior = history.length > 1 ? history[history.length - 2] : null;
+  const priorReps = prior ? Number(calibration && prior.avgRepsX != null ? prior.avgRepsX : prior.avgReps) : null;
+  const priorRir = prior && !calibration && prior.avgRir != null ? Number(prior.avgRir) : null;
+  const priorTargetRir = prior ? parseRirTarget(prior.rir) : null;
 
-  if (ex.rirCap != null && currentTargetRir != null && currentTargetRir < ex.rirCap) {
-    return { weight: Math.min(defaultWt, priorWt), note: `⚠ Holding conservative load — this lift has a ${ex.rirCap}+ RIR safety cap` };
-  }
-
-  if (calibration) {
-    if (observedReps != null && observedReps < minReps) {
-      const weight = Math.max(0, defaultWt - minStep);
-      return { weight, note: `↓ One increment below default — pre-failure sets averaged below ${minReps} reps (${defaultWt} → ${weight} lb)` };
-    }
-    if (observedReps != null && observedReps > maxReps) {
-      const weight = defaultWt + minStep;
-      return { weight, note: `↑ One increment above default — pre-failure sets exceeded the ${maxReps}-rep range (${defaultWt} → ${weight} lb)` };
-    }
-    return { weight: defaultWt, note: `⏸ Using programmed default ${defaultWt} lb — calibration data supports staying in range` };
-  }
-
-  if (actualRir == null || !Number.isFinite(actualRir) || previousTargetRir == null || currentTargetRir == null) {
-    return { weight: defaultWt, note: `Using programmed default ${defaultWt} lb — record final-set RIR to personalize the next adjustment` };
-  }
-
-  const rirDifference = actualRir - previousTargetRir;
   let steps = 0;
-  let reason = `prior reps and RIR support the programmed progression`;
+  let reason = "recent performance supports the programmed progression";
+  const belowFloor = observedReps != null && observedReps < minReps;
+  const materiallyHard = actualRir != null && previousTargetRir != null && actualRir <= previousTargetRir - 1.5;
+  const aboveCeiling = observedReps != null && observedReps > maxReps;
+  const materiallyEasy = actualRir != null && previousTargetRir != null && actualRir >= previousTargetRir + 1.5;
+  const priorEasy = prior && (
+    (Number.isFinite(priorReps) && priorReps > maxReps) ||
+    (Number.isFinite(priorRir) && priorTargetRir != null && priorRir >= priorTargetRir + 1.5)
+  );
 
-  if ((observedReps != null && observedReps < minReps)
-      || (observedReps != null && observedReps < targetReps - 1 && actualRir < currentTargetRir)
-      || rirDifference <= -1.5) {
+  // One clearly under-range session warrants a conservative reduction.
+  // Increases require repeated easy evidence, limiting reactions to a good day.
+  if (belowFloor) {
     steps = -1;
-    reason = `prior performance was too hard for the prescribed reps/RIR`;
-  } else if ((observedReps != null && observedReps > maxReps)
-      || (observedReps != null && observedReps >= targetReps + 1 && actualRir >= currentTargetRir)
-      || rirDifference >= 1.5) {
+    reason = `sets averaged below the ${minReps}-rep floor`;
+  } else if (materiallyHard && (prior || actualRir <= previousTargetRir - 2)) {
+    steps = -1;
+    reason = "performance indicates the load is consistently too demanding";
+  } else if ((aboveCeiling || materiallyEasy) && (priorEasy || aboveCeiling)) {
     steps = 1;
-    reason = `prior performance supports a small increase above the programmed default`;
+    reason = "repeated or clearly above-range performance supports a small increase";
+  } else if (observedReps != null && observedReps < targetReps - 1 && actualRir != null && currentTargetRir != null && actualRir < currentTargetRir) {
+    steps = -1;
+    reason = "reps and RIR were both below target";
+  } else if (observedReps != null && observedReps >= targetReps + 1 && actualRir != null && currentTargetRir != null && actualRir >= currentTargetRir && priorEasy) {
+    steps = 1;
+    reason = "two sessions support a small increase";
   }
 
+  // Keep knee-sensitive lifts at or below the programmed default.
+  if (ex.rirCap != null) steps = Math.min(0, steps);
   const weight = Math.max(0, defaultWt + steps * minStep);
   const note = steps === 0
     ? `⏸ Using programmed default ${defaultWt} lb — ${reason}`
-    : `${steps > 0 ? "↑" : "↓"} Adjusting one increment from default — ${reason} (${defaultWt} → ${weight} lb)`;
+    : `${steps > 0 ? "↑" : "↓"} Recalibrated from default — ${reason}; the planned weekly increments remain intact (${defaultWt} → ${weight} lb)`;
   return { weight, note };
 }
 
@@ -1902,7 +1895,19 @@ function saveSessionPerformance(allSets, sessionKey, weekNumber, rir, mesoPrefix
     // Use last set's RIR — the only set performed under full accumulated fatigue
     const setsWithRir = setArr.filter(s => s.rir != null);
     const lastRir = setsWithRir.length > 0 ? setsWithRir[setsWithRir.length - 1].rir : null;
-    perf[exName] = { avgWt, avgReps, avgWtX, avgRepsX, weekNumber, rir, avgRir: lastRir };
+    const entry = { avgWt, avgReps, avgWtX, avgRepsX, weekNumber, rir, avgRir: lastRir };
+    const previous = perf[exName] || {};
+    const history = Array.isArray(previous.history) ? previous.history : (
+      previous.weekNumber != null ? [{
+        avgWt: previous.avgWt, avgReps: previous.avgReps, avgWtX: previous.avgWtX,
+        avgRepsX: previous.avgRepsX, weekNumber: previous.weekNumber,
+        rir: previous.rir, avgRir: previous.avgRir,
+      }] : []
+    );
+    const nextHistory = [...history.filter(item => Number(item.weekNumber) !== Number(weekNumber)), entry]
+      .sort((a, b) => Number(a.weekNumber) - Number(b.weekNumber))
+      .slice(-6);
+    perf[exName] = { ...entry, history: nextHistory };
   });
   try { localStorage.setItem(perfKey, JSON.stringify(perf)); } catch(e) {}
 }
