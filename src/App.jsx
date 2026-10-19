@@ -849,7 +849,7 @@ function getMeso5LoadRecommendation(ex, perf, targetWeek, currentRirLabel, minSt
   let note = null;
 
   const jump = weight - lastWt;
-  const tooLargeJump = jump > Math.max(step, lastWt * 0.05) + 0.001;
+  const tooLargeJump = jump > Math.max(0.001, lastWt * 0.05) + 0.001;
   const repsAtPreviousTarget = Number.isFinite(observedReps) && observedReps >= lastTargetReps;
   const notClearlyHard = actualRir == null || lastTargetRir == null || actualRir >= lastTargetRir - 0.5;
   const nextRepTarget = MESO5_REP_STEPS.find(value => value > lastTargetReps && value <= maxReps);
