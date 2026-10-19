@@ -2101,7 +2101,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
   const [historyRefresh, setHistoryRefresh] = useState(0);
   useEffect(() => {
     if (!ex.wt || wkData.deload) return;
-    const perfKey = 'training-hub-perf-' + mesoPrefix.replace(/\\s+/g, '-');
+    const perfKey = 'training-hub-perf-' + mesoPrefix.replace(/\s+/g, '-');
     let stored = {};
     try { stored = JSON.parse(localStorage.getItem(perfKey) || '{}'); } catch(e) {}
     const current = stored[ex.name];
