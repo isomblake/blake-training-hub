@@ -2096,6 +2096,44 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
     return { smartTarget: adjusted !== baseTarget ? adjusted : null, progressNote: note || null, smartTargetReps: repsAdj };
   }
 
+  // Rehydrate per-set reps for performance records created before setReps was added.
+  // Older localStorage summaries otherwise mask the richer set-level data already in Supabase.
+  const [historyRefresh, setHistoryRefresh] = useState(0);
+  useEffect(() => {
+    if (!ex.wt || wkData.deload) return;
+    const perfKey = 'training-hub-perf-' + mesoPrefix.replace(/\\s+/g, '-');
+    let stored = {};
+    try { stored = JSON.parse(localStorage.getItem(perfKey) || '{}'); } catch(e) {}
+    const current = stored[ex.name];
+    if (!current || Array.isArray(current.setReps)) return;
+    let cancelled = false;
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    db.getLastSessionForExercise(ex.name, tomorrow, mesoPrefix).then(last => {
+      if (cancelled || !last || !Array.isArray(last.sets) || !last.sets.length) return;
+      const setReps = [...last.sets]
+        .sort((a, b) => Number(a.set_number) - Number(b.set_number))
+        .map(s => Number.parseInt(s.reps, 10))
+        .filter(n => Number.isFinite(n) && n > 0);
+      if (!setReps.length) return;
+      let latest = {};
+      try { latest = JSON.parse(localStorage.getItem(perfKey) || '{}'); } catch(e) {}
+      const record = latest[ex.name];
+      if (!record || Array.isArray(record.setReps)) return;
+      record.setReps = setReps;
+      if (Array.isArray(record.history)) {
+        const targetIndex = record.history.findIndex(h => Number(h.weekNumber) === Number(record.weekNumber));
+        if (targetIndex >= 0 && !Array.isArray(record.history[targetIndex].setReps)) {
+          record.history[targetIndex] = { ...record.history[targetIndex], setReps };
+        }
+      }
+      try {
+        localStorage.setItem(perfKey, JSON.stringify(latest));
+        setHistoryRefresh(v => v + 1);
+      } catch(e) {}
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [ex.name, ex.wt, week, mesoPrefix, wkData.deload]);
+
   // Fast path: read from localStorage (written at session finish)
   const lsResult = useMemo(() => {
     if (!ex.wt || wkData.deload) return null;
@@ -2109,7 +2147,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
       return computeAdjustment(last.avgWtX, last.avgRepsX, last.weekNumber || 0, last.rir || "", null, last);
     }
     return computeAdjustment(last.avgWt, last.avgReps, last.weekNumber || 0, last.rir || "", last.avgRir ?? null, last);
-  }, [ex.name, ex.wt, ex.reps, ex.calibration, week, mesoPrefix, baseTarget, weeklyAdd, minStep, wkData.deload]);
+  }, [ex.name, ex.wt, ex.reps, ex.calibration, week, mesoPrefix, baseTarget, weeklyAdd, minStep, wkData.deload, historyRefresh]);
 
   // Async DB fallback: only fires when localStorage has no data for this exercise
   const [dbResult, setDbResult] = useState(null);
