@@ -684,7 +684,8 @@ const db = {
   },
 
   async getHealthDaily(limit = 400) {
-    const { data } = await supabase.from('health_daily').select('*').order('date', { ascending: true }).limit(limit);
+    const { data, error } = await supabase.from('health_daily').select('*').order('date', { ascending: true }).limit(limit);
+    if (error) throw error;
     return data || [];
   }
 };
@@ -717,6 +718,155 @@ function getExCategory(name, rest) {
   return "iso"; // cable/landmine isolation
 }
 
+function parseRirTarget(rir) {
+  const values = (String(rir ?? "").match(/\d+(?:\.\d+)?/g) || []).map(Number);
+  if (!values.length) return null;
+  if (String(rir).includes("+")) return values[0];
+  return values.length > 1 ? (values[0] + values[1]) / 2 : values[0];
+}
+
+function getRepRangeBounds(repRange) {
+  const values = String(repRange ?? "").split("-").map(v => Number(v.trim()));
+  if (!values.length || !Number.isFinite(values[0])) return [1, 30];
+  const min = values[0];
+  const max = Number.isFinite(values[1]) ? values[1] : min;
+  return [Math.min(min, max), Math.max(min, max)];
+}
+
+function getMeso5TargetReps(ex) {
+  const [min, max] = getRepRangeBounds(ex.reps);
+  const configured = Number(ex.targetReps);
+  const target = Number.isFinite(configured) && configured > 0
+    ? configured
+    : Math.round((min + max) / 2);
+  return Math.max(min, Math.min(max, Math.round(target)));
+}
+
+const MESO5_REP_STEPS = [8, 10, 12, 15, 16, 18, 20];
+
+function getMeso5ProgrammedWeight(ex, targetWeek, minStep) {
+  if (ex.wt == null || !Number.isFinite(Number(ex.wt))) return null;
+  const step = Number(minStep) > 0 ? Number(minStep) : 2.5;
+  const cfg = MESO5_WEEKS[Math.max(0, Math.min(MESO5_WEEKS.length - 1, (Number(targetWeek) || 1) - 1))];
+  const category = getExCategory(ex.name, ex.rest);
+  const plannedAdd = cfg && !cfg.deload ? (Number(cfg[category]) || 0) : 0;
+  return Math.max(0, Math.round((Number(ex.wt) + plannedAdd) / step) * step);
+}
+
+function getMeso5LoadRecommendation(ex, perf, targetWeek, currentRirLabel, minStep, fallbackWt) {
+  const step = Number(minStep) > 0 ? Number(minStep) : 2.5;
+  const fallback = fallbackWt ?? getMeso5ProgrammedWeight(ex, targetWeek, step) ?? ex.wt ?? null;
+  if (fallback == null || !Number.isFinite(Number(fallback))) {
+    return { weight: null, targetReps: getMeso5TargetReps(ex), note: null };
+  }
+
+  const defaultWt = Math.max(0, Math.round(Number(fallback) / step) * step);
+  const defaultTargetReps = getMeso5TargetReps(ex);
+  if (!perf || (perf.avgWt == null && !Array.isArray(perf.history))) {
+    return { weight: defaultWt, targetReps: defaultTargetReps, note: null };
+  }
+
+  // Normalize legacy single-record entries and keep only valid completed weeks.
+  const rawHistory = Array.isArray(perf.history) && perf.history.length ? perf.history : [perf];
+  const history = rawHistory
+    .filter(item => item && Number(item.weekNumber) > 0 && Number(item.weekNumber) < Number(targetWeek))
+    .slice()
+    .sort((a, b) => (Number(a.weekNumber) - Number(b.weekNumber)) ||
+      String(a.sessionKey || "").localeCompare(String(b.sessionKey || "")));
+  if (!history.length) return { weight: defaultWt, targetReps: defaultTargetReps, note: null };
+
+  const last = history[history.length - 1];
+  if (last.avgWt == null || !Number.isFinite(Number(last.avgWt))) {
+    return { weight: defaultWt, targetReps: defaultTargetReps, note: null };
+  }
+
+  const lastWeek = Number(last.weekNumber) || 0;
+  const lastWt = Math.max(0, Math.round(Number(last.avgWt) / step) * step);
+  const bounds = getRepRangeBounds(ex.reps);
+  const minReps = bounds[0], maxReps = bounds[1];
+  const observedReps = last.avgReps == null || last.avgReps === "" ? NaN : Number(last.avgReps);
+  const actualRir = last.avgRir == null ? null : Number(last.avgRir);
+  const lastTargetRir = parseRirTarget(last.rir);
+  const lastTargetRecorded = Number(last.targetReps);
+  const lastTargetReps = Number.isFinite(lastTargetRecorded)
+    ? Math.max(minReps, Math.min(maxReps, Math.round(lastTargetRecorded)))
+    : defaultTargetReps;
+
+  // Carry the offset from the programmed schedule forward, but cap it at two
+  // equipment increments in either direction to avoid runaway recalibration.
+  const programmedAtLastWeek = getMeso5ProgrammedWeight(ex, lastWeek, step);
+  let correctionSteps = programmedAtLastWeek == null ? 0 :
+    Math.round((lastWt - programmedAtLastWeek) / step);
+  correctionSteps = Math.max(-2, Math.min(2, correctionSteps));
+
+  // Use two consecutive sessions for ordinary adjustments. A missed minimum
+  // or an exceptionally hard session can justify a single-session reduction.
+  const prior = history.length > 1 ? history[history.length - 2] : null;
+  const priorReps = prior && prior.avgReps != null && prior.avgReps !== "" ? Number(prior.avgReps) : null;
+  const priorRir = prior && prior.avgRir != null ? Number(prior.avgRir) : null;
+  const priorTargetRir = prior ? parseRirTarget(prior.rir) : null;
+  const belowFloor = Number.isFinite(observedReps) && observedReps < minReps;
+  const aboveCeiling = Number.isFinite(observedReps) && observedReps > maxReps;
+  const materiallyHard = actualRir != null && lastTargetRir != null && actualRir <= lastTargetRir - 1.5;
+  const veryHard = actualRir != null && lastTargetRir != null && actualRir <= lastTargetRir - 2;
+  const materiallyEasy = actualRir != null && lastTargetRir != null && actualRir >= lastTargetRir + 1.5;
+  const priorHard = !!prior && (
+    (Number.isFinite(priorReps) && priorReps < minReps) ||
+    (priorRir != null && priorTargetRir != null && priorRir <= priorTargetRir - 1.5)
+  );
+  const priorEasy = !!prior && (
+    (Number.isFinite(priorReps) && priorReps > maxReps) ||
+    (priorRir != null && priorTargetRir != null && priorRir >= priorTargetRir + 1.5)
+  );
+
+  let adjustment = 0;
+  if (belowFloor || (materiallyHard && (priorHard || veryHard))) adjustment = -1;
+  else if (aboveCeiling || (materiallyEasy && priorEasy)) adjustment = 1;
+
+  // Knee-sensitive lifts keep their planned progression but never receive
+  // an extra performance-driven upward correction.
+  if (ex.noAutoLoadIncrease) {
+    correctionSteps = Math.min(0, correctionSteps);
+    adjustment = Math.min(0, adjustment);
+  }
+  correctionSteps = Math.max(-2, Math.min(2, correctionSteps + adjustment));
+
+  let weight = Math.max(0, defaultWt + correctionSteps * step);
+  let targetReps = Math.min(maxReps, Math.max(defaultTargetReps, lastTargetReps));
+  let note = null;
+
+  // If the equipment jump is too large relative to the current working load,
+  // build reps first. Use a floor so low-load isolation movements still get
+  // a meaningful threshold rather than a near-zero percentage calculation.
+  const jump = weight - lastWt;
+  const tooLargeJump = jump > Math.max(step, lastWt * 0.05) + 0.001;
+  const repsAtPreviousTarget = Number.isFinite(observedReps) && observedReps >= lastTargetReps;
+  const notClearlyHard = actualRir == null || lastTargetRir == null || actualRir >= lastTargetRir - 0.5;
+  const nextRepTarget = [8, 10, 12, 15, 16, 18, 20].find(value => value > lastTargetReps && value <= maxReps);
+
+  if (weight > lastWt && (!repsAtPreviousTarget || !notClearlyHard)) {
+    weight = lastWt;
+    targetReps = Math.min(maxReps, Math.max(defaultTargetReps, lastTargetReps));
+    note = "Holding load until the previous rep target is achieved at the planned effort";
+  } else if (tooLargeJump && targetReps < maxReps) {
+    weight = lastWt;
+    if (repsAtPreviousTarget && notClearlyHard && nextRepTarget != null) {
+      targetReps = nextRepTarget;
+      note = "Holding " + lastWt + " lb and building toward " + targetReps +
+        " reps before taking the larger load jump";
+    } else {
+      targetReps = Math.min(maxReps, Math.max(defaultTargetReps, lastTargetReps));
+      note = "Holding " + lastWt + " lb until reps support the next increase";
+    }
+  } else if (weight > lastWt) {
+    targetReps = defaultTargetReps;
+    note = "Load increased within the progression guardrail; reps reset to the programmed target";
+  } else if (weight < defaultWt || correctionSteps !== 0) {
+    note = "Programmed load recalibrated from recent performance: " + defaultWt + " → " + weight + " lb";
+  }
+
+  return { weight, targetReps, note };
+}
 // ============================================================
 // MESOCYCLE DEFINITIONS
 // Each mesocycle has its own routines, weeks config, and date range.
@@ -1229,53 +1379,55 @@ const MESO4_ROUTINES = {
 // Thanksgiving is now a normal training period; Christmas travel is outside this mesocycle. Knee-sensitive quad work remains optional.
 const MESO5_ROUTINES = {
   "Upper A": { day:"D1", sections:[
-    {name:"Chest",exercises:[{name:"Smith Flat Bench Press",muscles:"Chest",sets:5,reps:"10-15",rest:120,wt:120,vid:"https://www.muscleandstrength.com/exercises/smith-machine-bench-press.html",src:"M&S"}]},
-    {name:"Back",exercises:[{name:"Cable Lat Pulldown (Close)",muscles:"Lats",sets:5,reps:"8-12",rest:120,wt:190,vid:"https://www.muscleandstrength.com/exercises/close-grip-pull-down.html",src:"M&S"}]},
+    {name:"Chest",exercises:[{name:"Smith Flat Bench Press",muscles:"Chest",sets:5,reps:"8-12",targetReps:10,rest:120,wt:120,vid:"https://www.muscleandstrength.com/exercises/smith-machine-bench-press.html",src:"M&S"}]},
+    {name:"Back",exercises:[{name:"Cable Lat Pulldown (Close)",muscles:"Lats",sets:5,reps:"8-12",targetReps:10,rest:120,wt:190,vid:"https://www.muscleandstrength.com/exercises/close-grip-pull-down.html",src:"M&S"}]},
     {name:"Shoulders",exercises:[
-      {name:"DB Lateral Raise",muscles:"Side Delts",sets:3,reps:"15-20",rest:60,wt:10,addSets:{3:1},vid:"https://www.youtube.com/watch?v=4hTUCDUQaNA",src:"YouTube"},
-      {name:"Cable Face Pull (Rope)",muscles:"Rear Delts",sets:4,reps:"15-20",rest:60,wt:72.5,vid:"https://www.muscleandstrength.com/exercises/cable-face-pull",src:"M&S"}]},
+      {name:"DB Lateral Raise",muscles:"Side Delts",sets:3,reps:"12-20",targetReps:15,rest:60,wt:10,addSets:{3:1},vid:"https://www.youtube.com/watch?v=4hTUCDUQaNA",src:"YouTube"},
+      {name:"Cable Face Pull (Rope)",muscles:"Rear Delts",sets:4,reps:"12-20",targetReps:15,rest:60,wt:72.5,vid:"https://www.muscleandstrength.com/exercises/cable-face-pull",src:"M&S"}]},
     {name:"Arms",exercises:[
-      {name:"Cable EZ Bar Curl",muscles:"Biceps",sets:4,reps:"8-12",rest:90,wt:50,vid:"https://www.muscleandstrength.com/exercises/cable-curl.html",src:"M&S"},
-      {name:"Cable OH Tricep Extension",muscles:"Triceps",sets:3,reps:"10-15",rest:90,wt:45,calibration:true,addSets:{3:1},vid:"https://www.muscleandstrength.com/exercises/standing-low-pulley-overhead-tricep-extension-(rope-extension).html",src:"M&S"}]}
+      {name:"Cable EZ Bar Curl",muscles:"Biceps",sets:4,reps:"10-15",targetReps:12,rest:90,wt:50,vid:"https://www.muscleandstrength.com/exercises/cable-curl.html",src:"M&S"},
+      {name:"Cable OH Tricep Extension",muscles:"Triceps",sets:3,reps:"10-15",targetReps:12,rest:90,wt:45,calibration:true,addSets:{3:1},vid:"https://www.muscleandstrength.com/exercises/standing-low-pulley-overhead-tricep-extension-(rope-extension).html",src:"M&S"}]}
   ]},
   "Lower A": { day:"D2", sections:[
     {name:"Quads",exercises:[
-      {name:"Smith Front Squat",muscles:"Quads · Glutes",sets:3,reps:"8-10",rest:150,wt:135,rirCap:4,note:"Optional: skip if knee symptoms are present or worsen; reintroduce conservatively and stop if painful",vid:"https://www.muscleandstrength.com/exercises/smith-machine-front-squat.html",src:"M&S"},
-      {name:"Leg Extension",muscles:"Quads",sets:3,reps:"15-20",rest:90,wt:80,rirCap:4,note:"Optional: skip if knee symptoms are present or worsen; use controlled, pain-free range only",vid:"https://www.muscleandstrength.com/exercises/leg-extension.html",src:"M&S"}]},
-    {name:"Hamstrings",exercises:[{name:"Smith Stiff-Leg Deadlift",muscles:"Hams · Glutes",sets:3,reps:"8-10",rest:150,wt:145,vid:"https://www.muscleandstrength.com/exercises/smith-machine-stiff-leg-deadlift.html",src:"M&S"}]},
-    {name:"Calves",exercises:[{name:"Smith Deficit Calf Raise",muscles:"Calves",sets:4,reps:"15-20",rest:60,wt:135,note:"Keep only if pain-free and not worse later or next morning",vid:"https://www.muscleandstrength.com/exercises/smith-machine-calf-raise.html",src:"M&S"}]},
+      {name:"Smith Front Squat",muscles:"Quads · Glutes",sets:3,reps:"8-10",targetReps:10,rest:150,wt:135,rirCap:4,noAutoLoadIncrease:true,note:"Optional: skip if knee symptoms are present or worsen; reintroduce conservatively and stop if painful",vid:"https://www.muscleandstrength.com/exercises/smith-machine-front-squat.html",src:"M&S"},
+      {name:"Leg Extension",muscles:"Quads",sets:3,reps:"12-20",targetReps:15,rest:90,wt:80,rirCap:4,noAutoLoadIncrease:true,note:"Optional: skip if knee symptoms are present or worsen; use controlled, pain-free range only",vid:"https://www.muscleandstrength.com/exercises/leg-extension.html",src:"M&S"}]},
+    {name:"Hamstrings",exercises:[{name:"Smith Stiff-Leg Deadlift",muscles:"Hams · Glutes",sets:3,reps:"8-12",targetReps:10,rest:150,wt:145,vid:"https://www.muscleandstrength.com/exercises/smith-machine-stiff-leg-deadlift.html",src:"M&S"}]},
+    {name:"Calves",exercises:[{name:"Smith Deficit Calf Raise",muscles:"Calves",sets:4,reps:"10-20",targetReps:15,rest:60,wt:135,note:"Keep only if pain-free and not worse later or next morning",vid:"https://www.muscleandstrength.com/exercises/smith-machine-calf-raise.html",src:"M&S"}]},
     {name:"Core + Delts",exercises:[
-      {name:"Cable Crunch (Kneeling)",muscles:"Abs",sets:3,reps:"12-15",rest:60,wt:80,calibration:true,calibrationWeeks:[1],vid:"https://www.muscleandstrength.com/exercises/cable-crunch.html",src:"M&S"},
-      {name:"Cable Upright Row",muscles:"Side Delts",sets:3,reps:"15-20",rest:60,wt:47.5,note:"Wide grip; elbows lead; stop below shoulder height",vid:"https://www.muscleandstrength.com/exercises/cable-upright-row.html",src:"M&S"}]}
+      {name:"Cable Crunch (Kneeling)",muscles:"Abs",sets:3,reps:"10-20",targetReps:15,rest:60,wt:80,calibration:true,calibrationWeeks:[1],vid:"https://www.muscleandstrength.com/exercises/cable-crunch.html",src:"M&S"},
+      {name:"Cable Upright Row",muscles:"Side Delts",sets:3,reps:"12-20",targetReps:15,rest:60,wt:47.5,note:"Wide grip; elbows lead; stop below shoulder height",vid:"https://www.muscleandstrength.com/exercises/cable-upright-row.html",src:"M&S"}]}
   ]},
   "Upper B": { day:"D3", sections:[
-    {name:"Chest",exercises:[{name:"Smith Incline Press",muscles:"Upper Chest",sets:5,reps:"10-15",rest:120,wt:80,vid:"https://www.muscleandstrength.com/exercises/incline-smith-machine-bench-press.html",src:"M&S"}]},
-    {name:"Back",exercises:[{name:"Seated Cable Row (Neutral)",muscles:"Upper Back · Lats",sets:5,reps:"8-12",rest:120,wt:175,vid:"https://www.muscleandstrength.com/exercises/seated-row.html",src:"M&S"}]},
+    {name:"Chest",exercises:[{name:"Smith Incline Press",muscles:"Upper Chest",sets:5,reps:"8-12",targetReps:10,rest:120,wt:80,vid:"https://www.muscleandstrength.com/exercises/incline-smith-machine-bench-press.html",src:"M&S"}]},
+    {name:"Back",exercises:[{name:"Seated Cable Row (Neutral)",muscles:"Upper Back · Lats",sets:5,reps:"8-12",targetReps:10,rest:120,wt:175,vid:"https://www.muscleandstrength.com/exercises/seated-row.html",src:"M&S"}]},
     {name:"Shoulders",exercises:[
-      {name:"Cable Cross-Body Lateral",muscles:"Side Delts",sets:3,reps:"15-20",rest:60,wt:5,addSets:{3:1},note:"Single arm, low pulley, across body",vid:"https://www.muscleandstrength.com/exercises/one-arm-cable-lateral-raise.html",src:"M&S"},
-      {name:"Cable Rear Delt Fly",muscles:"Rear Delts",sets:4,reps:"15-20",rest:60,wt:2.5,note:"Build reps to 20 before trying 5 lb",vid:"https://www.muscleandstrength.com/exercises/standing-cable-flys.html",src:"M&S"}]},
+      {name:"Cable Cross-Body Lateral",muscles:"Side Delts",sets:3,reps:"12-20",targetReps:15,rest:60,wt:5,addSets:{3:1},note:"Single arm, low pulley, across body",vid:"https://www.muscleandstrength.com/exercises/one-arm-cable-lateral-raise.html",src:"M&S"},
+      {name:"Cable Rear Delt Fly",muscles:"Rear Delts",sets:4,reps:"12-20",targetReps:15,rest:60,wt:2.5,note:"Build reps to 20 before trying 5 lb",vid:"https://www.muscleandstrength.com/exercises/standing-cable-flys.html",src:"M&S"}]},
     {name:"Arms",exercises:[
-      {name:"Cable Bayesian Curl",muscles:"Biceps",sets:4,reps:"8-12",rest:90,wt:22.5,calibration:true,vid:"https://barbend.com/bayesian-curl/",src:"BarBend"},
-      {name:"Cable Pushdown (Bar)",muscles:"Triceps",sets:3,reps:"8-12",rest:90,wt:70,addSets:{3:1},vid:"https://www.muscleandstrength.com/exercises/tricep-extension.html",src:"M&S"}]}
+      {name:"Cable Bayesian Curl",muscles:"Biceps",sets:4,reps:"10-15",targetReps:12,rest:90,wt:22.5,calibration:true,vid:"https://barbend.com/bayesian-curl/",src:"BarBend"},
+      {name:"Cable Pushdown (Bar)",muscles:"Triceps",sets:3,reps:"10-15",targetReps:12,rest:90,wt:70,addSets:{3:1},vid:"https://www.muscleandstrength.com/exercises/tricep-extension.html",src:"M&S"}]}
   ]},
   "Lower B": { day:"D4", sections:[
-    {name:"Quads",exercises:[{name:"Smith Back Squat",muscles:"Quads · Glutes",sets:3,reps:"8-10",rest:150,wt:135,rirCap:4,note:"Optional: skip if knee symptoms are present or worsen; reintroduce conservatively and stop if painful",vid:"https://www.muscleandstrength.com/exercises/smith-machine-squat.html",src:"M&S"}]},
-    {name:"Calves",exercises:[{name:"Smith Deficit Calf Raise",muscles:"Calves",sets:4,reps:"15-20",rest:60,wt:135,note:"Keep only if pain-free and not worse later or next morning",vid:"https://www.muscleandstrength.com/exercises/smith-machine-calf-raise.html",src:"M&S"}]},
-    {name:"Hamstrings",exercises:[{name:"Barbell RDL",muscles:"Hamstrings · Glutes",sets:3,reps:"8-10",rest:150,wt:115,vid:"https://www.youtube.com/watch?v=_oyxCn2iSjU",src:"YouTube"}]},
-    {name:"Glutes",exercises:[{name:"Smith Hip Thrust",muscles:"Glutes",sets:3,reps:"8-12",rest:120,wt:130,addSets:{3:1},note:"Keep only if knee remains comfortable",vid:"https://www.muscleandstrength.com/exercises/barbell-hip-thrust.html",src:"M&S"}]},
+    {name:"Quads",exercises:[{name:"Smith Back Squat",muscles:"Quads · Glutes",sets:3,reps:"8-10",targetReps:10,rest:150,wt:135,rirCap:4,noAutoLoadIncrease:true,note:"Optional: skip if knee symptoms are present or worsen; reintroduce conservatively and stop if painful",vid:"https://www.muscleandstrength.com/exercises/smith-machine-squat.html",src:"M&S"}]},
+    {name:"Calves",exercises:[{name:"Smith Deficit Calf Raise",muscles:"Calves",sets:4,reps:"10-20",targetReps:15,rest:60,wt:135,note:"Keep only if pain-free and not worse later or next morning",vid:"https://www.muscleandstrength.com/exercises/smith-machine-calf-raise.html",src:"M&S"}]},
+    {name:"Hamstrings",exercises:[{name:"Barbell RDL",muscles:"Hamstrings · Glutes",sets:3,reps:"8-12",targetReps:10,rest:150,wt:115,vid:"https://www.youtube.com/watch?v=_oyxCn2iSjU",src:"YouTube"}]},
+    {name:"Glutes",exercises:[{name:"Smith Hip Thrust",muscles:"Glutes",sets:3,reps:"8-12",targetReps:10,rest:120,wt:130,addSets:{3:1},note:"Keep only if knee remains comfortable",vid:"https://www.muscleandstrength.com/exercises/barbell-hip-thrust.html",src:"M&S"}]},
     {name:"Core + Delts",exercises:[
-      {name:"Hanging Straight-Leg Raise",muscles:"Abs",sets:3,reps:"8-15",rest:60,wt:null,bodyweight:true,vid:"https://www.muscleandstrength.com/exercises/hanging-leg-raise.html",src:"M&S"},
-      {name:"Cable Upright Row",muscles:"Side Delts",sets:3,reps:"15-20",rest:60,wt:47.5,note:"Wide grip; stop below shoulder height",vid:"https://www.muscleandstrength.com/exercises/cable-upright-row.html",src:"M&S"}]}
+      {name:"Hanging Straight-Leg Raise",muscles:"Abs",sets:3,reps:"8-15",targetReps:10,rest:60,wt:null,bodyweight:true,vid:"https://www.muscleandstrength.com/exercises/hanging-leg-raise.html",src:"M&S"},
+      {name:"Cable Upright Row",muscles:"Side Delts",sets:3,reps:"12-20",targetReps:15,rest:60,wt:47.5,note:"Wide grip; stop below shoulder height",vid:"https://www.muscleandstrength.com/exercises/cable-upright-row.html",src:"M&S"}]}
   ]}
 };
 
 const MESO5_WEEKS = [
- {rir:"4 RIR",note:"W1 · Completed; conservative re-entry, unchanged",smith:0,cable:0,iso:0,deload:false},
- {rir:"3–4 RIR",note:"W2 · Build reps; progress only tolerated movements",smith:0,cable:0,iso:0,deload:false},
- {rir:"3 RIR",note:"W3 · Add load only after reaching the top of the rep range with target RIR",smith:5,cable:2.5,iso:0,deload:false},
- {rir:"2–3 RIR",note:"W4 · Productive accumulation; no forced reps",smith:5,cable:2.5,iso:0,deload:false},
- {rir:"1–2 RIR",note:"W5 · Hardest week; compounds stay controlled and knee-sensitive lifts stay symptom-limited",smith:5,cable:5,iso:2.5,deload:false},
- {rir:"4–5+ RIR",note:"DELOAD · 2 sets per exercise · use a comfortably lighter load (typically ~80–90% of recent working load); no grinding",smith:0,cable:0,iso:0,deload:true},
+ // Default progression is the starting plan; actual performance/RIR can override it.
+ // Values are cumulative additions to the programmed starting load, not week-over-week jumps.
+ {rir:"4 RIR",note:"W1 · Conservative re-entry; use the programmed starting load",smith:0,cable:0,iso:0,deload:false},
+ {rir:"3–4 RIR",note:"W2 · Default: +5 lb Smith / +2.5 lb cable compound; adjust from logged performance",smith:5,cable:2.5,iso:0,deload:false},
+ {rir:"3 RIR",note:"W3 · Default: +5 lb Smith / +5 lb cable compound / +2.5 lb isolation; adapt to reps and RIR",smith:5,cable:5,iso:2.5,deload:false},
+ {rir:"2–3 RIR",note:"W4 · Default: +10 lb Smith / +7.5 lb cable compound / +2.5 lb isolation; adapt to performance",smith:10,cable:7.5,iso:2.5,deload:false},
+ {rir:"1–2 RIR",note:"W5 · Default: +10 lb Smith / +10 lb cable compound / +5 lb isolation; adapt to performance and keep knee-sensitive work symptom-limited",smith:10,cable:10,iso:5,deload:false},
+ {rir:"4–5+ RIR",note:"DELOAD · 2 sets per exercise · use about 50% of the recent working load; no grinding",smith:0,cable:0,iso:0,deload:true},
 ];
 
 // Deload only has 1 "week" — no progression
@@ -1422,7 +1574,7 @@ const SetRow = React.memo(function SetRow({ setNum, isLastSet, targetReps, targe
   const handleLog = () => {
     const weight = isBW ? 0 : parseFloat(editWt);
     if (editReps && (isBW || editWt)) {
-      const data = { reps: parseInt(editReps), wt: weight };
+      const data = { reps: parseInt(editReps), wt: weight, targetReps: parseInt(targetReps, 10) || null };
       if (band) data.band = band;
       const wasEditing = editing;
       onLog(setNum, data);
@@ -1452,7 +1604,7 @@ const SetRow = React.memo(function SetRow({ setNum, isLastSet, targetReps, targe
     const r = editReps || targetReps;
     const w = isBW ? 0 : parseFloat(editWt || targetWt || 0);
     if (r && (isBW || w)) {
-      const data = { reps: parseInt(r), wt: w };
+      const data = { reps: parseInt(r), wt: w, targetReps: parseInt(targetReps, 10) || null };
       if (band) data.band = band;
       onLog(setNum, data);
       setEditing(false);
@@ -1673,7 +1825,7 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone, nextSetInfo, on
                 return (
                   <button key={r} onClick={() => {
                       const reps = parseInt(logReps); const w = nsi.isBW ? 0 : parseFloat(logWt);
-                      if (reps && (nsi.isBW || w >= 0)) { onLogFromTimer(nsi.exName, nsi.nextSetNum, { reps, wt: w, rir: rirVal }, nsi); }
+                      if (reps && (nsi.isBW || w >= 0)) { onLogFromTimer(nsi.exName, nsi.nextSetNum, { reps, wt: w, rir: rirVal, targetReps: parseInt(nsi.targetReps, 10) || null }, nsi); }
                     }}
                     style={{ flex: 1, padding: "18px 0", borderRadius: 14, border: `1px solid ${C.pur}55`, background: C.pur + "22", color: C.pur, fontSize: 20, fontWeight: 800, cursor: "pointer" }}>
                     {r}
@@ -1683,7 +1835,7 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone, nextSetInfo, on
             </div>
             <button onClick={() => {
                 const r = parseInt(logReps); const w = nsi.isBW ? 0 : parseFloat(logWt);
-                if (r && (nsi.isBW || w >= 0)) { onLogFromTimer(nsi.exName, nsi.nextSetNum, { reps: r, wt: w }, nsi); }
+                if (r && (nsi.isBW || w >= 0)) { onLogFromTimer(nsi.exName, nsi.nextSetNum, { reps: r, wt: w, targetReps: parseInt(nsi.targetReps, 10) || null }, nsi); }
               }}
               style={{ padding: "10px 32px", borderRadius: 10, border: `1px solid ${C.grn}44`, background: C.grn + "11", color: C.grn, fontSize: 12, fontWeight: 700, cursor: "pointer", marginBottom: 8 }}>
               Log without RIR ✓
@@ -1692,7 +1844,7 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone, nextSetInfo, on
         ) : (
           <button onClick={() => {
               const r = parseInt(logReps); const w = nsi.isBW ? 0 : parseFloat(logWt);
-              if (r && (nsi.isBW || w >= 0)) { onLogFromTimer(nsi.exName, nsi.nextSetNum, { reps: r, wt: w }, nsi); }
+              if (r && (nsi.isBW || w >= 0)) { onLogFromTimer(nsi.exName, nsi.nextSetNum, { reps: r, wt: w, targetReps: parseInt(nsi.targetReps, 10) || null }, nsi); }
             }}
             style={{ padding: "16px 60px", borderRadius: 14, border: "none", background: C.grn, color: C.bg, fontSize: 16, fontWeight: 800, cursor: "pointer", marginBottom: 12 }}>
             Log Set {nsi.nextSetNum} ✓
@@ -1807,7 +1959,25 @@ function saveSessionPerformance(allSets, sessionKey, weekNumber, rir, mesoPrefix
     // Use last set's RIR — the only set performed under full accumulated fatigue
     const setsWithRir = setArr.filter(s => s.rir != null);
     const lastRir = setsWithRir.length > 0 ? setsWithRir[setsWithRir.length - 1].rir : null;
-    perf[exName] = { avgWt, avgReps, avgWtX, avgRepsX, weekNumber, rir, avgRir: lastRir };
+    const targets = setArr.map(s => Number(s.targetReps)).filter(n => Number.isFinite(n) && n > 0);
+    const targetReps = targets.length ? Math.round(targets.reduce((a, b) => a + b, 0) / targets.length) : null;
+    const entry = { avgWt, avgReps, avgWtX, avgRepsX, targetReps, weekNumber, rir, avgRir: lastRir, sessionKey };
+    const previous = perf[exName] || {};
+    const history = Array.isArray(previous.history) ? previous.history : (
+      previous.weekNumber != null ? [{
+        avgWt: previous.avgWt, avgReps: previous.avgReps, avgWtX: previous.avgWtX,
+        avgRepsX: previous.avgRepsX, targetReps: previous.targetReps, weekNumber: previous.weekNumber,
+        rir: previous.rir, avgRir: previous.avgRir, sessionKey: previous.sessionKey,
+      }] : []
+    );
+    const nextHistory = [...history.filter(item => {
+      if (item.sessionKey && sessionKey) return item.sessionKey !== sessionKey;
+      return Number(item.weekNumber) !== Number(weekNumber);
+    }), entry]
+      .sort((a, b) => (Number(a.weekNumber) - Number(b.weekNumber)) ||
+        String(a.sessionKey || "").localeCompare(String(b.sessionKey || "")))
+      .slice(-12);
+    perf[exName] = { ...entry, history: nextHistory };
   });
   try { localStorage.setItem(perfKey, JSON.stringify(perf)); } catch(e) {}
 }
@@ -1853,84 +2023,23 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
     : null;
 
   // Helper: run the progression computation given raw perf data
-  function computeAdjustment(avgWt, avgReps, lastWk, lastRir, lastAvgRir) {
-    if (lastWk > (week + 1)) return {};
-    if (lastWk === (week + 1)) {
-      // Same week: don't add progression, but show actual weight rather than programmed base
-      const holdWt = Math.round(avgWt / minStep) * minStep;
-      return holdWt !== baseTarget ? { smartTarget: holdWt } : {};
+  function computeAdjustment(avgWt, avgReps, lastWk, lastRir, lastAvgRir, perfRecord) {
+    if (mesoPrefix === "Meso 5") {
+      if (lastWk > (week + 1)) return {};
+      const recommendation = getMeso5LoadRecommendation(
+        ex,
+        { ...(perfRecord || {}), avgWt, avgReps, weekNumber: lastWk, rir: lastRir, avgRir: lastAvgRir },
+        week + 1,
+        wkData.rir,
+        minStep,
+        baseTarget
+      );
+      return {
+        smartTarget: recommendation.weight != null && recommendation.weight !== baseTarget ? recommendation.weight : null,
+        progressNote: recommendation.note,
+        smartTargetReps: recommendation.targetReps !== getMeso5TargetReps(ex) ? recommendation.targetReps : null,
+      };
     }
-    // Safety RIR cap — hold weight in weeks where programmed intensity exceeds ex.rirCap
-    if (ex.rirCap != null) {
-      const weekRirTarget = parseInt(wkData.rir);
-      if (!isNaN(weekRirTarget) && weekRirTarget < ex.rirCap) {
-        const holdWt = Math.round(avgWt / minStep) * minStep;
-        return {
-          smartTarget: holdWt !== baseTarget ? holdWt : null,
-          progressNote: `⚠ Holding — week target (${weekRirTarget} RIR) exceeds ${ex.rirCap}+ RIR safety cap`,
-          smartTargetReps: null,
-        };
-      }
-    }
-    const repRange = ex.reps.split("-").map(Number);
-    const minReps = repRange[0], maxReps = repRange[1] || repRange[0];
-    let adjusted, note, repsAdj = null;
-    const targetRirLow = lastRir ? parseInt(lastRir) : null;
-    const rirDiff = (lastAvgRir != null && targetRirLow != null) ? lastAvgRir - targetRirLow : null;
-    if (avgReps < minReps) {
-      // Below rep floor — reduce weight proportional to shortfall so the new rep target is reachable
-      const gap = minReps - avgReps;
-      const stepsDown = (rirDiff != null && rirDiff <= -2)
-        ? Math.max(1, Math.ceil(gap / 2))   // grinding too: reduce more aggressively
-        : Math.floor(gap / 2);               // no grind signal: gentle reduction (1 step per 2-rep gap)
-      if (stepsDown > 0) {
-        adjusted = Math.round((avgWt - stepsDown * minStep) / minStep) * minStep;
-        note = `↓ Reduced ${stepsDown > 1 ? `${stepsDown}× ` : ""}— only ${Math.round(avgReps)} reps last session (min ${minReps}), recalibrating for new range`;
-      } else {
-        adjusted = Math.round(avgWt / minStep) * minStep;
-        note = `⏸ Holding @ ${Math.round(avgWt)} lb — ${Math.round(avgReps)} reps, 1 below floor, should resolve next session`;
-      }
-      repsAdj = maxReps; // build reps before weight increases
-    } else if (avgReps > maxReps) {
-      adjusted = Math.round((avgWt + weeklyAdd + minStep) / minStep) * minStep;
-      note = `↑ Bumped — ${Math.round(avgReps)} reps @ ${Math.round(avgWt)} lb last session (exceeded range)`;
-    } else {
-      // RIR-aware progression: compare logged RIR to the session's target RIR
-      let add = weeklyAdd;
-      if (rirDiff != null) {
-        if (rirDiff >= 2) {
-          add = weeklyAdd + minStep;
-          note = `↑↑ Extra bump — ${Math.round(lastAvgRir)} RIR logged vs ${targetRirLow} target`;
-        } else if (rirDiff <= -3) {
-          // Severely grinding — reduce weight
-          adjusted = Math.round((avgWt - minStep) / minStep) * minStep;
-          note = `↓ Reduced — ${Math.round(lastAvgRir)} RIR logged (too far below ${targetRirLow} target)`;
-        } else if (rirDiff <= -2) {
-          // Moderately grinding — hold
-          adjusted = Math.round(avgWt / minStep) * minStep;
-          note = `⏸ Holding — ${Math.round(lastAvgRir)} RIR logged (grinding past target)`;
-        }
-      }
-      if (adjusted === undefined) {
-        adjusted = Math.round((avgWt + add) / minStep) * minStep;
-        const rirTag = lastRir ? ` (${lastRir})` : "";
-        if (!note) {
-          if (avgWt < ex.wt - minStep / 2) note = `↓ ${Math.round(avgWt)} lb used last${rirTag} → ${adjusted} lb this week`;
-          else if (avgWt > ex.wt + minStep / 2) note = `↑ ${Math.round(avgWt)} lb used last${rirTag} → ${adjusted} lb this week`;
-        }
-      }
-      // Weight holding and not grinding → push reps to max
-      if (adjusted === Math.round(avgWt / minStep) * minStep) {
-        const notGrinding = rirDiff == null || rirDiff >= 0;
-        if (notGrinding) repsAdj = maxReps;
-      }
-    }
-    if (adjusted === undefined) return {};
-    // Return even when adjusted === baseTarget so smartTargetReps can still surface
-    if (adjusted === baseTarget && repsAdj == null) return {};
-    return { smartTarget: adjusted !== baseTarget ? adjusted : null, progressNote: note || null, smartTargetReps: repsAdj };
-  }
-
   // Fast path: read from localStorage (written at session finish)
   const lsResult = useMemo(() => {
     if (!ex.wt || wkData.deload) return null;
@@ -1941,9 +2050,9 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
     if (!last || last.avgWt == null) return null;
     if (ex.calibration && last.avgWtX != null) {
       // Calibration exercise: judge progression on the non-failure sets, ignore the failure set's RIR
-      return computeAdjustment(last.avgWtX, last.avgRepsX, last.weekNumber || 0, last.rir || "", null);
+      return computeAdjustment(last.avgWtX, last.avgRepsX, last.weekNumber || 0, last.rir || "", null, last);
     }
-    return computeAdjustment(last.avgWt, last.avgReps, last.weekNumber || 0, last.rir || "", last.avgRir ?? null);
+    return computeAdjustment(last.avgWt, last.avgReps, last.weekNumber || 0, last.rir || "", last.avgRir ?? null, last);
   }, [ex.name, ex.wt, ex.reps, ex.calibration, week, mesoPrefix, baseTarget, weeklyAdd, minStep, wkData.deload]);
 
   // Async DB fallback: only fires when localStorage has no data for this exercise
@@ -2090,7 +2199,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
           )}
 
           {Array.from({ length: totalSets }, (_, i) => (
-            <SetRow key={i} setNum={i + 1} isLastSet={i + 1 === totalSets} targetReps={smartTargetReps ? String(smartTargetReps) : ex.reps.split("-").at(-1)} targetWt={targetWt} lastWeight={lastWeightRef.current} lastReps={lastRepsRef.current} isBW={!!ex.bodyweight} bands={ex.bands} logged={logged[i + 1]} onLog={logSet} onDelete={deleteSet} onRir={handleRir} />
+            <SetRow key={i} setNum={i + 1} isLastSet={i + 1 === totalSets} targetReps={smartTargetReps ? String(smartTargetReps) : (mesoPrefix === "Meso 5" ? String(getMeso5TargetReps(ex)) : ex.reps.split("-").at(-1))} targetWt={targetWt} lastWeight={lastWeightRef.current} lastReps={lastRepsRef.current} isBW={!!ex.bodyweight} bands={ex.bands} logged={logged[i + 1]} onLog={logSet} onDelete={deleteSet} onRir={handleRir} />
           ))}
         </div>
       )}
@@ -4121,34 +4230,224 @@ function CompareView() {
     </div>
   );
 }
+function AnalyticsOverviewView({ onNavigate }) {
+  var s1 = React.useState(null); var loaded = s1[0]; var setLoaded = s1[1];
+  React.useEffect(function() {
+    var active = true;
+    Promise.all([db.getHealthDaily(1000), db.getRecentSessions(1000)])
+      .then(function(arr) { if (active) setLoaded({ health: arr[0] || [], sessions: arr[1] || [], error: false }); })
+      .catch(function() { if (active) setLoaded({ health: [], sessions: [], error: true }); });
+    return function() { active = false; };
+  }, []);
+  if (!loaded) return <div style={{ padding: 32, textAlign: "center", color: C.mut }}>Loading overview…</div>;
+
+  var health = loaded.health.slice().sort(function(a, b) { return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
+  var weights = health.filter(function(h) { return h.weight_kg != null || h.weight_lbs != null; }).map(deriveBodyComp);
+  var latestWeight = weights.length ? weights[weights.length - 1] : null;
+  var latestHealth = health.length ? health[health.length - 1] : null;
+  var today = localDate();
+  function dateOffset(base, n) {
+    var d = new Date((base || today) + "T12:00:00");
+    d.setDate(d.getDate() - n);
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+  function findWeightOnOrBefore(targetDate) {
+    for (var i = weights.length - 1; i >= 0; i--) if (weights[i].date <= targetDate) return weights[i];
+    return null;
+  }
+  var ref7 = latestWeight ? findWeightOnOrBefore(dateOffset(latestWeight.date, 7)) : null;
+  var ref28 = latestWeight ? findWeightOnOrBefore(dateOffset(latestWeight.date, 28)) : null;
+  var delta7 = latestWeight && ref7 && latestWeight.weight != null && ref7.weight != null ? latestWeight.weight - ref7.weight : null;
+  var delta28 = latestWeight && ref28 && latestWeight.weight != null && ref28.weight != null ? latestWeight.weight - ref28.weight : null;
+  var recent7Start = dateOffset(today, 7);
+  var recent28Start = dateOffset(today, 28);
+  var recentHealth = health.filter(function(h) { return h.date >= recent7Start; });
+  var recentSessions7 = loaded.sessions.filter(function(s) { return s.date >= recent7Start && s.status !== "cancelled"; });
+  var recentSessions28 = loaded.sessions.filter(function(s) { return s.date >= recent28Start && s.status !== "cancelled"; });
+  var stepsRows = recentHealth.filter(function(h) { return h.steps != null; });
+  var stepAvg = stepsRows.length ? stepsRows.reduce(function(sum, h) { return sum + Number(h.steps); }, 0) / stepsRows.length : null;
+  var freshness = latestHealth ? Math.max(0, daysBetween(latestHealth.date, today)) : null;
+  var weightPoints = weights.filter(function(r) { return r.weight != null; }).slice(-90).map(function(r) { return { date: r.date, val: r.weight }; });
+  function stat(label, value, sub, color) {
+    return <div style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 10, minWidth: 0 }}>
+      <div style={{ color: C.mut, fontSize: 9, letterSpacing: 0.6, textTransform: "uppercase" }}>{label}</div>
+      <div style={{ color: color || C.txt, fontSize: 22, fontWeight: 800, marginTop: 4, lineHeight: 1.1 }}>{value}</div>
+      <div style={{ color: C.mut, fontSize: 10, marginTop: 4 }}>{sub || " "}</div>
+    </div>;
+  }
+  function link(label, key, color) {
+    return <button key={key} onClick={function() { onNavigate(key); }} style={{ flex: 1, padding: "9px 6px", borderRadius: 8, border: "1px solid " + color + "44", background: color + "11", color: color, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>{label}</button>;
+  }
+  return <div>
+    {loaded.error ? <div style={{ padding: 12, borderRadius: 9, border: "1px solid " + C.red + "55", color: C.red, background: C.red + "11", fontSize: 11, marginBottom: 10 }}>
+      Some analytics data could not be loaded. Check the Sources tab for integration and connection status.
+    </div> : null}
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 }}>
+      {stat("Latest weight", latestWeight && latestWeight.weight != null ? latestWeight.weight.toFixed(1) + " lb" : "—",
+        latestWeight ? fmtShortDate(latestWeight.date) + (freshness != null && freshness > 3 ? " · health data may be stale" : "") : "No scale readings imported",
+        C.blu)}
+      {stat("7-day weight change", delta7 == null ? "—" : fmtSignedNum(delta7, 1) + " lb",
+        ref7 ? "vs " + fmtShortDate(ref7.date) : "Needs a reference weigh-in",
+        delta7 == null ? C.mut : (delta7 < 0 ? C.grn : C.org))}
+      {stat("28-day weight change", delta28 == null ? "—" : fmtSignedNum(delta28, 1) + " lb",
+        ref28 ? "vs " + fmtShortDate(ref28.date) : "Needs a reference weigh-in",
+        delta28 == null ? C.mut : (delta28 < 0 ? C.grn : C.org))}
+      {stat("Training sessions", String(recentSessions7.length),
+        recentSessions28.length + " in the last 28 days",
+        C.pur)}
+    </div>
+    <div style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 12, padding: 12, marginBottom: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+        <div style={{ color: C.txt, fontSize: 12, fontWeight: 800 }}>Body-weight trend</div>
+        <div style={{ color: C.mut, fontSize: 10 }}>{weights.length ? weights.length + " weigh-ins" : "No readings yet"}</div>
+      </div>
+      {weightPoints.length >= 2
+        ? <TrendChart data={weightPoints} color={C.blu} unit="lb" />
+        : <div style={{ color: C.mut, fontSize: 11, padding: "16px 2px" }}>Import scale readings to show the trend here. The chart will use recorded values rather than fabricated or interpolated data.</div>}
+      {latestWeight && latestWeight.bf != null ? <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, marginTop: 8 }}>
+        <div style={{ background: C.c2, borderRadius: 8, padding: 8 }}><div style={{ color: C.mut, fontSize: 9 }}>Body fat</div><div style={{ color: C.gld, fontSize: 14, fontWeight: 800 }}>{latestWeight.bf.toFixed(1)}%</div></div>
+        <div style={{ background: C.c2, borderRadius: 8, padding: 8 }}><div style={{ color: C.mut, fontSize: 9 }}>Lean mass*</div><div style={{ color: C.grn, fontSize: 14, fontWeight: 800 }}>{latestWeight.lean != null ? latestWeight.lean.toFixed(1) + " lb" : "—"}</div></div>
+        <div style={{ background: C.c2, borderRadius: 8, padding: 8 }}><div style={{ color: C.mut, fontSize: 9 }}>Fat mass*</div><div style={{ color: C.org, fontSize: 14, fontWeight: 800 }}>{latestWeight.fat != null ? latestWeight.fat.toFixed(1) + " lb" : "—"}</div></div>
+      </div> : null}
+      {latestWeight && latestWeight.bf != null ? <div style={{ color: C.mut, fontSize: 9, marginTop: 6 }}>*Derived from the scale's body-fat estimate; treat short-term changes as estimates, not direct muscle/fat measurements.</div> : null}
+    </div>
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 10 }}>
+      {stat("Average steps", stepAvg == null ? "—" : Math.round(stepAvg).toLocaleString(),
+        stepsRows.length ? stepsRows.length + " days with imported records" : "No recent Apple Health records",
+        C.gld)}
+      {stat("Latest HRV", latestHealth && latestHealth.hrv_sdnn != null ? Number(latestHealth.hrv_sdnn).toFixed(1) + " ms" : "—",
+        latestHealth ? "Most recent health row: " + fmtShortDate(latestHealth.date) : "No health metrics imported",
+        C.grn)}
+    </div>
+    <div style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 12, marginBottom: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+        <div style={{ color: C.txt, fontWeight: 800, fontSize: 12 }}>Data freshness</div>
+        <div style={{ color: !latestHealth ? C.org : (freshness <= 3 ? C.grn : C.org), fontSize: 10, fontWeight: 700 }}>
+          {!latestHealth ? "NO HEALTH DATA" : (freshness <= 3 ? "RECENT" : "STALE")}
+        </div>
+      </div>
+      <div style={{ color: C.mut, fontSize: 11, lineHeight: 1.45, marginTop: 6 }}>
+        {!latestHealth ? "Apple Health and scale data are not currently being imported into Training Hub." :
+          ("The newest imported health row is " + fmtShortDate(latestHealth.date) + ". A recent database record does not by itself mean an automated sync is configured.")}
+      </div>
+    </div>
+    <div style={{ display: "flex", gap: 6 }}>
+      {link("Weight details", "body", C.blu)}
+      {link("Training details", "perf", C.pur)}
+      {link("Data sources", "data", C.org)}
+    </div>
+  </div>;
+}
+
+function DataSourcesView() {
+  var s1 = React.useState(null); var loaded = s1[0]; var setLoaded = s1[1];
+  var s2 = React.useState(false); var refreshing = s2[0]; var setRefreshing = s2[1];
+  function load() {
+    setRefreshing(true);
+    Promise.all([db.getHealthDaily(1000), db.getRecentSessions(1000)])
+      .then(function(arr) { setLoaded({ health: arr[0] || [], sessions: arr[1] || [], error: false }); })
+      .catch(function() { setLoaded({ health: [], sessions: [], error: true }); })
+      .finally(function() { setRefreshing(false); });
+  }
+  React.useEffect(function() { load(); }, []);
+  if (!loaded) return <div style={{ padding: 32, textAlign: "center", color: C.mut }}>Checking data sources…</div>;
+
+  var health = loaded.health.slice().sort(function(a, b) { return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
+  var latest = health.length ? health[health.length - 1] : null;
+  var weightRows = health.filter(function(h) { return h.weight_kg != null || h.weight_lbs != null; });
+  var hrvRows = health.filter(function(h) { return h.hrv_sdnn != null; });
+  var latestGap = latest ? Math.max(0, daysBetween(latest.date, localDate())) : null;
+  var dataFresh = latestGap != null && latestGap <= 3;
+  var sources = Array.from(new Set(health.map(function(h) { return h.source; }).filter(Boolean)));
+  function statusCard(title, status, detail, accent) {
+    return <div style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 12, marginBottom: 8 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+        <div style={{ color: C.txt, fontSize: 12, fontWeight: 800 }}>{title}</div>
+        <div style={{ color: accent, fontSize: 9, fontWeight: 800, letterSpacing: 0.5 }}>{status}</div>
+      </div>
+      <div style={{ color: C.mut, fontSize: 11, lineHeight: 1.45, marginTop: 6 }}>{detail}</div>
+    </div>;
+  }
+  return <div>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 10 }}>
+      <div>
+        <div style={{ color: C.txt, fontSize: 14, fontWeight: 800 }}>Data connections</div>
+        <div style={{ color: C.mut, fontSize: 10, marginTop: 3 }}>Status is based on the actual records currently available to this app.</div>
+      </div>
+      <button onClick={load} disabled={refreshing} style={{ padding: "7px 10px", borderRadius: 7, border: "1px solid " + C.bdr, background: C.c2, color: C.txt, fontSize: 10, fontWeight: 700, cursor: "pointer" }}>{refreshing ? "Refreshing…" : "Refresh"}</button>
+    </div>
+    {loaded.error ? <div style={{ color: C.red, background: C.red + "11", border: "1px solid " + C.red + "44", borderRadius: 8, padding: 10, fontSize: 11, marginBottom: 8 }}>The data query failed. This is different from a valid connection with zero rows; check Supabase and app configuration.</div> : null}
+    {statusCard("Apple Health daily metrics",
+      !health.length ? "NO DATA" : (dataFresh ? "RECENT ROWS" : "STALE HISTORY"),
+      !health.length
+        ? "The health_daily table exists, but currently returns no records. The current sync-health Edge Function is only a status endpoint; it does not import Apple Health data."
+        : ("Imported rows: " + health.length + " · newest: " + fmtShortDate(latest.date) + " · source labels: " + (sources.join(", ") || "not recorded") + ". " + (latestGap > 3 ? "Data is more than three days old." : "A recent row is available.")),
+      !health.length ? C.org : (dataFresh ? C.grn : C.org))}
+    {statusCard("Scale weight and body composition",
+      !weightRows.length ? "NOT SYNCING" : "READINGS FOUND",
+      !weightRows.length
+        ? "No scale readings currently exist in health_daily. When your scale app writes weight/body-fat estimates to Apple Health, those metrics can be mapped into this record set."
+        : (weightRows.length + " dated readings available. Most recent scale-linked row: " + fmtShortDate(weightRows[weightRows.length - 1].date) + ". Body composition is an estimate and should be interpreted over trends, not single readings."),
+      !weightRows.length ? C.org : C.grn)}
+    {statusCard("Workout logging",
+      loaded.sessions.length ? "ACTIVE" : "NO SESSIONS",
+      loaded.sessions.length
+        ? loaded.sessions.length + " session records are available from Supabase."
+        : "No workout sessions were returned by the current connection.",
+      loaded.sessions.length ? C.grn : C.org)}
+    {statusCard("Automated sync",
+      "NOT IMPLEMENTED",
+      "A sync-health function is deployed, but its current code returns a health-check response only. No HealthKit or scale-data importer is running yet; this screen intentionally does not label it as connected.",
+      C.org)}
+    <div style={{ background: C.card, border: "1px solid " + C.bdr, borderRadius: 10, padding: 12, marginBottom: 8 }}>
+      <div style={{ color: C.txt, fontSize: 12, fontWeight: 800, marginBottom: 6 }}>Recommended connection path</div>
+      <div style={{ color: C.mut, fontSize: 11, lineHeight: 1.55 }}>
+        Scale app → Apple Health (if supported) → an authenticated iOS Shortcut/export bridge → Training Hub. Because Training Hub is currently a web app, it cannot request native HealthKit permission directly; a native iOS app or a separate bridge is required.
+      </div>
+      <div style={{ color: C.mut, fontSize: 11, lineHeight: 1.55, marginTop: 8 }}>
+        The bridge depends on your scale’s make/model and whether its companion app writes weight and body-fat data to Apple Health. Once that source is confirmed, the importer can be designed around its real export format instead of guessing at fields.
+      </div>
+    </div>
+    <div style={{ background: C.red + "10", border: "1px solid " + C.red + "55", borderRadius: 10, padding: 12 }}>
+      <div style={{ color: C.red, fontSize: 12, fontWeight: 800, marginBottom: 6 }}>Privacy prerequisite before automatic import</div>
+      <div style={{ color: C.txt, fontSize: 11, lineHeight: 1.5 }}>
+        The current Supabase tables use permissive public read/write policies, including the tables that store workout and health metrics. Automatic health imports should wait until access is secured. A safe fix needs to account for the app’s existing no-login design so workout logging does not break.
+      </div>
+    </div>
+  </div>;
+}
+
 function AnalyticsView() {
-  var s1 = React.useState("body"); var sub = s1[0]; var setSub = s1[1];
+  var s1 = React.useState("overview"); var sub = s1[0]; var setSub = s1[1];
   var TABS = [
-    { k: "body", label: "Body", color: C.gld },
-    { k: "perf", label: "Performance", color: C.blu },
+    { k: "overview", label: "Overview", color: C.gld },
+    { k: "body", label: "Weight", color: C.blu },
+    { k: "perf", label: "Training", color: C.pur },
     { k: "rec", label: "Recovery", color: C.grn },
-    { k: "cmp", label: "Compare", color: C.pur }
+    { k: "cmp", label: "Compare", color: C.org },
+    { k: "data", label: "Sources", color: C.teal }
   ];
   return (
     <div style={{ padding: "10px 0 40px" }}>
-      <div
-        style={{ display: "flex", gap: 4, marginBottom: 12, position: "sticky", top: 0, background: C.bg, zIndex: 4, paddingBottom: 4 }}>
+      <div style={{ display: "flex", gap: 4, marginBottom: 12, position: "sticky", top: 0, background: C.bg, zIndex: 4, paddingBottom: 4, overflowX: "auto", WebkitOverflowScrolling: "touch" }}>
         {TABS.map(function(t) {
           var sel = sub === t.k;
           return (
             <button
               key={t.k}
               onClick={function() { setSub(t.k); }}
-              style={{ flex: 1, padding: "7px 4px", borderRadius: 8, border: "1px solid " + (sel ? t.color : C.bdr), background: sel ? t.color + "22" : "transparent", color: sel ? t.color : C.mut, fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+              style={{ flex: "0 0 auto", minWidth: t.k === "overview" ? 68 : 58, padding: "7px 8px", borderRadius: 8, border: "1px solid " + (sel ? t.color : C.bdr), background: sel ? t.color + "22" : "transparent", color: sel ? t.color : C.mut, fontSize: 10, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}>
               {t.label}
             </button>
           );
         })}
       </div>
-      {sub === "body" ? <BodyCompView /> :
-      sub === "perf" ? <PerformanceView /> :
-      sub === "rec" ? <RecoveryView /> :
-      <CompareView />}
+      {sub === "overview" ? <AnalyticsOverviewView onNavigate={setSub} /> :
+       sub === "body" ? <BodyCompView /> :
+       sub === "perf" ? <PerformanceView /> :
+       sub === "rec" ? <RecoveryView /> :
+       sub === "data" ? <DataSourcesView /> :
+       <CompareView />}
     </div>
   );
 }
@@ -4461,6 +4760,12 @@ export default function App() {
     // Smart target helper: mirrors ExerciseCard's computeAdjustment using localStorage perf data
     const getSmartWt = (ex, exCat, minStep, weeklyAdd, baseTarget) => {
       if (!ex.wt || wkData.deload) return baseTarget;
+      if (activeMeso.id === "rp-meso-5") {
+        const perfKey = 'training-hub-perf-' + activeMeso.shortName.replace(/\\s+/g, '-');
+        let perf = {};
+        try { perf = JSON.parse(localStorage.getItem(perfKey) || '{}'); } catch(e) {}
+        return getMeso5LoadRecommendation(ex, perf[ex.name], week + 1, wkData.rir, minStep, baseTarget).weight;
+      }
       const perfKey = 'training-hub-perf-' + activeMeso.shortName.replace(/\s+/g, '-');
       let perf = {};
       try { perf = JSON.parse(localStorage.getItem(perfKey) || '{}'); } catch(e) {}
@@ -4499,10 +4804,10 @@ export default function App() {
       const exCat = getExCategory(currentEx.name, currentEx.rest);
       const minStep = (exCat === "smith" || currentEx.name.startsWith("DB ")) ? 5 : 2.5;
       const weeklyAdd = wkData[exCat];
-      const baseTarget = wkData.deload ? getDeloadWt(currentEx) : (currentEx.wt ? Math.round((currentEx.wt + weeklyAdd) / minStep) * minStep : null);
+      const baseTarget = wkData.deload ? getDeloadWt(currentEx) : (activeMeso.id === "rp-meso-5" ? getMeso5ProgrammedWeight(currentEx, week + 1, minStep) : (currentEx.wt ? Math.round((currentEx.wt + weeklyAdd) / minStep) * minStep : null));
       const lastLogged = logged[timer.setNum];
       const targetWt = lastLogged ? lastLogged.wt : getSmartWt(currentEx, exCat, minStep, weeklyAdd, baseTarget);
-      const targetReps = lastLogged ? String(lastLogged.reps) : currentEx.reps.split("-").at(-1);
+      const targetReps = activeMeso.id === "rp-meso-5" ? String(getMeso5LoadRecommendation(currentEx, (() => { let p = {}; try { p = JSON.parse(localStorage.getItem('training-hub-perf-' + activeMeso.shortName.replace(/\s+/g, '-')) || '{}'); } catch(e) {} return p[currentEx.name]; })(), week + 1, wkData.rir, minStep, baseTarget).targetReps || getMeso5TargetReps(currentEx)) : (lastLogged ? String(lastLogged.reps) : currentEx.reps.split("-").at(-1));
       return { exName: currentEx.name, muscles: currentEx.muscles, nextSetNum, totalSets: currentTotalSets, targetReps, targetWt, isBW: !currentEx.wt && currentEx.wt !== 0, restSeconds: currentEx.rest, isLastExInSession: false };
     }
 
@@ -4514,9 +4819,9 @@ export default function App() {
     const exCat = getExCategory(nextEx.name, nextEx.rest);
     const minStep = (exCat === "smith" || nextEx.name.startsWith("DB ")) ? 5 : 2.5;
     const weeklyAdd = wkData[exCat];
-    const baseTarget = wkData.deload ? getDeloadWt(nextEx) : (nextEx.wt ? Math.round((nextEx.wt + weeklyAdd) / minStep) * minStep : null);
+    const baseTarget = wkData.deload ? getDeloadWt(nextEx) : (activeMeso.id === "rp-meso-5" ? getMeso5ProgrammedWeight(nextEx, week + 1, minStep) : (nextEx.wt ? Math.round((nextEx.wt + weeklyAdd) / minStep) * minStep : null));
     const targetWt = getSmartWt(nextEx, exCat, minStep, weeklyAdd, baseTarget);
-    const targetReps = nextEx.reps.split("-").at(-1);
+    const targetReps = activeMeso.id === "rp-meso-5" ? String(getMeso5LoadRecommendation(nextEx, (() => { let p = {}; try { p = JSON.parse(localStorage.getItem('training-hub-perf-' + activeMeso.shortName.replace(/\s+/g, '-')) || '{}'); } catch(e) {} return p[nextEx.name]; })(), week + 1, wkData.rir, minStep, baseTarget).targetReps || getMeso5TargetReps(nextEx)) : nextEx.reps.split("-").at(-1);
     const isLastEx = currentIdx + 1 === allExercises.length - 1;
     return { exName: nextEx.name, muscles: nextEx.muscles, nextSetNum: 1, totalSets: wkData.deload ? deloadSets : nextEx.sets, targetReps, targetWt, isBW: !nextEx.wt && nextEx.wt !== 0, restSeconds: nextEx.rest, isLastExInSession: isLastEx, isNewExercise: true };
   }, [timer, r, sessionKey, allSets, activeWeeks, week]);
