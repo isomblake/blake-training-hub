@@ -766,31 +766,16 @@ function getMeso5LoadRecommendation(ex, perf, targetWeek, currentRirLabel, minSt
     return { weight: defaultWt, targetReps: defaultTargetReps, note: null };
   }
 
+  // Normalize legacy single-record entries and keep only valid completed weeks.
   const rawHistory = Array.isArray(perf.history) && perf.history.length ? perf.history : [perf];
   const history = rawHistory
-    .filter(item => item && Number(item.weekNumber) > 0 && Number(item.weekNumber) <= Number(targetWeek))
+    .filter(item => item && Number(item.weekNumber) > 0 && Number(item.weekNumber) < Number(targetWeek))
     .slice()
     .sort((a, b) => (Number(a.weekNumber) - Number(b.weekNumber)) ||
       String(a.sessionKey || "").localeCompare(String(b.sessionKey || "")));
+  if (!history.length) return { weight: defaultWt, targetReps: defaultTargetReps, note: null };
 
-  const sameWeek = history.filter(item => Number(item.weekNumber) === Number(targetWeek));
-  if (sameWeek.length) {
-    const latestThisWeek = sameWeek[sameWeek.length - 1];
-    const heldWt = latestThisWeek.avgWt != null
-      ? Math.max(0, Math.round(Number(latestThisWeek.avgWt) / step) * step)
-      : defaultWt;
-    const bounds = getRepRangeBounds(ex.reps);
-    const recordedTarget = Number(latestThisWeek.targetReps);
-    const targetReps = Number.isFinite(recordedTarget)
-      ? Math.max(bounds[0], Math.min(bounds[1], Math.round(recordedTarget)))
-      : defaultTargetReps;
-    return { weight: heldWt, targetReps, note: null };
-  }
-
-  const priorWeeks = history.filter(item => Number(item.weekNumber) < Number(targetWeek));
-  if (!priorWeeks.length) return { weight: defaultWt, targetReps: defaultTargetReps, note: null };
-
-  const last = priorWeeks[priorWeeks.length - 1];
+  const last = history[history.length - 1];
   if (last.avgWt == null || !Number.isFinite(Number(last.avgWt))) {
     return { weight: defaultWt, targetReps: defaultTargetReps, note: null };
   }
@@ -807,12 +792,16 @@ function getMeso5LoadRecommendation(ex, perf, targetWeek, currentRirLabel, minSt
     ? Math.max(minReps, Math.min(maxReps, Math.round(lastTargetRecorded)))
     : defaultTargetReps;
 
+  // Carry the offset from the programmed schedule forward, but cap it at two
+  // equipment increments in either direction to avoid runaway recalibration.
   const programmedAtLastWeek = getMeso5ProgrammedWeight(ex, lastWeek, step);
   let correctionSteps = programmedAtLastWeek == null ? 0 :
     Math.round((lastWt - programmedAtLastWeek) / step);
   correctionSteps = Math.max(-2, Math.min(2, correctionSteps));
 
-  const prior = priorWeeks.length > 1 ? priorWeeks[priorWeeks.length - 2] : null;
+  // Use two consecutive sessions for ordinary adjustments. A missed minimum
+  // or an exceptionally hard session can justify a single-session reduction.
+  const prior = history.length > 1 ? history[history.length - 2] : null;
   const priorReps = prior && prior.avgReps != null ? Number(prior.avgReps) : null;
   const priorRir = prior && prior.avgRir != null ? Number(prior.avgRir) : null;
   const priorTargetRir = prior ? parseRirTarget(prior.rir) : null;
@@ -821,22 +810,20 @@ function getMeso5LoadRecommendation(ex, perf, targetWeek, currentRirLabel, minSt
   const materiallyHard = actualRir != null && lastTargetRir != null && actualRir <= lastTargetRir - 1.5;
   const veryHard = actualRir != null && lastTargetRir != null && actualRir <= lastTargetRir - 2;
   const materiallyEasy = actualRir != null && lastTargetRir != null && actualRir >= lastTargetRir + 1.5;
-  const priorHard = prior && (
+  const priorHard = !!prior && (
     (Number.isFinite(priorReps) && priorReps < minReps) ||
     (priorRir != null && priorTargetRir != null && priorRir <= priorTargetRir - 1.5)
   );
-  const priorEasy = prior && (
+  const priorEasy = !!prior && (
     (Number.isFinite(priorReps) && priorReps > maxReps) ||
     (priorRir != null && priorTargetRir != null && priorRir >= priorTargetRir + 1.5)
   );
 
   let adjustment = 0;
-  if (belowFloor) adjustment = -1;
-  else if (materiallyHard && (priorHard || veryHard)) adjustment = -1;
-  else if (aboveCeiling) adjustment = 1;
-  else if (materiallyEasy && priorEasy) adjustment = 1;
+  if (belowFloor || (materiallyHard && (priorHard || veryHard))) adjustment = -1;
+  else if (aboveCeiling || (materiallyEasy && priorEasy)) adjustment = 1;
 
-  // Knee-sensitive lifts keep the planned weekly increments but never receive
+  // Knee-sensitive lifts keep their planned progression but never receive
   // an extra performance-driven upward correction.
   if (ex.noAutoLoadIncrease) {
     correctionSteps = Math.min(0, correctionSteps);
@@ -848,19 +835,20 @@ function getMeso5LoadRecommendation(ex, perf, targetWeek, currentRirLabel, minSt
   let targetReps = Math.min(maxReps, Math.max(defaultTargetReps, lastTargetReps));
   let note = null;
 
+  // If the equipment jump is too large relative to the current working load,
+  // build reps first. Use a floor so low-load isolation movements still get
+  // a meaningful threshold rather than a near-zero percentage calculation.
   const jump = weight - lastWt;
-  const tooLargeJump = jump > Math.max(0.001, lastWt * 0.05) + 0.001;
+  const tooLargeJump = jump > Math.max(step, lastWt * 0.05) + 0.001;
   const repsAtPreviousTarget = Number.isFinite(observedReps) && observedReps >= lastTargetReps;
   const notClearlyHard = actualRir == null || lastTargetRir == null || actualRir >= lastTargetRir - 0.5;
-  const nextRepTarget = MESO5_REP_STEPS.find(value => value > lastTargetReps && value <= maxReps);
+  const nextRepTarget = [8, 10, 12, 15, 16, 18, 20].find(value => value > lastTargetReps && value <= maxReps);
 
   if (weight > lastWt && (!repsAtPreviousTarget || !notClearlyHard)) {
     weight = lastWt;
     targetReps = Math.min(maxReps, Math.max(defaultTargetReps, lastTargetReps));
     note = "Holding load until the previous rep target is achieved at the planned effort";
   } else if (tooLargeJump && targetReps < maxReps) {
-    // If the next load increment is disproportionate, hold the load and build
-    // reps through the allowed targets rather than forcing a weight increase.
     weight = lastWt;
     if (repsAtPreviousTarget && notClearlyHard && nextRepTarget != null) {
       targetReps = nextRepTarget;
@@ -879,7 +867,6 @@ function getMeso5LoadRecommendation(ex, perf, targetWeek, currentRirLabel, minSt
 
   return { weight, targetReps, note };
 }
-
 // ============================================================
 // MESOCYCLE DEFINITIONS
 // Each mesocycle has its own routines, weeks config, and date range.
