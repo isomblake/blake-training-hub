@@ -805,7 +805,9 @@ function getMeso5LoadRecommendation(ex, perf, targetWeek, currentRirLabel, minSt
   const priorReps = prior && prior.avgReps != null && prior.avgReps !== "" ? Number(prior.avgReps) : null;
   const priorRir = prior && prior.avgRir != null ? Number(prior.avgRir) : null;
   const priorTargetRir = prior ? parseRirTarget(prior.rir) : null;
-  const belowFloor = Number.isFinite(observedReps) && observedReps < minReps;
+  const setReps = Array.isArray(last.setReps) ? last.setReps.map(Number).filter(Number.isFinite) : [];
+  // A missed minimum on any completed set matters even when the average clears the floor.
+  const belowFloor = (Number.isFinite(observedReps) && observedReps < minReps) || setReps.some(reps => reps < minReps);
   const aboveCeiling = Number.isFinite(observedReps) && observedReps > maxReps;
   const materiallyHard = actualRir != null && lastTargetRir != null && actualRir <= lastTargetRir - 1.5;
   const veryHard = actualRir != null && lastTargetRir != null && actualRir <= lastTargetRir - 2;
@@ -1961,12 +1963,13 @@ function saveSessionPerformance(allSets, sessionKey, weekNumber, rir, mesoPrefix
     const lastRir = setsWithRir.length > 0 ? setsWithRir[setsWithRir.length - 1].rir : null;
     const targets = setArr.map(s => Number(s.targetReps)).filter(n => Number.isFinite(n) && n > 0);
     const targetReps = targets.length ? Math.round(targets.reduce((a, b) => a + b, 0) / targets.length) : null;
-    const entry = { avgWt, avgReps, avgWtX, avgRepsX, targetReps, weekNumber, rir, avgRir: lastRir, sessionKey };
+    const setReps = setArr.map(s => Number.parseInt(s.reps, 10)).filter(n => Number.isFinite(n) && n > 0);
+    const entry = { avgWt, avgReps, avgWtX, avgRepsX, setReps, targetReps, weekNumber, rir, avgRir: lastRir, sessionKey };
     const previous = perf[exName] || {};
     const history = Array.isArray(previous.history) ? previous.history : (
       previous.weekNumber != null ? [{
         avgWt: previous.avgWt, avgReps: previous.avgReps, avgWtX: previous.avgWtX,
-        avgRepsX: previous.avgRepsX, targetReps: previous.targetReps, weekNumber: previous.weekNumber,
+        avgRepsX: previous.avgRepsX, setReps: previous.setReps, targetReps: previous.targetReps, weekNumber: previous.weekNumber,
         rir: previous.rir, avgRir: previous.avgRir, sessionKey: previous.sessionKey,
       }] : []
     );
