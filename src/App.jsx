@@ -1353,12 +1353,14 @@ const MESO5_ROUTINES = {
 };
 
 const MESO5_WEEKS = [
- {rir:"4 RIR",note:"W1 · Completed; conservative re-entry, unchanged",smith:0,cable:0,iso:0,deload:false},
- {rir:"3–4 RIR",note:"W2 · Keep prescribed reps steady; adjust load to land at 3–4 RIR",smith:0,cable:0,iso:0,deload:false},
- {rir:"3 RIR",note:"W3 · Keep rep targets steady; add load conservatively to reach 3 RIR",smith:0,cable:0,iso:0,deload:false},
- {rir:"2–3 RIR",note:"W4 · Maintain reps; adjust load for 2–3 RIR without grinding",smith:0,cable:0,iso:0,deload:false},
- {rir:"1–2 RIR",note:"W5 · Hardest week; maintain reps and target 1–2 RIR on suitable lifts; keep knee-sensitive work symptom-limited",smith:0,cable:0,iso:0,deload:false},
- {rir:"4–5+ RIR",note:"DELOAD · 2 sets per exercise · use a comfortably lighter load (typically ~80–90% of recent working load); no grinding",smith:0,cable:0,iso:0,deload:true},
+ // Default progression is the starting plan; actual performance/RIR can override it.
+ // Values are cumulative additions to the programmed starting load, not week-over-week jumps.
+ {rir:"4 RIR",note:"W1 · Conservative re-entry; use the programmed starting load",smith:0,cable:0,iso:0,deload:false},
+ {rir:"3–4 RIR",note:"W2 · Default: +5 lb Smith / +2.5 lb cable compound; adjust from logged performance",smith:5,cable:2.5,iso:0,deload:false},
+ {rir:"3 RIR",note:"W3 · Default: +5 lb Smith / +5 lb cable compound / +2.5 lb isolation; adapt to reps and RIR",smith:5,cable:5,iso:2.5,deload:false},
+ {rir:"2–3 RIR",note:"W4 · Default: +10 lb Smith / +7.5 lb cable compound / +2.5 lb isolation; adapt to performance",smith:10,cable:7.5,iso:2.5,deload:false},
+ {rir:"1–2 RIR",note:"W5 · Default: +10 lb Smith / +10 lb cable compound / +5 lb isolation; adapt to performance and keep knee-sensitive work symptom-limited",smith:10,cable:10,iso:5,deload:false},
+ {rir:"4–5+ RIR",note:"DELOAD · 2 sets per exercise · use about 50% of the recent working load; no grinding",smith:0,cable:0,iso:0,deload:true},
 ];
 
 // Deload only has 1 "week" — no progression
@@ -1932,7 +1934,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
   const baseTarget = ex.wt
     ? wkData.deload
       ? (wkData.preDeloaded ? ex.wt : (deloadActualTarget ?? Math.round(ex.wt * 0.5 / minStep) * minStep))
-      : (mesoPrefix === "Meso 5" ? ex.wt : Math.round((ex.wt + weeklyAdd) / minStep) * minStep)
+      : Math.round((ex.wt + weeklyAdd) / minStep) * minStep
     : null;
 
   // Helper: run the progression computation given raw perf data
