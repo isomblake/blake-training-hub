@@ -784,7 +784,7 @@ function getMeso5LoadRecommendation(ex, perf, targetWeek, currentRirLabel, minSt
   const lastWt = Math.max(0, Math.round(Number(last.avgWt) / step) * step);
   const bounds = getRepRangeBounds(ex.reps);
   const minReps = bounds[0], maxReps = bounds[1];
-  const observedReps = Number(last.avgReps);
+  const observedReps = last.avgReps == null || last.avgReps === "" ? NaN : Number(last.avgReps);
   const actualRir = last.avgRir == null ? null : Number(last.avgRir);
   const lastTargetRir = parseRirTarget(last.rir);
   const lastTargetRecorded = Number(last.targetReps);
@@ -802,7 +802,7 @@ function getMeso5LoadRecommendation(ex, perf, targetWeek, currentRirLabel, minSt
   // Use two consecutive sessions for ordinary adjustments. A missed minimum
   // or an exceptionally hard session can justify a single-session reduction.
   const prior = history.length > 1 ? history[history.length - 2] : null;
-  const priorReps = prior && prior.avgReps != null ? Number(prior.avgReps) : null;
+  const priorReps = prior && prior.avgReps != null && prior.avgReps !== "" ? Number(prior.avgReps) : null;
   const priorRir = prior && prior.avgRir != null ? Number(prior.avgRir) : null;
   const priorTargetRir = prior ? parseRirTarget(prior.rir) : null;
   const belowFloor = Number.isFinite(observedReps) && observedReps < minReps;
