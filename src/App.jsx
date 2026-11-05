@@ -4839,34 +4839,16 @@ export default function App() {
     const nextSetNum = timer.setNum + 1;
 
     const deloadSets = 2;
-    const currentTotalSets = wkData.deload ? deloadSets : currentEx.sets;
+    const addedSets = (!wkData.deload && currentEx.addSets)
+      ? Object.entries(currentEx.addSets).reduce((sum, [w, n]) => sum + (parseInt(w, 10) <= week + 1 ? n : 0), 0)
+      : 0;
+    const currentTotalSets = wkData.deload ? deloadSets : currentEx.sets + addedSets;
 
-    // Smart target helper: mirrors ExerciseCard's computeAdjustment using localStorage perf data
-    const getSmartWt = (ex, exCat, minStep, weeklyAdd, baseTarget) => {
-      if (!ex.wt || wkData.deload) return baseTarget;
-      if (activeMeso.id === "rp-meso-5") {
-        const perfKey = 'training-hub-perf-' + activeMeso.shortName.replace(/\\s+/g, '-');
-        let perf = {};
-        try { perf = JSON.parse(localStorage.getItem(perfKey) || '{}'); } catch(e) {}
-        return getMeso5LoadRecommendation(ex, perf[ex.name], week + 1, wkData.rir, minStep, baseTarget).weight;
-      }
-      const perfKey = 'training-hub-perf-' + activeMeso.shortName.replace(/\s+/g, '-');
+    const getSmartRecommendation = (ex, minStep, baseTarget) => {
+      const perfKey = 'training-hub-perf-' + activeMeso.shortName.replace(/\\s+/g, '-');
       let perf = {};
       try { perf = JSON.parse(localStorage.getItem(perfKey) || '{}'); } catch(e) {}
-      const last = perf[ex.name];
-      if (!last || last.avgWt == null) return baseTarget;
-      const lastWk = last.weekNumber || 0;
-      const curWk = week + 1;
-      if (lastWk > curWk) return baseTarget;
-      if (lastWk === curWk) {
-        const hold = Math.round(last.avgWt / minStep) * minStep;
-        return hold !== baseTarget ? hold : baseTarget;
-      }
-      const repRange = ex.reps.split("-").map(Number);
-      const min = repRange[0], max = repRange[1] || repRange[0];
-      if (last.avgReps < min) return Math.round(last.avgWt / minStep) * minStep;
-      if (last.avgReps > max) return Math.round((last.avgWt + weeklyAdd + minStep) / minStep) * minStep;
-      return Math.round((last.avgWt + weeklyAdd) / minStep) * minStep;
+      return getExerciseLoadRecommendation(ex, perf[ex.name], week + 1, wkData, activeMeso.shortName, minStep, baseTarget);
     };
 
     // Deload weight helper: actual last-week avgWt × 0.5 from localStorage, fallback to programmed × 0.5
@@ -4887,11 +4869,12 @@ export default function App() {
       // Next set of SAME exercise
       const exCat = getExCategory(currentEx.name, currentEx.rest);
       const minStep = (exCat === "smith" || currentEx.name.startsWith("DB ")) ? 5 : 2.5;
-      const weeklyAdd = wkData[exCat];
-      const baseTarget = wkData.deload ? getDeloadWt(currentEx) : (activeMeso.id === "rp-meso-5" ? getMeso5ProgrammedWeight(currentEx, week + 1, minStep) : (currentEx.wt ? Math.round((currentEx.wt + weeklyAdd) / minStep) * minStep : null));
+      const weeklyAdd = wkData[exCat] || 0;
+      const baseTarget = wkData.deload ? getDeloadWt(currentEx) : (currentEx.wt != null ? Math.round((currentEx.wt + weeklyAdd) / minStep) * minStep : null);
+      const recommendation = getSmartRecommendation(currentEx, minStep, baseTarget);
       const lastLogged = logged[timer.setNum];
-      const targetWt = lastLogged ? lastLogged.wt : getSmartWt(currentEx, exCat, minStep, weeklyAdd, baseTarget);
-      const targetReps = activeMeso.id === "rp-meso-5" ? String(getMeso5LoadRecommendation(currentEx, (() => { let p = {}; try { p = JSON.parse(localStorage.getItem('training-hub-perf-' + activeMeso.shortName.replace(/\s+/g, '-')) || '{}'); } catch(e) {} return p[currentEx.name]; })(), week + 1, wkData.rir, minStep, baseTarget).targetReps || getMeso5TargetReps(currentEx)) : (lastLogged ? String(lastLogged.reps) : currentEx.reps.split("-").at(-1));
+      const targetWt = lastLogged ? lastLogged.wt : recommendation.weight;
+      const targetReps = lastLogged ? String(lastLogged.reps) : String(recommendation.targetReps || (activeMeso.shortName === "Meso 5" ? getMeso5TargetReps(currentEx) : currentEx.reps.split("-").at(-1)));
       return { exName: currentEx.name, muscles: currentEx.muscles, nextSetNum, totalSets: currentTotalSets, targetReps, targetWt, isBW: !currentEx.wt && currentEx.wt !== 0, restSeconds: currentEx.rest, isLastExInSession: false };
     }
 
@@ -4902,10 +4885,11 @@ export default function App() {
     // First set of next exercise
     const exCat = getExCategory(nextEx.name, nextEx.rest);
     const minStep = (exCat === "smith" || nextEx.name.startsWith("DB ")) ? 5 : 2.5;
-    const weeklyAdd = wkData[exCat];
-    const baseTarget = wkData.deload ? getDeloadWt(nextEx) : (activeMeso.id === "rp-meso-5" ? getMeso5ProgrammedWeight(nextEx, week + 1, minStep) : (nextEx.wt ? Math.round((nextEx.wt + weeklyAdd) / minStep) * minStep : null));
-    const targetWt = getSmartWt(nextEx, exCat, minStep, weeklyAdd, baseTarget);
-    const targetReps = activeMeso.id === "rp-meso-5" ? String(getMeso5LoadRecommendation(nextEx, (() => { let p = {}; try { p = JSON.parse(localStorage.getItem('training-hub-perf-' + activeMeso.shortName.replace(/\s+/g, '-')) || '{}'); } catch(e) {} return p[nextEx.name]; })(), week + 1, wkData.rir, minStep, baseTarget).targetReps || getMeso5TargetReps(nextEx)) : nextEx.reps.split("-").at(-1);
+    const weeklyAdd = wkData[exCat] || 0;
+    const baseTarget = wkData.deload ? getDeloadWt(nextEx) : (nextEx.wt != null ? Math.round((nextEx.wt + weeklyAdd) / minStep) * minStep : null);
+    const recommendation = getSmartRecommendation(nextEx, minStep, baseTarget);
+    const targetWt = recommendation.weight;
+    const targetReps = String(recommendation.targetReps || (activeMeso.shortName === "Meso 5" ? getMeso5TargetReps(nextEx) : nextEx.reps.split("-").at(-1)));
     const isLastEx = currentIdx + 1 === allExercises.length - 1;
     return { exName: nextEx.name, muscles: nextEx.muscles, nextSetNum: 1, totalSets: wkData.deload ? deloadSets : nextEx.sets, targetReps, targetWt, isBW: !nextEx.wt && nextEx.wt !== 0, restSeconds: nextEx.rest, isLastExInSession: isLastEx, isNewExercise: true };
   }, [timer, r, sessionKey, allSets, activeWeeks, week]);
