@@ -1597,7 +1597,7 @@ const SetRow = React.memo(function SetRow({ setNum, isLastSet, targetReps, targe
     if (!isDone && !editing && !userEditedWt.current && lastWeight == null) {
       setEditWt(targetWt?.toString() || (isBW ? "0" : ""));
     }
-  }, [targetWt]);
+  }, [targetWt, lastWeight, isBW, isDone, editing]);
 
   // Display values: show logged data when done, local state when editing/entering
   const reps = isDone ? logged.reps.toString() : editReps;
@@ -1615,7 +1615,7 @@ const SetRow = React.memo(function SetRow({ setNum, isLastSet, targetReps, targe
 
   // When lastWeight changes from a previous set, update the input for unlogged sets
   useEffect(() => {
-    if (!logged && !editing && lastWeight != null && !isBW) {
+    if (!logged && !editing && !userEditedWt.current && lastWeight != null && !isBW) {
       setEditWt(lastWeight.toString());
     }
   }, [lastWeight]);
@@ -4892,7 +4892,7 @@ export default function App() {
     const targetReps = String(recommendation.targetReps || (activeMeso.shortName === "Meso 5" ? getMeso5TargetReps(nextEx) : nextEx.reps.split("-").at(-1)));
     const isLastEx = currentIdx + 1 === allExercises.length - 1;
     return { exName: nextEx.name, muscles: nextEx.muscles, nextSetNum: 1, totalSets: wkData.deload ? deloadSets : nextEx.sets, targetReps, targetWt, isBW: !nextEx.wt && nextEx.wt !== 0, restSeconds: nextEx.rest, isLastExInSession: isLastEx, isNewExercise: true };
-  }, [timer, r, sessionKey, allSets, activeWeeks, week]);
+  }, [timer, r, sessionKey, allSets, activeWeeks, activeMeso, week]);
 
   // Handle logging a set from the timer's NextSetCard
   const logFromTimer = useCallback((exName, setNum, data, nextSetInfo, dismissTimer) => {
