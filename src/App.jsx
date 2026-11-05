@@ -4890,8 +4890,12 @@ export default function App() {
     const recommendation = getSmartRecommendation(nextEx, minStep, baseTarget);
     const targetWt = recommendation.weight;
     const targetReps = String(recommendation.targetReps || (activeMeso.shortName === "Meso 5" ? getMeso5TargetReps(nextEx) : nextEx.reps.split("-").at(-1)));
+    const nextAddedSets = (!wkData.deload && nextEx.addSets)
+      ? Object.entries(nextEx.addSets).reduce((sum, [w, n]) => sum + (parseInt(w, 10) <= week + 1 ? n : 0), 0)
+      : 0;
+    const nextTotalSets = wkData.deload ? deloadSets : nextEx.sets + nextAddedSets;
     const isLastEx = currentIdx + 1 === allExercises.length - 1;
-    return { exName: nextEx.name, muscles: nextEx.muscles, nextSetNum: 1, totalSets: wkData.deload ? deloadSets : nextEx.sets, targetReps, targetWt, isBW: !nextEx.wt && nextEx.wt !== 0, restSeconds: nextEx.rest, isLastExInSession: isLastEx, isNewExercise: true };
+    return { exName: nextEx.name, muscles: nextEx.muscles, nextSetNum: 1, totalSets: nextTotalSets, targetReps, targetWt, isBW: !nextEx.wt && nextEx.wt !== 0, restSeconds: nextEx.rest, isLastExInSession: isLastEx, isNewExercise: true };
   }, [timer, r, sessionKey, allSets, activeWeeks, activeMeso, week]);
 
   // Handle logging a set from the timer's NextSetCard
