@@ -718,6 +718,16 @@ function getExCategory(name, rest) {
   return "iso"; // cable/landmine isolation
 }
 
+// Equipment-specific load increments. Barbells and Smith machines use 5-lb
+// total jumps; dumbbells use available rack increments; cable stacks may use 2.5.
+function getExerciseLoadStep(ex) {
+  const name = String(ex?.name || "");
+  if (name.toLowerCase().startsWith("smith") ||
+      name.startsWith("DB ") ||
+      name.toLowerCase().startsWith("barbell ")) return 5;
+  return 2.5;
+}
+
 function parseRirTarget(rir) {
   const values = (String(rir ?? "").match(/\d+(?:\.\d+)?/g) || []).map(Number);
   if (!values.length) return null;
@@ -1762,6 +1772,7 @@ const SetRow = React.memo(function SetRow({ setNum, isLastSet, targetReps, targe
     && prev.logged?.band === next.logged?.band
     && prev.logged?.rir === next.logged?.rir
     && prev.lastWeight === next.lastWeight
+    && prev.lastReps === next.lastReps
     && (prev.logged == null) === (next.logged == null);
 });
 
@@ -2055,8 +2066,6 @@ function saveSessionPerformance(allSets, sessionKey, weekNumber, rir, mesoPrefix
 
 function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, onStartRest, onSave, onSync, onDeleteFromDb, mesoPrefix, isLastExercise, skipped, onToggleSkip }) {
   const [expanded, setExpanded] = useState(false);
-  const lastWeightRef = useRef(null);
-  const lastRepsRef = useRef(null);
   const exKey = `${sessionKey}|${ex.name}`;
   const logged = allSets[exKey] || {};
   const numDone = Object.keys(logged).length;
@@ -2071,8 +2080,8 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
 
   const exCat = getExCategory(ex.name, ex.rest);
   const weeklyAdd = wkData[exCat]; // smith, cable, or iso
-  // DB rack is 5-lb steps only (5–30), so DBs round like Smith
-  const minStep = (exCat === "smith" || ex.name.startsWith("DB ")) ? 5 : 2.5; // rounding step
+  // Use the actual equipment increment for every recommendation and rounding path.
+  const minStep = getExerciseLoadStep(ex);
 
   // For deload: use actual W5 performance × 0.5 rather than programmed base × 0.5
   const deloadActualTarget = useMemo(() => {
@@ -2200,9 +2209,6 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
       }
       return { ...prev, [exKey]: updatedEx };
     });
-    // Store the latest weight/reps so unlogged SetRows can pick them up
-    if (data.wt !== undefined) lastWeightRef.current = data.wt;
-    if (data.reps !== undefined) lastRepsRef.current = data.reps;
     onSync(ex.name, setNum, data.reps, data.wt, data.band, data.rir ?? null, ex.muscles);
     const isLastSet = setNum >= totalSets;
     if (!(isLastExercise && isLastSet)) {
@@ -2296,9 +2302,17 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
             </div>
           )}
 
-          {Array.from({ length: totalSets }, (_, i) => (
-            <SetRow key={i} setNum={i + 1} isLastSet={i + 1 === totalSets} targetReps={smartTargetReps ? String(smartTargetReps) : (mesoPrefix === "Meso 5" ? String(getMeso5TargetReps(ex)) : ex.reps.split("-").at(-1))} targetWt={targetWt} lastWeight={lastWeightRef.current} lastReps={lastRepsRef.current} isBW={!!ex.bodyweight} bands={ex.bands} logged={logged[i + 1]} onLog={logSet} onDelete={deleteSet} onRir={handleRir} />
-          ))}
+          {Array.from({ length: totalSets }, (_, i) => {
+            const setNum = i + 1;
+            // Each unlogged set inherits the most recently logged preceding set.
+            // Derive from state rather than mutable refs so React.memo and reloads
+            // cannot leave later set inputs stale after a manual first-set change.
+            const priorSet = Object.entries(logged)
+              .filter(([n]) => Number(n) < setNum)
+              .sort((a, b) => Number(a[0]) - Number(b[0]))
+              .at(-1)?.[1] || null;
+            return <SetRow key={i} setNum={setNum} isLastSet={setNum === totalSets} targetReps={smartTargetReps ? String(smartTargetReps) : (mesoPrefix === "Meso 5" ? String(getMeso5TargetReps(ex)) : ex.reps.split("-").at(-1))} targetWt={targetWt} lastWeight={priorSet?.wt ?? null} lastReps={priorSet?.reps ?? null} isBW={!!ex.bodyweight} bands={ex.bands} logged={logged[setNum]} onLog={logSet} onDelete={deleteSet} onRir={handleRir} />;
+          })}
         </div>
       )}
     </div>
@@ -4867,7 +4881,7 @@ export default function App() {
 
     // Deload weight helper: actual last-week avgWt × 0.5 from localStorage, fallback to programmed × 0.5
     const getDeloadWt = (ex) => {
-      const step = (ex.name.toLowerCase().startsWith("smith") || ex.name.startsWith("DB ")) ? 5 : 2.5;
+      const step = getExerciseLoadStep(ex);
       if (wkData.preDeloaded) return ex.wt || null; // ex.wt already deloaded by makeDeloadRoutines
       const perfKey = 'training-hub-perf-' + activeMeso.shortName.replace(/\s+/g, '-');
       let perf = {};
@@ -4882,7 +4896,7 @@ export default function App() {
     if (nextSetNum <= currentTotalSets) {
       // Next set of SAME exercise
       const exCat = getExCategory(currentEx.name, currentEx.rest);
-      const minStep = (exCat === "smith" || currentEx.name.startsWith("DB ")) ? 5 : 2.5;
+      const minStep = getExerciseLoadStep(currentEx);
       const weeklyAdd = wkData[exCat] || 0;
       const baseTarget = wkData.deload ? getDeloadWt(currentEx) : (currentEx.wt != null ? Math.round((currentEx.wt + weeklyAdd) / minStep) * minStep : null);
       const recommendation = getSmartRecommendation(currentEx, minStep, baseTarget);
@@ -4898,7 +4912,7 @@ export default function App() {
 
     // First set of next exercise
     const exCat = getExCategory(nextEx.name, nextEx.rest);
-    const minStep = (exCat === "smith" || nextEx.name.startsWith("DB ")) ? 5 : 2.5;
+    const minStep = getExerciseLoadStep(nextEx);
     const weeklyAdd = wkData[exCat] || 0;
     const baseTarget = wkData.deload ? getDeloadWt(nextEx) : (nextEx.wt != null ? Math.round((nextEx.wt + weeklyAdd) / minStep) * minStep : null);
     const recommendation = getSmartRecommendation(nextEx, minStep, baseTarget);
