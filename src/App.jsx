@@ -869,6 +869,60 @@ function getMeso5LoadRecommendation(ex, perf, targetWeek, currentRirLabel, minSt
 
   return { weight, targetReps, note };
 }
+
+// Shared source of truth for all recommended working loads.
+function getExerciseLoadRecommendation(ex, perf, targetWeek, wkData, mesoPrefix, minStep, baseTarget) {
+  if (ex.wt == null || wkData.deload) return { weight: baseTarget, targetReps: mesoPrefix === "Meso 5" ? getMeso5TargetReps(ex) : null, note: null, smartTarget: null, smartTargetReps: null };
+  if (mesoPrefix === "Meso 5") {
+    const r = getMeso5LoadRecommendation(ex, perf, targetWeek, wkData.rir, minStep, baseTarget);
+    return { weight: r.weight, targetReps: r.targetReps, note: r.note, smartTarget: r.weight != null && r.weight !== baseTarget ? r.weight : null, smartTargetReps: r.targetReps !== getMeso5TargetReps(ex) ? r.targetReps : null };
+  }
+  if (!perf || perf.avgWt == null) return { weight: baseTarget, targetReps: null, note: null, smartTarget: null, smartTargetReps: null };
+  const avgWt = Number(perf.avgWt), avgReps = Number(perf.avgReps), lastWk = Number(perf.weekNumber) || 0;
+  if (!Number.isFinite(avgWt) || !Number.isFinite(avgReps) || lastWk > targetWeek) return { weight: baseTarget, targetReps: null, note: null, smartTarget: null, smartTargetReps: null };
+  if (lastWk === targetWeek) {
+    const hold = Math.round(avgWt / minStep) * minStep;
+    return { weight: hold, targetReps: null, note: null, smartTarget: hold !== baseTarget ? hold : null, smartTargetReps: null };
+  }
+  if (ex.rirCap != null) {
+    const rirTarget = parseInt(wkData.rir);
+    if (!isNaN(rirTarget) && rirTarget < ex.rirCap) {
+      const hold = Math.round(avgWt / minStep) * minStep;
+      return { weight: hold, targetReps: null, note: `⚠ Holding — week target (${rirTarget} RIR) exceeds ${ex.rirCap}+ RIR safety cap`, smartTarget: hold !== baseTarget ? hold : null, smartTargetReps: null };
+    }
+  }
+  const [minReps, maxRaw] = ex.reps.split("-").map(Number), maxReps = maxRaw || minReps;
+  let adjusted, note, repsAdj = null;
+  const targetRir = perf.rir ? parseInt(perf.rir) : null;
+  const rirDiff = perf.avgRir != null && targetRir != null ? Number(perf.avgRir) - targetRir : null;
+  const weeklyAdd = wkData[getExCategory(ex.name, ex.rest)] || 0;
+  if (avgReps < minReps) {
+    const gap = minReps - avgReps;
+    const down = rirDiff != null && rirDiff <= -2 ? Math.max(1, Math.ceil(gap / 2)) : Math.floor(gap / 2);
+    if (down > 0) { adjusted = Math.round((avgWt - down * minStep) / minStep) * minStep; note = `↓ Reduced ${down > 1 ? `${down}× ` : ""}— only ${Math.round(avgReps)} reps last session (min ${minReps}), recalibrating for new range`; }
+    else { adjusted = Math.round(avgWt / minStep) * minStep; note = `⏸ Holding @ ${Math.round(avgWt)} lb — ${Math.round(avgReps)} reps, 1 below floor, should resolve next session`; }
+    repsAdj = maxReps;
+  } else if (avgReps > maxReps) {
+    adjusted = Math.round((avgWt + weeklyAdd + minStep) / minStep) * minStep;
+    note = `↑ Bumped — ${Math.round(avgReps)} reps @ ${Math.round(avgWt)} lb last session (exceeded range)`;
+  } else {
+    let add = weeklyAdd;
+    if (rirDiff != null) {
+      if (rirDiff >= 2) { add += minStep; note = `↑↑ Extra bump — ${Math.round(perf.avgRir)} RIR logged vs ${targetRir} target`; }
+      else if (rirDiff <= -3) { adjusted = Math.round((avgWt - minStep) / minStep) * minStep; note = `↓ Reduced — ${Math.round(perf.avgRir)} RIR logged (too far below ${targetRir} target)`; }
+      else if (rirDiff <= -2) { adjusted = Math.round(avgWt / minStep) * minStep; note = `⏸ Holding — ${Math.round(perf.avgRir)} RIR logged (grinding past ${targetRir} target)`; }
+    }
+    if (adjusted === undefined) {
+      adjusted = Math.round((avgWt + add) / minStep) * minStep;
+      const tag = perf.rir ? ` (${perf.rir})` : "";
+      if (avgWt < ex.wt - minStep / 2) note = `↓ ${Math.round(avgWt)} lb used last${tag} → ${adjusted} lb this week`;
+      else if (avgWt > ex.wt + minStep / 2) note = `↑ ${Math.round(avgWt)} lb used last${tag} → ${adjusted} lb this week`;
+    }
+    if (adjusted === Math.round(avgWt / minStep) * minStep && (rirDiff == null || rirDiff >= 0)) repsAdj = maxReps;
+  }
+  if (adjusted === undefined) return { weight: baseTarget, targetReps: null, note: null, smartTarget: null, smartTargetReps: null };
+  return { weight: adjusted, targetReps: repsAdj, note: note || null, smartTarget: adjusted !== baseTarget ? adjusted : null, smartTargetReps: repsAdj };
+}
 // ============================================================
 // MESOCYCLE DEFINITIONS
 // Each mesocycle has its own routines, weeks config, and date range.
