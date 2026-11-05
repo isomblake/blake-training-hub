@@ -842,7 +842,11 @@ function getMeso5LoadRecommendation(ex, perf, targetWeek, currentRirLabel, minSt
   // a meaningful threshold rather than a near-zero percentage calculation.
   const jump = weight - lastWt;
   const tooLargeJump = jump > Math.max(step, lastWt * 0.05) + 0.001;
-  const repsAtPreviousTarget = Number.isFinite(observedReps) && observedReps >= lastTargetReps;
+  // Require every recorded set to reach the prior target before advancing load.
+  // An average can hide an under-target set and advance progression prematurely.
+  const repsAtPreviousTarget = setReps.length
+    ? setReps.every(reps => reps >= lastTargetReps)
+    : Number.isFinite(observedReps) && observedReps >= lastTargetReps;
   const notClearlyHard = actualRir == null || lastTargetRir == null || actualRir >= lastTargetRir - 0.5;
   const nextRepTarget = [8, 10, 12, 15, 16, 18, 20].find(value => value > lastTargetReps && value <= maxReps);
 
@@ -1580,6 +1584,16 @@ const SetRow = React.memo(function SetRow({ setNum, isLastSet, targetReps, targe
   const [editing, setEditing] = useState(false);
   const [showRirPicker, setShowRirPicker] = useState(false);
   const isDone = logged != null && !editing;
+  const previousLoggedRef = useRef(logged != null);
+  // Timer logging bypasses the SetRow handlers. Detect a newly completed final
+  // set here so its RIR prompt appears after that set is actually logged.
+  useEffect(() => {
+    const hasLogged = logged != null;
+    if (!previousLoggedRef.current && hasLogged && isLastSet && logged.rir == null) {
+      setShowRirPicker(true);
+    }
+    previousLoggedRef.current = hasLogged;
+  }, [logged, isLastSet]);
   const userEditedReps = useRef(false);
   const userEditedWt = useRef(false);
 
@@ -1872,7 +1886,7 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone, nextSetInfo, on
           )}
         </div>
 
-        {nsi.nextSetNum === nsi.totalSets ? (
+        {false ? (
           <>
             <div style={{ fontSize: 10, color: C.mut, marginBottom: 8, textAlign: "center", letterSpacing: 0.5 }}>REPS IN RESERVE — tap to log final set</div>
             <div style={{ display: "flex", gap: 8, marginBottom: 16, width: "100%" }}>
@@ -4911,16 +4925,20 @@ export default function App() {
       const allExercises = r.sections.flatMap(sec => sec.exercises);
       const isLastExercise = allExercises[allExercises.length - 1]?.name === exName;
       const currentEx = allExercises.find(ex => ex.name === exName);
-      const isLastSet = currentEx && setNum >= currentEx.sets;
+      const isDeload = activeWeeks[week]?.deload;
+      const addedSets = (!isDeload && currentEx?.addSets)
+        ? Object.entries(currentEx.addSets).reduce((sum, [w, n]) => sum + (parseInt(w, 10) <= week + 1 ? n : 0), 0)
+        : 0;
+      const currentTotalSets = isDeload ? 2 : (currentEx ? currentEx.sets + addedSets : nextSetInfo.totalSets);
+      const isLastSet = currentEx && setNum >= currentTotalSets;
       const isFinalSetOfSession = isLastExercise && isLastSet;
 
       if (!isFinalSetOfSession) {
         const restEx = allExercises.find(ex => ex.name === exName);
         const restSeconds = restEx ? restEx.rest : 90;
-        const isDeload = activeWeeks[week]?.deload;
         const cappedRest = isDeload ? Math.min(restSeconds, 75) : restSeconds;
         setTimerKey(k => k + 1);
-        setTimer({ seconds: cappedRest, exName, setNum, totalSets: currentEx?.sets || nextSetInfo.totalSets });
+        setTimer({ seconds: cappedRest, exName, setNum, totalSets: currentTotalSets });
       } else {
         // Final set of session — dismiss the timer overlay
         setTimer(null);
