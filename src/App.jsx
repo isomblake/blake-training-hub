@@ -920,7 +920,7 @@ function getExerciseLoadRecommendation(ex, perf, targetWeek, wkData, mesoPrefix,
     }
     if (adjusted === Math.round(avgWt / minStep) * minStep && (rirDiff == null || rirDiff >= 0)) repsAdj = maxReps;
   }
-  if (adjusted === undefined) return { weight: baseTarget, targetReps: null, note: null, smartTarget: null, smartTargetReps: null };
+  if (adjusted === undefined || (adjusted === baseTarget && repsAdj == null)) return { weight: baseTarget, targetReps: null, note: null, smartTarget: null, smartTargetReps: null };
   return { weight: adjusted, targetReps: repsAdj, note: note || null, smartTarget: adjusted !== baseTarget ? adjusted : null, smartTargetReps: repsAdj };
 }
 // ============================================================
