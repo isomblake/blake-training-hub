@@ -869,6 +869,60 @@ function getMeso5LoadRecommendation(ex, perf, targetWeek, currentRirLabel, minSt
 
   return { weight, targetReps, note };
 }
+
+// Shared source of truth for all recommended working loads.
+function getExerciseLoadRecommendation(ex, perf, targetWeek, wkData, mesoPrefix, minStep, baseTarget) {
+  if (ex.wt == null || wkData.deload) return { weight: baseTarget, targetReps: mesoPrefix === "Meso 5" ? getMeso5TargetReps(ex) : null, note: null, smartTarget: null, smartTargetReps: null };
+  if (mesoPrefix === "Meso 5") {
+    const r = getMeso5LoadRecommendation(ex, perf, targetWeek, wkData.rir, minStep, baseTarget);
+    return { weight: r.weight, targetReps: r.targetReps, note: r.note, smartTarget: r.weight != null && r.weight !== baseTarget ? r.weight : null, smartTargetReps: r.targetReps !== getMeso5TargetReps(ex) ? r.targetReps : null };
+  }
+  if (!perf || perf.avgWt == null) return { weight: baseTarget, targetReps: null, note: null, smartTarget: null, smartTargetReps: null };
+  const avgWt = Number(perf.avgWt), avgReps = Number(perf.avgReps), lastWk = Number(perf.weekNumber) || 0;
+  if (!Number.isFinite(avgWt) || !Number.isFinite(avgReps) || lastWk > targetWeek) return { weight: baseTarget, targetReps: null, note: null, smartTarget: null, smartTargetReps: null };
+  if (lastWk === targetWeek) {
+    const hold = Math.round(avgWt / minStep) * minStep;
+    return { weight: hold, targetReps: null, note: null, smartTarget: hold !== baseTarget ? hold : null, smartTargetReps: null };
+  }
+  if (ex.rirCap != null) {
+    const rirTarget = parseInt(wkData.rir);
+    if (!isNaN(rirTarget) && rirTarget < ex.rirCap) {
+      const hold = Math.round(avgWt / minStep) * minStep;
+      return { weight: hold, targetReps: null, note: `⚠ Holding — week target (${rirTarget} RIR) exceeds ${ex.rirCap}+ RIR safety cap`, smartTarget: hold !== baseTarget ? hold : null, smartTargetReps: null };
+    }
+  }
+  const [minReps, maxRaw] = ex.reps.split("-").map(Number), maxReps = maxRaw || minReps;
+  let adjusted, note, repsAdj = null;
+  const targetRir = perf.rir ? parseInt(perf.rir) : null;
+  const rirDiff = perf.avgRir != null && targetRir != null ? Number(perf.avgRir) - targetRir : null;
+  const weeklyAdd = wkData[getExCategory(ex.name, ex.rest)] || 0;
+  if (avgReps < minReps) {
+    const gap = minReps - avgReps;
+    const down = rirDiff != null && rirDiff <= -2 ? Math.max(1, Math.ceil(gap / 2)) : Math.floor(gap / 2);
+    if (down > 0) { adjusted = Math.round((avgWt - down * minStep) / minStep) * minStep; note = `↓ Reduced ${down > 1 ? `${down}× ` : ""}— only ${Math.round(avgReps)} reps last session (min ${minReps}), recalibrating for new range`; }
+    else { adjusted = Math.round(avgWt / minStep) * minStep; note = `⏸ Holding @ ${Math.round(avgWt)} lb — ${Math.round(avgReps)} reps, 1 below floor, should resolve next session`; }
+    repsAdj = maxReps;
+  } else if (avgReps > maxReps) {
+    adjusted = Math.round((avgWt + weeklyAdd + minStep) / minStep) * minStep;
+    note = `↑ Bumped — ${Math.round(avgReps)} reps @ ${Math.round(avgWt)} lb last session (exceeded range)`;
+  } else {
+    let add = weeklyAdd;
+    if (rirDiff != null) {
+      if (rirDiff >= 2) { add += minStep; note = `↑↑ Extra bump — ${Math.round(perf.avgRir)} RIR logged vs ${targetRir} target`; }
+      else if (rirDiff <= -3) { adjusted = Math.round((avgWt - minStep) / minStep) * minStep; note = `↓ Reduced — ${Math.round(perf.avgRir)} RIR logged (too far below ${targetRir} target)`; }
+      else if (rirDiff <= -2) { adjusted = Math.round(avgWt / minStep) * minStep; note = `⏸ Holding — ${Math.round(perf.avgRir)} RIR logged (grinding past ${targetRir} target)`; }
+    }
+    if (adjusted === undefined) {
+      adjusted = Math.round((avgWt + add) / minStep) * minStep;
+      const tag = perf.rir ? ` (${perf.rir})` : "";
+      if (avgWt < ex.wt - minStep / 2) note = `↓ ${Math.round(avgWt)} lb used last${tag} → ${adjusted} lb this week`;
+      else if (avgWt > ex.wt + minStep / 2) note = `↑ ${Math.round(avgWt)} lb used last${tag} → ${adjusted} lb this week`;
+    }
+    if (adjusted === Math.round(avgWt / minStep) * minStep && (rirDiff == null || rirDiff >= 0)) repsAdj = maxReps;
+  }
+  if (adjusted === undefined || (adjusted === baseTarget && repsAdj == null)) return { weight: baseTarget, targetReps: null, note: null, smartTarget: null, smartTargetReps: null };
+  return { weight: adjusted, targetReps: repsAdj, note: note || null, smartTarget: adjusted !== baseTarget ? adjusted : null, smartTargetReps: repsAdj };
+}
 // ============================================================
 // MESOCYCLE DEFINITIONS
 // Each mesocycle has its own routines, weeks config, and date range.
@@ -1543,7 +1597,7 @@ const SetRow = React.memo(function SetRow({ setNum, isLastSet, targetReps, targe
     if (!isDone && !editing && !userEditedWt.current && lastWeight == null) {
       setEditWt(targetWt?.toString() || (isBW ? "0" : ""));
     }
-  }, [targetWt]);
+  }, [targetWt, lastWeight, isBW, isDone, editing]);
 
   // Display values: show logged data when done, local state when editing/entering
   const reps = isDone ? logged.reps.toString() : editReps;
@@ -1561,7 +1615,7 @@ const SetRow = React.memo(function SetRow({ setNum, isLastSet, targetReps, targe
 
   // When lastWeight changes from a previous set, update the input for unlogged sets
   useEffect(() => {
-    if (!logged && !editing && lastWeight != null && !isBW) {
+    if (!logged && !editing && !userEditedWt.current && lastWeight != null && !isBW) {
       setEditWt(lastWeight.toString());
     }
   }, [lastWeight]);
@@ -2025,75 +2079,11 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
       : Math.round((ex.wt + weeklyAdd) / minStep) * minStep
     : null;
 
-  // Helper: run the progression computation given raw perf data
+  // Delegate progression to the shared recommendation function.
   function computeAdjustment(avgWt, avgReps, lastWk, lastRir, lastAvgRir, perfRecord) {
-    if (mesoPrefix === "Meso 5") {
-      if (lastWk > (week + 1)) return {};
-      const recommendation = getMeso5LoadRecommendation(
-        ex,
-        { ...(perfRecord || {}), avgWt, avgReps, weekNumber: lastWk, rir: lastRir, avgRir: lastAvgRir },
-        week + 1,
-        wkData.rir,
-        minStep,
-        baseTarget
-      );
-      return {
-        smartTarget: recommendation.weight != null && recommendation.weight !== baseTarget ? recommendation.weight : null,
-        progressNote: recommendation.note,
-        smartTargetReps: recommendation.targetReps !== getMeso5TargetReps(ex) ? recommendation.targetReps : null,
-      };
-    }
-    if (lastWk > (week + 1)) return {};
-    if (lastWk === (week + 1)) {
-      const holdWt = Math.round(avgWt / minStep) * minStep;
-      return holdWt !== baseTarget ? { smartTarget: holdWt } : {};
-    }
-    if (ex.rirCap != null) {
-      const weekRirTarget = parseInt(wkData.rir);
-      if (!isNaN(weekRirTarget) && weekRirTarget < ex.rirCap) {
-        const holdWt = Math.round(avgWt / minStep) * minStep;
-        return { smartTarget: holdWt !== baseTarget ? holdWt : null, progressNote: `⚠ Holding — week target (${weekRirTarget} RIR) exceeds ${ex.rirCap}+ RIR safety cap`, smartTargetReps: null };
-      }
-    }
-    const repRange = ex.reps.split("-").map(Number);
-    const minReps = repRange[0], maxReps = repRange[1] || repRange[0];
-    let adjusted, note, repsAdj = null;
-    const targetRirLow = lastRir ? parseInt(lastRir) : null;
-    const rirDiff = (lastAvgRir != null && targetRirLow != null) ? lastAvgRir - targetRirLow : null;
-    if (avgReps < minReps) {
-      const gap = minReps - avgReps;
-      const stepsDown = (rirDiff != null && rirDiff <= -2) ? Math.max(1, Math.ceil(gap / 2)) : Math.floor(gap / 2);
-      if (stepsDown > 0) {
-        adjusted = Math.round((avgWt - stepsDown * minStep) / minStep) * minStep;
-        note = `↓ Reduced ${stepsDown > 1 ? `${stepsDown}× ` : ""}— only ${Math.round(avgReps)} reps last session (min ${minReps}), recalibrating for new range`;
-      } else {
-        adjusted = Math.round(avgWt / minStep) * minStep;
-        note = `⏸ Holding @ ${Math.round(avgWt)} lb — ${Math.round(avgReps)} reps, 1 below floor, should resolve next session`;
-      }
-      repsAdj = maxReps;
-    } else if (avgReps > maxReps) {
-      adjusted = Math.round((avgWt + weeklyAdd + minStep) / minStep) * minStep;
-      note = `↑ Bumped — ${Math.round(avgReps)} reps @ ${Math.round(avgWt)} lb last session (exceeded range)`;
-    } else {
-      let add = weeklyAdd;
-      if (rirDiff != null) {
-        if (rirDiff >= 2) { add = weeklyAdd + minStep; note = `↑↑ Extra bump — ${Math.round(lastAvgRir)} RIR logged vs ${targetRirLow} target`; }
-        else if (rirDiff <= -3) { adjusted = Math.round((avgWt - minStep) / minStep) * minStep; note = `↓ Reduced — ${Math.round(lastAvgRir)} RIR logged (too far below ${targetRirLow} target)`; }
-        else if (rirDiff <= -2) { adjusted = Math.round(avgWt / minStep) * minStep; note = `⏸ Holding — ${Math.round(lastAvgRir)} RIR logged (grinding past target)`; }
-      }
-      if (adjusted === undefined) {
-        adjusted = Math.round((avgWt + add) / minStep) * minStep;
-        const rirTag = lastRir ? ` (${lastRir})` : "";
-        if (!note) {
-          if (avgWt < ex.wt - minStep / 2) note = `↓ ${Math.round(avgWt)} lb used last${rirTag} → ${adjusted} lb this week`;
-          else if (avgWt > ex.wt + minStep / 2) note = `↑ ${Math.round(avgWt)} lb used last${rirTag} → ${adjusted} lb this week`;
-        }
-      }
-      if (adjusted === Math.round(avgWt / minStep) * minStep && (rirDiff == null || rirDiff >= 0)) repsAdj = maxReps;
-    }
-    if (adjusted === undefined) return {};
-    if (adjusted === baseTarget && repsAdj == null) return {};
-    return { smartTarget: adjusted !== baseTarget ? adjusted : null, progressNote: note || null, smartTargetReps: repsAdj };
+    const record = { ...(perfRecord || {}), avgWt, avgReps, weekNumber: lastWk, rir: lastRir, avgRir: lastAvgRir };
+    const r = getExerciseLoadRecommendation(ex, record, week + 1, wkData, mesoPrefix, minStep, baseTarget);
+    return { smartTarget: r.smartTarget, progressNote: r.note, smartTargetReps: r.smartTargetReps };
   }
 
   // Rehydrate per-set reps for performance records created before setReps was added.
@@ -4849,34 +4839,16 @@ export default function App() {
     const nextSetNum = timer.setNum + 1;
 
     const deloadSets = 2;
-    const currentTotalSets = wkData.deload ? deloadSets : currentEx.sets;
+    const addedSets = (!wkData.deload && currentEx.addSets)
+      ? Object.entries(currentEx.addSets).reduce((sum, [w, n]) => sum + (parseInt(w, 10) <= week + 1 ? n : 0), 0)
+      : 0;
+    const currentTotalSets = wkData.deload ? deloadSets : currentEx.sets + addedSets;
 
-    // Smart target helper: mirrors ExerciseCard's computeAdjustment using localStorage perf data
-    const getSmartWt = (ex, exCat, minStep, weeklyAdd, baseTarget) => {
-      if (!ex.wt || wkData.deload) return baseTarget;
-      if (activeMeso.id === "rp-meso-5") {
-        const perfKey = 'training-hub-perf-' + activeMeso.shortName.replace(/\\s+/g, '-');
-        let perf = {};
-        try { perf = JSON.parse(localStorage.getItem(perfKey) || '{}'); } catch(e) {}
-        return getMeso5LoadRecommendation(ex, perf[ex.name], week + 1, wkData.rir, minStep, baseTarget).weight;
-      }
+    const getSmartRecommendation = (ex, minStep, baseTarget) => {
       const perfKey = 'training-hub-perf-' + activeMeso.shortName.replace(/\s+/g, '-');
       let perf = {};
       try { perf = JSON.parse(localStorage.getItem(perfKey) || '{}'); } catch(e) {}
-      const last = perf[ex.name];
-      if (!last || last.avgWt == null) return baseTarget;
-      const lastWk = last.weekNumber || 0;
-      const curWk = week + 1;
-      if (lastWk > curWk) return baseTarget;
-      if (lastWk === curWk) {
-        const hold = Math.round(last.avgWt / minStep) * minStep;
-        return hold !== baseTarget ? hold : baseTarget;
-      }
-      const repRange = ex.reps.split("-").map(Number);
-      const min = repRange[0], max = repRange[1] || repRange[0];
-      if (last.avgReps < min) return Math.round(last.avgWt / minStep) * minStep;
-      if (last.avgReps > max) return Math.round((last.avgWt + weeklyAdd + minStep) / minStep) * minStep;
-      return Math.round((last.avgWt + weeklyAdd) / minStep) * minStep;
+      return getExerciseLoadRecommendation(ex, perf[ex.name], week + 1, wkData, activeMeso.shortName, minStep, baseTarget);
     };
 
     // Deload weight helper: actual last-week avgWt × 0.5 from localStorage, fallback to programmed × 0.5
@@ -4897,11 +4869,12 @@ export default function App() {
       // Next set of SAME exercise
       const exCat = getExCategory(currentEx.name, currentEx.rest);
       const minStep = (exCat === "smith" || currentEx.name.startsWith("DB ")) ? 5 : 2.5;
-      const weeklyAdd = wkData[exCat];
-      const baseTarget = wkData.deload ? getDeloadWt(currentEx) : (activeMeso.id === "rp-meso-5" ? getMeso5ProgrammedWeight(currentEx, week + 1, minStep) : (currentEx.wt ? Math.round((currentEx.wt + weeklyAdd) / minStep) * minStep : null));
+      const weeklyAdd = wkData[exCat] || 0;
+      const baseTarget = wkData.deload ? getDeloadWt(currentEx) : (currentEx.wt != null ? Math.round((currentEx.wt + weeklyAdd) / minStep) * minStep : null);
+      const recommendation = getSmartRecommendation(currentEx, minStep, baseTarget);
       const lastLogged = logged[timer.setNum];
-      const targetWt = lastLogged ? lastLogged.wt : getSmartWt(currentEx, exCat, minStep, weeklyAdd, baseTarget);
-      const targetReps = activeMeso.id === "rp-meso-5" ? String(getMeso5LoadRecommendation(currentEx, (() => { let p = {}; try { p = JSON.parse(localStorage.getItem('training-hub-perf-' + activeMeso.shortName.replace(/\s+/g, '-')) || '{}'); } catch(e) {} return p[currentEx.name]; })(), week + 1, wkData.rir, minStep, baseTarget).targetReps || getMeso5TargetReps(currentEx)) : (lastLogged ? String(lastLogged.reps) : currentEx.reps.split("-").at(-1));
+      const targetWt = lastLogged ? lastLogged.wt : recommendation.weight;
+      const targetReps = lastLogged ? String(lastLogged.reps) : String(recommendation.targetReps || (activeMeso.shortName === "Meso 5" ? getMeso5TargetReps(currentEx) : currentEx.reps.split("-").at(-1)));
       return { exName: currentEx.name, muscles: currentEx.muscles, nextSetNum, totalSets: currentTotalSets, targetReps, targetWt, isBW: !currentEx.wt && currentEx.wt !== 0, restSeconds: currentEx.rest, isLastExInSession: false };
     }
 
@@ -4912,13 +4885,18 @@ export default function App() {
     // First set of next exercise
     const exCat = getExCategory(nextEx.name, nextEx.rest);
     const minStep = (exCat === "smith" || nextEx.name.startsWith("DB ")) ? 5 : 2.5;
-    const weeklyAdd = wkData[exCat];
-    const baseTarget = wkData.deload ? getDeloadWt(nextEx) : (activeMeso.id === "rp-meso-5" ? getMeso5ProgrammedWeight(nextEx, week + 1, minStep) : (nextEx.wt ? Math.round((nextEx.wt + weeklyAdd) / minStep) * minStep : null));
-    const targetWt = getSmartWt(nextEx, exCat, minStep, weeklyAdd, baseTarget);
-    const targetReps = activeMeso.id === "rp-meso-5" ? String(getMeso5LoadRecommendation(nextEx, (() => { let p = {}; try { p = JSON.parse(localStorage.getItem('training-hub-perf-' + activeMeso.shortName.replace(/\s+/g, '-')) || '{}'); } catch(e) {} return p[nextEx.name]; })(), week + 1, wkData.rir, minStep, baseTarget).targetReps || getMeso5TargetReps(nextEx)) : nextEx.reps.split("-").at(-1);
+    const weeklyAdd = wkData[exCat] || 0;
+    const baseTarget = wkData.deload ? getDeloadWt(nextEx) : (nextEx.wt != null ? Math.round((nextEx.wt + weeklyAdd) / minStep) * minStep : null);
+    const recommendation = getSmartRecommendation(nextEx, minStep, baseTarget);
+    const targetWt = recommendation.weight;
+    const targetReps = String(recommendation.targetReps || (activeMeso.shortName === "Meso 5" ? getMeso5TargetReps(nextEx) : nextEx.reps.split("-").at(-1)));
+    const nextAddedSets = (!wkData.deload && nextEx.addSets)
+      ? Object.entries(nextEx.addSets).reduce((sum, [w, n]) => sum + (parseInt(w, 10) <= week + 1 ? n : 0), 0)
+      : 0;
+    const nextTotalSets = wkData.deload ? deloadSets : nextEx.sets + nextAddedSets;
     const isLastEx = currentIdx + 1 === allExercises.length - 1;
-    return { exName: nextEx.name, muscles: nextEx.muscles, nextSetNum: 1, totalSets: wkData.deload ? deloadSets : nextEx.sets, targetReps, targetWt, isBW: !nextEx.wt && nextEx.wt !== 0, restSeconds: nextEx.rest, isLastExInSession: isLastEx, isNewExercise: true };
-  }, [timer, r, sessionKey, allSets, activeWeeks, week]);
+    return { exName: nextEx.name, muscles: nextEx.muscles, nextSetNum: 1, totalSets: nextTotalSets, targetReps, targetWt, isBW: !nextEx.wt && nextEx.wt !== 0, restSeconds: nextEx.rest, isLastExInSession: isLastEx, isNewExercise: true };
+  }, [timer, r, sessionKey, allSets, activeWeeks, activeMeso, week]);
 
   // Handle logging a set from the timer's NextSetCard
   const logFromTimer = useCallback((exName, setNum, data, nextSetInfo, dismissTimer) => {
