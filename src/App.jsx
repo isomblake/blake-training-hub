@@ -4845,7 +4845,7 @@ export default function App() {
     const currentTotalSets = wkData.deload ? deloadSets : currentEx.sets + addedSets;
 
     const getSmartRecommendation = (ex, minStep, baseTarget) => {
-      const perfKey = 'training-hub-perf-' + activeMeso.shortName.replace(/\\s+/g, '-');
+      const perfKey = 'training-hub-perf-' + activeMeso.shortName.replace(/\s+/g, '-');
       let perf = {};
       try { perf = JSON.parse(localStorage.getItem(perfKey) || '{}'); } catch(e) {}
       return getExerciseLoadRecommendation(ex, perf[ex.name], week + 1, wkData, activeMeso.shortName, minStep, baseTarget);
