@@ -1897,7 +1897,7 @@ function RestTimer({ seconds, exName, setNum, totalSets, onDone, nextSetInfo, on
           )}
         </div>
 
-        {false ? (
+        {nsi.nextSetNum === nsi.totalSets ? (
           <>
             <div style={{ fontSize: 10, color: C.mut, marginBottom: 8, textAlign: "center", letterSpacing: 0.5 }}>REPS IN RESERVE — tap to log final set</div>
             <div style={{ display: "flex", gap: 8, marginBottom: 16, width: "100%" }}>
