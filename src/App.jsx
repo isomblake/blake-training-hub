@@ -1726,10 +1726,11 @@ const SetRow = React.memo(function SetRow({ setNum, isLastSet, targetReps, targe
     if (editReps && (isBW || editWt)) {
       const data = { reps: parseInt(editReps), wt: weight, targetReps: parseInt(targetReps, 10) || null };
       if (band) data.band = band;
-      const wasEditing = editing;
+      // Preserve an already-recorded RIR when editing a completed final set.
+      if (logged?.rir != null) data.rir = logged.rir;
       onLog(setNum, data);
       setEditing(false);
-      if (!wasEditing && isLastSet) setShowRirPicker(true);
+      if (isLastSet && data.rir == null) setShowRirPicker(true);
     }
   };
 
@@ -1834,6 +1835,7 @@ const SetRow = React.memo(function SetRow({ setNum, isLastSet, targetReps, targe
   );
 }, (prev, next) => {
   return prev.setNum === next.setNum
+    && prev.isLastSet === next.isLastSet
     && prev.targetWt === next.targetWt
     && prev.targetReps === next.targetReps
     && prev.isBW === next.isBW
