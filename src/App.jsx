@@ -621,7 +621,7 @@ const db = {
     // Issue #7: Filter by meso so old program data doesn't bleed in
     let { data: sessions } = await supabase
       .from('sessions')
-      .select('id, date, week_number, notes')
+      .select('id, date, week_number, notes, rir')
       .lt('date', beforeDate || '9999-12-31')
       .order('date', { ascending: false })
       .limit(10);
@@ -914,6 +914,12 @@ function getExerciseLoadRecommendation(ex, perf, targetWeek, wkData, mesoPrefix,
       const hold = Math.round(avgWt / minStep) * minStep;
       return { weight: hold, targetReps: null, note: `⚠ Holding — week target (${rirTarget} RIR) exceeds ${ex.rirCap}+ RIR safety cap`, smartTarget: hold !== baseTarget ? hold : null, smartTargetReps: null };
     }
+  }
+  // Knee-sensitive lifts never receive automatic load increases. The athlete can
+  // make a deliberate manual increase after repeatable, symptom-stable sessions.
+  if (ex.noAutoLoadIncrease) {
+    const hold = Math.max(0, Math.round(avgWt / minStep) * minStep);
+    return { weight: hold, targetReps: null, note: "Knee-sensitive lift: load held automatically; increase manually only after symptom-stable sessions", smartTarget: hold !== baseTarget ? hold : null, smartTargetReps: null };
   }
   const [minReps, maxRaw] = ex.reps.split("-").map(Number), maxReps = maxRaw || minReps;
   let adjusted, note, repsAdj = null;
