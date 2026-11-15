@@ -633,12 +633,22 @@ const db = {
     for (const session of sessions) {
       const { data: sets } = await supabase
         .from('sets')
-        .select('reps, weight, set_number')
+        .select('reps, weight, set_number, notes')
         .eq('session_id', session.id)
         .eq('exercise_id', ex.id);
 
       if (sets && sets.length > 0) {
-        return { date: session.date, weekNumber: session.week_number, rir: session.rir, sets };
+        const parsedSets = (sets || []).map(set => {
+          let rir = null;
+          if (set.notes) {
+            set.notes.split('|').forEach(part => {
+              if (part.startsWith('rir:')) rir = Number.parseInt(part.slice(4), 10);
+            });
+          }
+          return { ...set, rir };
+        }).sort((a, b) => Number(a.set_number) - Number(b.set_number));
+        const finalSet = parsedSets[parsedSets.length - 1];
+        return { date: session.date, weekNumber: session.week_number, rir: session.rir, sets: parsedSets, actualRir: finalSet?.rir ?? null };
       }
     }
     return null;
@@ -2175,17 +2185,19 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
     db.getLastSessionForExercise(ex.name, tomorrow, mesoPrefix).then(last => {
       if (!last || !last.sets || last.sets.length === 0) return;
       const useSets = (ex.calibration && last.sets.length > 1) ? last.sets.slice(0, -1) : last.sets;
-      const avgWt = useSets.reduce((a, s) => a + s.weight, 0) / useSets.length;
-      const avgReps = useSets.reduce((a, s) => a + s.reps, 0) / useSets.length;
+      const avgWt = useSets.reduce((a, s) => a + Number(s.weight || 0), 0) / useSets.length;
+      const avgReps = useSets.reduce((a, s) => a + Number(s.reps || 0), 0) / useSets.length;
+      const setReps = useSets.map(s => Number.parseInt(s.reps, 10)).filter(Number.isFinite);
       const lastWk = last.weekNumber || 0;
       const lastRir = last.rir || "";
+      const actualRir = ex.calibration ? null : (last.actualRir ?? null);
       // Cache in localStorage so future loads are instant
       try {
         const stored = JSON.parse(localStorage.getItem(perfKey) || '{}');
-        stored[ex.name] = { avgWt, avgReps, weekNumber: lastWk, rir: lastRir };
+        stored[ex.name] = { avgWt, avgReps, setReps, weekNumber: lastWk, rir: lastRir, avgRir: actualRir };
         localStorage.setItem(perfKey, JSON.stringify(stored));
       } catch(e) {}
-      setDbResult(computeAdjustment(avgWt, avgReps, lastWk, lastRir, null));
+      setDbResult(computeAdjustment(avgWt, avgReps, lastWk, lastRir, actualRir, { avgWt, avgReps, setReps, weekNumber: lastWk, rir: lastRir, avgRir: actualRir }));
     }).catch(() => {});
   }, [ex.name, week]);
 
