@@ -1510,6 +1510,61 @@ const MESO5_WEEKS = [
  {rir:"4–5+ RIR",note:"DELOAD · 2 sets per exercise · use about 50% of the recent working load; no grinding",smith:0,cable:0,iso:0,deload:true},
 ];
 
+// MESO 6 — Nov 30, 2026–Jan 10, 2027. Five accumulation weeks + deload.
+// Starts after the Nov 22–28 travel week. Chest/back remain the priority.
+// Squats begin at 2 sets per lower day; no leg extensions. Progress squat volume
+// only after repeatable, symptom-stable sessions. Upright rows retained at 2 sets
+// per lower day to preserve the familiar shoulder/trap accessory without the old 3-set dose.
+const MESO6_ROUTINES = {
+  "Upper A": { day:"D1", sections:[
+    {name:"Chest",exercises:[{name:"Smith Flat Bench Press",muscles:"Chest",sets:5,reps:"8-12",targetReps:10,rest:150,wt:120,note:"Controlled reps; stop with at least 1–2 RIR",vid:"https://www.muscleandstrength.com/exercises/smith-machine-bench-press.html",src:"M&S"}]},
+    {name:"Back",exercises:[{name:"Cable Lat Pulldown (Close)",muscles:"Lats",sets:5,reps:"8-12",targetReps:10,rest:150,wt:190,vid:"https://www.muscleandstrength.com/exercises/close-grip-pull-down.html",src:"M&S"}]},
+    {name:"Shoulders",exercises:[
+      {name:"DB Lateral Raise",muscles:"Side Delts",sets:3,reps:"12-20",targetReps:15,rest:60,wt:15,vid:"https://www.youtube.com/watch?v=4hTUCDUQaNA",src:"YouTube"},
+      {name:"Cable Face Pull (Rope)",muscles:"Rear Delts · Upper Back",sets:3,reps:"12-20",targetReps:15,rest:60,wt:75,vid:"https://www.muscleandstrength.com/exercises/cable-face-pull",src:"M&S"}]},
+    {name:"Arms",exercises:[
+      {name:"Cable EZ Bar Curl",muscles:"Biceps",sets:3,reps:"10-15",targetReps:12,rest:90,wt:52.5,vid:"https://www.muscleandstrength.com/exercises/cable-curl.html",src:"M&S"},
+      {name:"Cable OH Tricep Extension",muscles:"Triceps",sets:3,reps:"10-15",targetReps:12,rest:90,wt:45,vid:"https://www.muscleandstrength.com/exercises/standing-low-pulley-overhead-tricep-extension-(rope-extension).html",src:"M&S"}]}
+  ]},
+  "Lower A": { day:"D2", sections:[
+    {name:"Quads",exercises:[{name:"Smith Front Squat",muscles:"Quads · Glutes",sets:2,reps:"8-10",targetReps:8,rest:150,wt:110,rirCap:3,noAutoLoadIncrease:true,note:"Optional and symptom-limited. Use a comfortable range; stop if pain increases during the set or afterward. No forced depth.",vid:"https://www.muscleandstrength.com/exercises/smith-machine-front-squat.html",src:"M&S"}]},
+    {name:"Hamstrings",exercises:[{name:"Smith Stiff-Leg Deadlift",muscles:"Hamstrings · Glutes",sets:3,reps:"8-12",targetReps:10,rest:150,wt:145,vid:"https://www.muscleandstrength.com/exercises/smith-machine-stiff-leg-deadlift.html",src:"M&S"}]},
+    {name:"Calves",exercises:[{name:"Smith Deficit Calf Raise",muscles:"Calves",sets:4,reps:"10-20",targetReps:15,rest:60,wt:140,vid:"https://www.muscleandstrength.com/exercises/smith-machine-calf-raise.html",src:"M&S"}]},
+    {name:"Core + Delts",exercises:[
+      {name:"Cable Crunch (Kneeling)",muscles:"Abs",sets:2,reps:"10-20",targetReps:15,rest:60,wt:80,vid:"https://www.muscleandstrength.com/exercises/cable-crunch.html",src:"M&S"},
+      {name:"Cable Upright Row",muscles:"Side Delts · Traps",sets:2,reps:"12-20",targetReps:15,rest:60,wt:50,note:"Use a comfortable grip and range; stop below shoulder height",vid:"https://www.muscleandstrength.com/exercises/cable-upright-row.html",src:"M&S"}]}
+  ]},
+  "Upper B": { day:"D3", sections:[
+    {name:"Chest",exercises:[{name:"Smith Incline Press",muscles:"Upper Chest",sets:5,reps:"8-12",targetReps:10,rest:150,wt:100,note:"Controlled reps; stop with at least 1–2 RIR",vid:"https://www.muscleandstrength.com/exercises/incline-smith-machine-bench-press.html",src:"M&S"}]},
+    {name:"Back",exercises:[{name:"Seated Cable Row (Neutral)",muscles:"Upper Back · Lats",sets:5,reps:"8-12",targetReps:10,rest:150,wt:180,vid:"https://www.muscleandstrength.com/exercises/seated-row.html",src:"M&S"}]},
+    {name:"Shoulders",exercises:[
+      {name:"Cable Cross-Body Lateral",muscles:"Side Delts",sets:3,reps:"12-20",targetReps:15,rest:60,wt:10,vid:"https://www.muscleandstrength.com/exercises/one-arm-cable-lateral-raise.html",src:"M&S"},
+      {name:"Cable Rear Delt Fly",muscles:"Rear Delts",sets:3,reps:"12-20",targetReps:15,rest:60,wt:5,note:"Build clean reps before increasing the stack",vid:"https://www.muscleandstrength.com/exercises/standing-cable-flys.html",src:"M&S"}]},
+    {name:"Arms",exercises:[
+      {name:"Cable Bayesian Curl",muscles:"Biceps",sets:3,reps:"10-15",targetReps:12,rest:90,wt:27.5,vid:"https://barbend.com/bayesian-curl/",src:"BarBend"},
+      {name:"Cable Pushdown (Bar)",muscles:"Triceps",sets:3,reps:"10-15",targetReps:12,rest:90,wt:75,vid:"https://www.muscleandstrength.com/exercises/tricep-extension.html",src:"M&S"}]}
+  ]},
+  "Lower B": { day:"D4", sections:[
+    {name:"Quads",exercises:[{name:"Smith Back Squat",muscles:"Quads · Glutes",sets:2,reps:"8-10",targetReps:8,rest:150,wt:120,rirCap:3,noAutoLoadIncrease:true,note:"Optional and symptom-limited. Use a comfortable range; stop if pain increases during the set or afterward. No forced depth.",vid:"https://www.muscleandstrength.com/exercises/smith-machine-squat.html",src:"M&S"}]},
+    {name:"Calves",exercises:[{name:"Smith Deficit Calf Raise",muscles:"Calves",sets:4,reps:"10-20",targetReps:15,rest:60,wt:140,vid:"https://www.muscleandstrength.com/exercises/smith-machine-calf-raise.html",src:"M&S"}]},
+    {name:"Hamstrings + Glutes",exercises:[
+      {name:"Barbell RDL",muscles:"Hamstrings · Glutes",sets:3,reps:"8-12",targetReps:10,rest:150,wt:130,vid:"https://www.youtube.com/watch?v=_oyxCn2iSjU",src:"YouTube"},
+      {name:"Smith Hip Thrust",muscles:"Glutes",sets:3,reps:"8-12",targetReps:10,rest:120,wt:140,vid:"https://www.muscleandstrength.com/exercises/barbell-hip-thrust.html",src:"M&S"}]},
+    {name:"Core + Delts",exercises:[
+      {name:"Hanging Straight-Leg Raise",muscles:"Abs",sets:2,reps:"8-15",targetReps:10,rest:60,wt:null,bodyweight:true,vid:"https://www.muscleandstrength.com/exercises/hanging-leg-raise.html",src:"M&S"},
+      {name:"Cable Upright Row",muscles:"Side Delts · Traps",sets:2,reps:"12-20",targetReps:15,rest:60,wt:50,note:"Use a comfortable grip and range; stop below shoulder height",vid:"https://www.muscleandstrength.com/exercises/cable-upright-row.html",src:"M&S"}]}
+  ]}
+};
+
+const MESO6_WEEKS = [
+  {rir:"3–4 RIR",note:"W1 · Establish repeatable loads and knee tolerance",smith:0,cable:0,iso:0,deload:false},
+  {rir:"3 RIR",note:"W2 · Add reps first; load only when performance supports it",smith:2.5,cable:2.5,iso:0,deload:false},
+  {rir:"2–3 RIR",note:"W3 · Progress stable lifts; keep knee-sensitive work conservative",smith:5,cable:2.5,iso:2.5,deload:false},
+  {rir:"2 RIR",note:"W4 · Continue only productive progressions; no forced failure",smith:5,cable:5,iso:2.5,deload:false},
+  {rir:"1–2 RIR",note:"W5 · Peak productive effort; selected isolation final sets may approach 0–1 RIR",smith:7.5,cable:5,iso:5,deload:false},
+  {rir:"4–5+ RIR",note:"DELOAD · 2 sets per exercise · reduce load and fatigue; no grinding",smith:0,cable:0,iso:0,deload:true}
+];
+
 // Deload only has 1 "week" — no progression
 const DELOAD_WEEKS = [
   { rir: "4+ RIR", note: "DELOAD · 2 sets · 50% weight · learn Meso 1 moves · prep for Apr 13", smith: 0, cable: 0, iso: 0, deload: true },
@@ -1569,6 +1624,11 @@ const MESOCYCLES = [
     id: "rp-meso-5", name: "RP Meso 5", shortName: "Meso 5",
     startDate: "2026-10-12", endDate: "2026-11-22", weeks: MESO5_WEEKS,
     routines: MESO5_ROUTINES, note: "Five accumulation weeks plus deload · Oct 12–Nov 22, 2026",
+  },
+  {
+    id: "rp-meso-6", name: "RP Meso 6", shortName: "Meso 6",
+    startDate: "2026-11-30", endDate: "2027-01-10", weeks: MESO6_WEEKS,
+    routines: MESO6_ROUTINES, note: "Five accumulation weeks plus deload · starts after Thanksgiving travel · cardio 25–30 min twice weekly",
   },
 ];
 
