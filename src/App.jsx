@@ -642,7 +642,10 @@ const db = {
           let rir = null;
           if (set.notes) {
             set.notes.split('|').forEach(part => {
-              if (part.startsWith('rir:')) rir = Number.parseInt(part.slice(4), 10);
+              if (part.startsWith('rir:')) {
+                const parsedRir = Number.parseInt(part.slice(4), 10);
+                rir = Number.isFinite(parsedRir) && parsedRir >= 0 && parsedRir <= 4 ? parsedRir : null;
+              }
             });
           }
           return { ...set, rir };
