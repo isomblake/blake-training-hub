@@ -1526,11 +1526,11 @@ const MESO5_WEEKS = [
 // per lower day to preserve the familiar shoulder/trap accessory without the old 3-set dose.
 const MESO6_ROUTINES = {
   "Upper A": { day:"D1", sections:[
-    {name:"Chest",exercises:[{name:"Smith Flat Bench Press",muscles:"Chest",sets:6,reps:"8-12",targetReps:10,rest:150,wt:120,note:"Controlled reps; stop with at least 1–2 RIR",vid:"https://www.muscleandstrength.com/exercises/smith-machine-bench-press.html",src:"M&S"}]},
-    {name:"Back",exercises:[{name:"Cable Lat Pulldown (Close)",muscles:"Lats",sets:6,reps:"8-12",targetReps:10,rest:150,wt:190,vid:"https://www.muscleandstrength.com/exercises/close-grip-pull-down.html",src:"M&S"}]},
+    {name:"Chest",exercises:[{name:"Smith Flat Bench Press",muscles:"Chest",sets:5,reps:"8-12",targetReps:10,rest:150,wt:120,note:"Controlled reps; stop with at least 1–2 RIR",vid:"https://www.muscleandstrength.com/exercises/smith-machine-bench-press.html",src:"M&S"}]},
+    {name:"Back",exercises:[{name:"Cable Lat Pulldown (Close)",muscles:"Lats",sets:5,reps:"8-12",targetReps:10,rest:150,wt:190,vid:"https://www.muscleandstrength.com/exercises/close-grip-pull-down.html",src:"M&S"}]},
     {name:"Shoulders",exercises:[
-      {name:"DB Lateral Raise",muscles:"Side Delts",sets:5,reps:"12-20",targetReps:15,rest:60,wt:15,vid:"https://www.youtube.com/watch?v=4hTUCDUQaNA",src:"YouTube"},
-      {name:"Cable Face Pull (Rope)",muscles:"Rear Delts · Upper Back",sets:4,reps:"12-20",targetReps:15,rest:60,wt:75,vid:"https://www.muscleandstrength.com/exercises/cable-face-pull",src:"M&S"}]},
+      {name:"DB Lateral Raise",muscles:"Side Delts",sets:4,reps:"12-20",targetReps:15,rest:60,wt:15,vid:"https://www.youtube.com/watch?v=4hTUCDUQaNA",src:"YouTube"},
+      {name:"Cable Fly (Low-to-High)",muscles:"Chest",sets:2,reps:"12-20",targetReps:15,rest:90,wt:15,note:"Controlled stretch and squeeze; stop short of shoulder discomfort",vid:"https://www.muscleandstrength.com/exercises/cable-lower-chest-raise.html",src:"M&S"}]},
     {name:"Arms",exercises:[
       {name:"Cable EZ Bar Curl",muscles:"Biceps",sets:4,reps:"10-15",targetReps:12,rest:90,wt:52.5,vid:"https://www.muscleandstrength.com/exercises/cable-curl.html",src:"M&S"},
       {name:"Cable OH Tricep Extension",muscles:"Triceps",sets:4,reps:"10-15",targetReps:12,rest:90,wt:45,vid:"https://www.muscleandstrength.com/exercises/standing-low-pulley-overhead-tricep-extension-(rope-extension).html",src:"M&S"}]}
@@ -1544,10 +1544,10 @@ const MESO6_ROUTINES = {
       {name:"Cable Upright Row",muscles:"Side Delts · Traps",sets:2,reps:"12-20",targetReps:15,rest:60,wt:50,note:"Use a comfortable grip and range; stop below shoulder height",vid:"https://www.muscleandstrength.com/exercises/cable-upright-row.html",src:"M&S"}]}
   ]},
   "Upper B": { day:"D3", sections:[
-    {name:"Chest",exercises:[{name:"Smith Incline Press",muscles:"Upper Chest",sets:6,reps:"8-12",targetReps:10,rest:150,wt:100,note:"Controlled reps; stop with at least 1–2 RIR",vid:"https://www.muscleandstrength.com/exercises/incline-smith-machine-bench-press.html",src:"M&S"}]},
-    {name:"Back",exercises:[{name:"Seated Cable Row (Neutral)",muscles:"Upper Back · Lats",sets:6,reps:"8-12",targetReps:10,rest:150,wt:180,vid:"https://www.muscleandstrength.com/exercises/seated-row.html",src:"M&S"}]},
+    {name:"Chest",exercises:[{name:"Smith Incline Press",muscles:"Upper Chest",sets:5,reps:"8-12",targetReps:10,rest:150,wt:100,note:"Controlled reps; stop with at least 1–2 RIR",vid:"https://www.muscleandstrength.com/exercises/incline-smith-machine-bench-press.html",src:"M&S"}]},
+    {name:"Back",exercises:[{name:"Seated Cable Row (Neutral)",muscles:"Upper Back · Lats",sets:5,reps:"8-12",targetReps:10,rest:150,wt:180,vid:"https://www.muscleandstrength.com/exercises/seated-row.html",src:"M&S"}]},
     {name:"Shoulders",exercises:[
-      {name:"Cable Cross-Body Lateral",muscles:"Side Delts",sets:5,reps:"12-20",targetReps:15,rest:60,wt:10,vid:"https://www.muscleandstrength.com/exercises/one-arm-cable-lateral-raise.html",src:"M&S"},
+      {name:"Cable Cross-Body Lateral",muscles:"Side Delts",sets:4,reps:"12-20",targetReps:15,rest:60,wt:10,vid:"https://www.muscleandstrength.com/exercises/one-arm-cable-lateral-raise.html",src:"M&S"},
       {name:"Cable Rear Delt Fly",muscles:"Rear Delts",sets:4,reps:"12-20",targetReps:15,rest:60,wt:5,note:"Build clean reps before increasing the stack",vid:"https://www.muscleandstrength.com/exercises/standing-cable-flys.html",src:"M&S"}]},
     {name:"Arms",exercises:[
       {name:"Cable Bayesian Curl",muscles:"Biceps",sets:4,reps:"10-15",targetReps:12,rest:90,wt:27.5,vid:"https://barbend.com/bayesian-curl/",src:"BarBend"},
