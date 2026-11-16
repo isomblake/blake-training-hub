@@ -1522,8 +1522,8 @@ const MESO5_WEEKS = [
 // MESO 6 — Nov 30, 2026–Jan 10, 2027. Five accumulation weeks + deload.
 // Starts after the Nov 22–28 travel week. Chest/back remain the priority.
 // Squats begin at 2 sets per lower day; no leg extensions. Progress squat volume
-// only after repeatable, symptom-stable sessions. Upright rows retained at 2 sets
-// per lower day to preserve the familiar shoulder/trap accessory without the old 3-set dose.
+// only after repeatable, symptom-stable sessions. Upright rows and direct abs work
+// are restored to 3 sets per lower day for the planned Meso 6 accessory volume.
 const MESO6_ROUTINES = {
   "Upper A": { day:"D1", sections:[
     {name:"Chest",exercises:[{name:"Smith Flat Bench Press",muscles:"Chest",sets:5,reps:"8-12",targetReps:10,rest:150,wt:120,note:"Controlled reps; stop with at least 1–2 RIR",vid:"https://www.muscleandstrength.com/exercises/smith-machine-bench-press.html",src:"M&S"}]},
@@ -1540,8 +1540,8 @@ const MESO6_ROUTINES = {
     {name:"Hamstrings",exercises:[{name:"Smith Stiff-Leg Deadlift",muscles:"Hamstrings · Glutes",sets:3,reps:"8-12",targetReps:10,rest:150,wt:145,vid:"https://www.muscleandstrength.com/exercises/smith-machine-stiff-leg-deadlift.html",src:"M&S"}]},
     {name:"Calves",exercises:[{name:"Smith Deficit Calf Raise",muscles:"Calves",sets:4,reps:"10-20",targetReps:15,rest:60,wt:140,vid:"https://www.muscleandstrength.com/exercises/smith-machine-calf-raise.html",src:"M&S"}]},
     {name:"Core + Delts",exercises:[
-      {name:"Cable Crunch (Kneeling)",muscles:"Abs",sets:2,reps:"10-20",targetReps:15,rest:60,wt:80,vid:"https://www.muscleandstrength.com/exercises/cable-crunch.html",src:"M&S"},
-      {name:"Cable Upright Row",muscles:"Side Delts · Traps",sets:2,reps:"12-20",targetReps:15,rest:60,wt:50,note:"Use a comfortable grip and range; stop below shoulder height",vid:"https://www.muscleandstrength.com/exercises/cable-upright-row.html",src:"M&S"}]}
+      {name:"Cable Crunch (Kneeling)",muscles:"Abs",sets:3,reps:"10-20",targetReps:15,rest:60,wt:80,vid:"https://www.muscleandstrength.com/exercises/cable-crunch.html",src:"M&S"},
+      {name:"Cable Upright Row",muscles:"Side Delts · Traps",sets:3,reps:"12-20",targetReps:15,rest:60,wt:50,note:"Use a comfortable grip and range; stop below shoulder height",vid:"https://www.muscleandstrength.com/exercises/cable-upright-row.html",src:"M&S"}]}
   ]},
   "Upper B": { day:"D3", sections:[
     {name:"Chest",exercises:[{name:"Smith Incline Press",muscles:"Upper Chest",sets:5,reps:"8-12",targetReps:10,rest:150,wt:100,note:"Controlled reps; stop with at least 1–2 RIR",vid:"https://www.muscleandstrength.com/exercises/incline-smith-machine-bench-press.html",src:"M&S"}]},
@@ -1560,8 +1560,8 @@ const MESO6_ROUTINES = {
       {name:"Barbell RDL",muscles:"Hamstrings · Glutes",sets:3,reps:"8-12",targetReps:10,rest:150,wt:130,vid:"https://www.youtube.com/watch?v=_oyxCn2iSjU",src:"YouTube"},
       {name:"Smith Hip Thrust",muscles:"Glutes",sets:3,reps:"8-12",targetReps:10,rest:120,wt:140,vid:"https://www.muscleandstrength.com/exercises/barbell-hip-thrust.html",src:"M&S"}]},
     {name:"Core + Delts",exercises:[
-      {name:"Hanging Straight-Leg Raise",muscles:"Abs",sets:2,reps:"8-15",targetReps:10,rest:60,wt:null,bodyweight:true,vid:"https://www.muscleandstrength.com/exercises/hanging-leg-raise.html",src:"M&S"},
-      {name:"Cable Upright Row",muscles:"Side Delts · Traps",sets:2,reps:"12-20",targetReps:15,rest:60,wt:50,note:"Use a comfortable grip and range; stop below shoulder height",vid:"https://www.muscleandstrength.com/exercises/cable-upright-row.html",src:"M&S"}]}
+      {name:"Hanging Straight-Leg Raise",muscles:"Abs",sets:3,reps:"8-15",targetReps:10,rest:60,wt:null,bodyweight:true,vid:"https://www.muscleandstrength.com/exercises/hanging-leg-raise.html",src:"M&S"},
+      {name:"Cable Upright Row",muscles:"Side Delts · Traps",sets:3,reps:"12-20",targetReps:15,rest:60,wt:50,note:"Use a comfortable grip and range; stop below shoulder height",vid:"https://www.muscleandstrength.com/exercises/cable-upright-row.html",src:"M&S"}]}
   ]}
 };
 
