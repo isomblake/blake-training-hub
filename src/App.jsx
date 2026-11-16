@@ -1519,11 +1519,11 @@ const MESO5_WEEKS = [
  {rir:"4–5+ RIR",note:"DELOAD · 2 sets per exercise · use about 50% of the recent working load; no grinding",smith:0,cable:0,iso:0,deload:true},
 ];
 
-// MESO 6 — Nov 30, 2026–Jan 10, 2027. Five accumulation weeks + deload.
-// Starts after the Nov 22–28 travel week. Chest/back remain the priority.
-// Squats begin at 2 sets per lower day; no leg extensions. Progress squat volume
-// only after repeatable, symptom-stable sessions. Upright rows and direct abs work
-// are restored to 3 sets per lower day for the planned Meso 6 accessory volume.
+// MESO 6 — Nov 23–Dec 27, 2026. Four accumulation weeks + full rest week.
+// Thanksgiving week is a normal training week; Dec 21–27 is complete rest for travel.
+// Chest/back remain the priority. Squats begin at 2 sets per lower day; no leg extensions.
+// Progress squat volume only after repeatable, symptom-stable sessions. Upright rows
+// and direct abs work remain at 3 sets per lower day.
 const MESO6_ROUTINES = {
   "Upper A": { day:"D1", sections:[
     {name:"Chest",exercises:[{name:"Smith Flat Bench Press",muscles:"Chest",sets:5,reps:"8-12",targetReps:10,rest:150,wt:120,note:"Controlled reps; stop with at least 1–2 RIR",vid:"https://www.muscleandstrength.com/exercises/smith-machine-bench-press.html",src:"M&S"}]},
@@ -1569,9 +1569,7 @@ const MESO6_WEEKS = [
   {rir:"3–4 RIR",note:"W1 · Establish repeatable loads and knee tolerance",smith:0,cable:0,iso:0,deload:false},
   {rir:"3 RIR",note:"W2 · Add reps first; load only when performance supports it",smith:2.5,cable:2.5,iso:0,deload:false},
   {rir:"2–3 RIR",note:"W3 · Progress stable lifts; keep knee-sensitive work conservative",smith:5,cable:2.5,iso:2.5,deload:false},
-  {rir:"2 RIR",note:"W4 · Continue only productive progressions; no forced failure",smith:5,cable:5,iso:2.5,deload:false},
-  {rir:"1–2 RIR",note:"W5 · Peak productive effort; selected isolation final sets may approach 0–1 RIR",smith:7.5,cable:5,iso:5,deload:false},
-  {rir:"4–5+ RIR",note:"DELOAD · 2 sets per exercise · reduce load and fatigue; no grinding",smith:0,cable:0,iso:0,deload:true}
+  {rir:"1–2 RIR",note:"W4 · Final accumulation week; productive effort, no forced failure or 0–1 RIR work",smith:5,cable:5,iso:2.5,deload:false}
 ];
 
 // Deload only has 1 "week" — no progression
@@ -1636,8 +1634,8 @@ const MESOCYCLES = [
   },
   {
     id: "rp-meso-6", name: "RP Meso 6", shortName: "Meso 6",
-    startDate: "2026-11-30", endDate: "2027-01-10", weeks: MESO6_WEEKS,
-    routines: MESO6_ROUTINES, note: "Five accumulation weeks plus deload · starts after Thanksgiving travel · cardio 25–30 min twice weekly",
+    startDate: "2026-11-23", endDate: "2026-12-27", weeks: MESO6_WEEKS,
+    routines: MESO6_ROUTINES, note: "Four accumulation weeks · Nov 23–Dec 20 · complete rest Dec 21–27 for Pittsburgh travel · cardio 25–30 min twice weekly",
   },
 ];
 
