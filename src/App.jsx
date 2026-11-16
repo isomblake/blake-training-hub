@@ -2394,7 +2394,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
               .filter(([n]) => Number(n) < setNum)
               .sort((a, b) => Number(a[0]) - Number(b[0]))
               .at(-1)?.[1] || null;
-            return <SetRow key={i} setNum={setNum} isLastSet={setNum === totalSets} targetReps={smartTargetReps ? String(smartTargetReps) : (mesoPrefix === "Meso 5" ? String(getMeso5TargetReps(ex)) : ex.reps.split("-").at(-1))} targetWt={targetWt} lastWeight={priorSet?.wt ?? null} lastReps={priorSet?.reps ?? null} isBW={!!ex.bodyweight} bands={ex.bands} logged={logged[setNum]} onLog={logSet} onDelete={deleteSet} onRir={handleRir} />;
+            return <SetRow key={i} setNum={setNum} isLastSet={setNum === totalSets} targetReps={smartTargetReps ? String(smartTargetReps) : (mesoPrefix === "Meso 5" ? String(getMeso5TargetReps(ex)) : (mesoPrefix === "Meso 6" && ex.targetReps != null ? String(ex.targetReps) : ex.reps.split("-").at(-1)))} targetWt={targetWt} lastWeight={priorSet?.wt ?? null} lastReps={priorSet?.reps ?? null} isBW={!!ex.bodyweight} bands={ex.bands} logged={logged[setNum]} onLog={logSet} onDelete={deleteSet} onRir={handleRir} />;
           })}
         </div>
       )}
