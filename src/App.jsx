@@ -2392,7 +2392,7 @@ function ExerciseCard({ ex, week, weeksConfig, sessionKey, allSets, setAllSets, 
               .filter(([n]) => Number(n) < setNum)
               .sort((a, b) => Number(a[0]) - Number(b[0]))
               .at(-1)?.[1] || null;
-            return <SetRow key={i} setNum={setNum} isLastSet={setNum === totalSets} targetReps={smartTargetReps ? String(smartTargetReps) : (mesoPrefix === "Meso 5" ? String(getMeso5TargetReps(ex)) : (mesoPrefix === "Meso 6" && ex.targetReps != null ? String(ex.targetReps) : ex.reps.split("-").at(-1)))} targetWt={targetWt} lastWeight={priorSet?.wt ?? null} lastReps={priorSet?.reps ?? null} isBW={!!ex.bodyweight} bands={ex.bands} logged={logged[setNum]} onLog={logSet} onDelete={deleteSet} onRir={handleRir} />;
+            return <SetRow key={i} setNum={setNum} isLastSet={setNum === totalSets} targetReps={smartTargetReps != null ? String(smartTargetReps) : (mesoPrefix === "Meso 5" ? String(getMeso5TargetReps(ex)) : (mesoPrefix === "Meso 6" && ex.targetReps != null ? String(ex.targetReps) : ex.reps.split("-").at(-1)))} targetWt={targetWt} lastWeight={priorSet?.wt ?? null} lastReps={priorSet?.reps ?? null} isBW={!!ex.bodyweight} bands={ex.bands} logged={logged[setNum]} onLog={logSet} onDelete={deleteSet} onRir={handleRir} />;
           })}
         </div>
       )}
@@ -4983,7 +4983,7 @@ export default function App() {
       const recommendation = getSmartRecommendation(currentEx, minStep, baseTarget);
       const lastLogged = logged[timer.setNum];
       const targetWt = lastLogged ? lastLogged.wt : recommendation.weight;
-      const targetReps = lastLogged ? String(lastLogged.reps) : String(recommendation.targetReps || (activeMeso.shortName === "Meso 5" ? getMeso5TargetReps(currentEx) : currentEx.reps.split("-").at(-1)));
+      const targetReps = lastLogged ? String(lastLogged.reps) : String(recommendation.targetReps != null ? recommendation.targetReps : (activeMeso.shortName === "Meso 5" ? getMeso5TargetReps(currentEx) : (activeMeso.shortName === "Meso 6" && currentEx.targetReps != null ? currentEx.targetReps : currentEx.reps.split("-").at(-1))));
       return { exName: currentEx.name, muscles: currentEx.muscles, nextSetNum, totalSets: currentTotalSets, targetReps, targetWt, isBW: !currentEx.wt && currentEx.wt !== 0, restSeconds: currentEx.rest, isLastExInSession: false };
     }
 
@@ -4998,7 +4998,7 @@ export default function App() {
     const baseTarget = wkData.deload ? getDeloadWt(nextEx) : (nextEx.wt != null ? Math.round((nextEx.wt + weeklyAdd) / minStep) * minStep : null);
     const recommendation = getSmartRecommendation(nextEx, minStep, baseTarget);
     const targetWt = recommendation.weight;
-    const targetReps = String(recommendation.targetReps || (activeMeso.shortName === "Meso 5" ? getMeso5TargetReps(nextEx) : nextEx.reps.split("-").at(-1)));
+    const targetReps = String(recommendation.targetReps != null ? recommendation.targetReps : (activeMeso.shortName === "Meso 5" ? getMeso5TargetReps(nextEx) : (activeMeso.shortName === "Meso 6" && nextEx.targetReps != null ? nextEx.targetReps : nextEx.reps.split("-").at(-1))));
     const nextAddedSets = (!wkData.deload && nextEx.addSets)
       ? Object.entries(nextEx.addSets).reduce((sum, [w, n]) => sum + (parseInt(w, 10) <= week + 1 ? n : 0), 0)
       : 0;
